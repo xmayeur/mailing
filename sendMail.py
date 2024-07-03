@@ -18,12 +18,37 @@ from getpass import getpass
 from glob import glob
 from smtplib import SMTP_SSL, SMTPAuthenticationError, SMTP
 from time import time, sleep
+import gspread
 import yaml
 from bs4 import BeautifulSoup
 from getSecrets import get_secret, get_user_pwd
-
-import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
+
+SHEETID='artscroisesDBmembreID'
+SA='artscroisesServiceAccount'
+
+
+def openGoogleDBMembersSheet(sa=SA, id=SHEETID):
+
+    scope = ['https://www.googleapis.com/auth/spreadsheets',
+             'https://spreadsheets.google.com/feeds',
+             'https://www.googleapis.com/auth/drive']
+
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)
+    gc = gspread.authorize(creds)
+
+    spreadsheet_id = get_secret(id)['ID']
+    wb = gc.open_by_key(spreadsheet_id)
+    return wb
+
+
+def readAllSheet(wb, sheet_name: str=""):
+    if sheet_name == "":
+        ws = wb.sheet1
+    else:
+        ws = wb.get_sheet_by_name(sheet_name)
+    return ws.get_all_values()
 
 
 def init_log():
@@ -275,82 +300,87 @@ def generate_mailing(param):
     nrow = 1
 
     start = time()
+    reader = iter([])
+    if db is None:
+        wb = openGoogleDBMembersSheet()
+        reader = iter(readAllSheet(wb))
+    else:
+        # Read the subscriber's db
+        try:
+            with open(db, "r", newline="") as csvfile:
+                reader = csv.reader(csvfile, delimiter=",", quotechar='"')
+        except FileNotFoundError:
+            log.critical(f"No such file or directory: '{db}'")
+            sys.exit(-1)
 
-    # Read the subscriber's db
-    try:
-        with open(db, "r", newline="") as csvfile:
-            reader = csv.reader(csvfile, delimiter=",", quotechar='"')
+    # Get the header
+    header = next(reader, None)
+    if header[0][:1] == '\ufeff':
+        header[0] = header[0][1:]
+    email_idx = header.index('Email')
+    group_idx = header.index('Groups')
+    selected_idx = header.index('Selected')
+    opt_out = header.index('Email status')
 
-            # Get the header
-            header = next(reader, None)
-            if header[0][:1] == '\ufeff':
-                header[0] = header[0][1:]
-            email_idx = header.index('Email')
-            group_idx = header.index('Groups')
-            selected_idx = header.index('Selected')
-            opt_out = header.index('Email status')
+    # skip records before starting index if required
+    if param.from_index:
+        log.info(f"Starting (re-)sending mails from index {param.from_index}")
+        for nrow in range(2, int(param.from_index)):
+            next(reader, None)
 
-            # skip records before starting index if required
-            if param.from_index:
-                log.info(f"Starting (re-)sending mails from index {param.from_index}")
-                for nrow in range(2, int(param.from_index)):
-                    next(reader, None)
+    # loop all other records
+    for row in reader:
+        nrow += 1
 
-            # loop all other records
-            for row in reader:
-                nrow += 1
+        # skip inactive records and opt-out ones
+        if row[opt_out] != "active":
+            continue
 
-                # skip inactive records and opt-out ones
-                if row[opt_out] != "active":
-                    continue
+        # skip records not belonging to the test group if requested
+        if param.test and "Test" not in row[group_idx]:
+            continue
 
-                # skip records not belonging to the test group if requested
-                if param.test and "Test" not in row[group_idx]:
-                    continue
+        if param.selected and row[selected_idx].lower() != "x":
+            continue
 
-                if param.selected and row[selected_idx].lower() != "x":
-                    continue
+        if param.verbose:
+            print("', ".join(row))
 
-                if param.verbose:
-                    print("', ".join(row))
+        if row[email_idx] == "" or row[email_idx] is None:
+            continue
 
-                if row[email_idx] == "" or row[email_idx] is None:
-                    continue
+        # create a group of 'max_add' addresses and send to all of them in BCC
+        addressees.append(row[email_idx])
+        n_add += 1
+        if n_add % max_add == 0:
+            if param.verbose:
+                print("_" * 80)
+                print(", ".join(addressees))
+                print("_" * 80)
+            log.info(
+                f'Sending {n_add} addressees, up to index {nrow}: {", ".join(addressees)}'
+            )
+            if not param.donotsend:
+                send_mail(
+                    param=param,
+                    subject=param.subject,
+                    message=param.message,
+                    bcc=",".join(addressees),
+                    attachments=param.file,
+                )
 
-                # create a group of 'max_add' addresses and send to all of them in BCC
-                addressees.append(row[email_idx])
-                n_add += 1
-                if n_add % max_add == 0:
-                    if param.verbose:
-                        print("_" * 80)
-                        print(", ".join(addressees))
-                        print("_" * 80)
-                    log.info(
-                        f'Sending {n_add} addressees, up to index {nrow}: {", ".join(addressees)}'
-                    )
-                    if not param.donotsend:
-                        send_mail(
-                            param=param,
-                            subject=param.subject,
-                            message=param.message,
-                            bcc=",".join(addressees),
-                            attachments=param.file,
-                        )
+            addressees = []
+            n_mail += 1
+            sleep(pause)
 
-                    addressees = []
-                    n_mail += 1
-                    sleep(pause)
+        # Control the limit of allowed mails to send as per email provider rules
+        if n_add % max_mail == 0:
+            log.info("Sleeping for 1 hour...")
+            if param.verbose:
+                print("+" * 80)
+            sleep(3600)
 
-                # Control the limit of allowed mails to send as per email provider rules
-                if n_add % max_mail == 0:
-                    log.info("Sleeping for 1 hour...")
-                    if param.verbose:
-                        print("+" * 80)
-                    sleep(3600)
 
-    except FileNotFoundError:
-        log.critical(f"No such file or directory: '{db}'")
-        sys.exit(-1)
 
     # Send the remaining mails
     if len(addressees) != 0:
@@ -479,6 +509,8 @@ def main():
     # Override default database path
     if args.database:
         config["db"] = args.database
+    else:
+        config["db"] = None
 
     # delay sending if required
     if args.wait:
