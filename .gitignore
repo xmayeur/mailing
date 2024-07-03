@@ -1,5 +1,7 @@
 data/
 input/
+test_data/
+*.log
 
 ### Python template
 # Byte-compiled / optimized / DLL files
