@@ -25,11 +25,47 @@ from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
 
 
+def init_log(log_file=None):
+    """
+    Initialize the logging module to the sdterr output and to the log file
+    :param log_file: the log file path
+    :return: a logger object
+    """
+    # if os.path.exists("sendMail.log"):
+    #     os.remove("sendMail.log")
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(logging.DEBUG)
+    stdout_handler.setFormatter(formatter)
+    logger.addHandler(stdout_handler)
+
+    if log_file is not None:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+
+    return logger
+
+
+log = init_log(log_file="sendMail.log")
+
 SHEETID = "artscroisesDBmembreID"
 SA = "artscroisesServiceAccount"
 
 
 def openGoogleDBMembersSheet(sa=SA, id=SHEETID):
+    """
+    Open  a Google Sheet and return it as a spreadsheet object
+    :param sa: Service Account entry name in secret vault
+    :param id: Google Sheet ID entry name in secret vault
+    :return: a workbook spreadsheet object
+    """
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://spreadsheets.google.com/feeds",
@@ -45,6 +81,12 @@ def openGoogleDBMembersSheet(sa=SA, id=SHEETID):
 
 
 def readAllSheet(wb, sheet_name: str = ""):
+    """
+    Read all ranges of a sheet
+    :param wb: workbook object
+    :param sheet_name: sheet name - default=sheet1
+    :return: range of value (array of arrays)
+    """
     if sheet_name == "":
         ws = wb.sheet1
     else:
@@ -52,32 +94,11 @@ def readAllSheet(wb, sheet_name: str = ""):
     return ws.get_all_values()
 
 
-def init_log():
-    if os.path.exists("sendMail.log"):
-        os.remove("sendMail.log")
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setLevel(logging.DEBUG)
-    stdout_handler.setFormatter(formatter)
-
-    file_handler = logging.FileHandler("sendMail.log")
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(stdout_handler)
-
-    return logger
-
-
-log = init_log()
-
-
 class Dict2Class(object):
+    """
+    Convert a dict to a class
+    """
+
     def __init__(self, my_dict):
         for key in my_dict:
             setattr(self, key.lower(), my_dict[key])
@@ -412,12 +433,11 @@ def main():
     abspath = os.path.abspath(__file__)
     os.chdir(os.path.dirname(abspath))
 
-    try:
-        # config = yaml.safe_load(open("config.yml", "r"))
-        config = get_secret("artscroisesmailing")
-    except FileNotFoundError:
-        log.critical(f"Config file 'config.yml' not found vault not available")
-        sys.exit(-1)
+    # open secret config object
+    config = get_secret("artscroisesmailing")
+    if config is None:
+        log.critical(f"No secret configuration found")
+        sys.exit(1)
 
     # Get arguments
     parser = argparse.ArgumentParser()
@@ -470,13 +490,14 @@ def main():
     gd_files = []
     service = None
     folder = "input"
+    # if file paths are passes as argument, get them & test existence
     if args.file:
         for f in args.file:
             if not os.path.isfile(f):
                 log.critical(f"File not found: {f}")
                 sys.exit(-1)
     else:
-        # download files from google drive into in
+        # alternatively, download files from google drive mailing folder
         service = gd.connect_google_driver()
         gd_files = gd.get_files(service, folder_id=config["mailing_folder"])
         if len(gd_files) > 0:
@@ -484,15 +505,36 @@ def main():
             gd.download_file(service, gd_files, "input")
 
         # Attach files to the mail
+        newsletter_name = ""
         files = glob(f"{folder}/*.*")
+        if len(files) == 0:
+            log.critical(f"No files found to attach to the mail - non content!")
+            sys.exit(-1)
+
+        # Derive the message subject
         for f in files:
             fb = os.path.basename(f)
             if fb.split(".")[-1] == "pdf" and not args.subject:
                 fn = fb.split(".")[0]
                 if "letter" in fn.lower() or "lettre" in fn.lower():
                     args.subject = fn
+                    newsletter_name = fb
                     break
         args.file = files
+
+        # define a default message body
+        if not args.message:
+            args.message = f"""
+Chers amies et amis des Arts Croisés,
+
+Veuillez trouvez en pièce jointe notre newsletter {newsletter_name}.
+Bonne lecture!
+
+L'équipe Arts Croisés, asbl
+
+PS: Veuillez utiliser notre adresse info@artscroises.be pour toute correspondance et ne pas répondre à ce mail
+    Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
+            """
 
     if args.test:
         log.info(f"Testing mode - send only to the Test Group subscribers")
@@ -550,8 +592,9 @@ def main():
     config.update(vars(args))
     # convert dict into class - all keys are converted in lower case
     param = Dict2Class(config)
+    # Generate the mailing mail and send it to all 'active' recipients from the database
     ret = generate_mailing(param)
-    if ret == "OK" and not args.test:
+    if ret == "OK":
         for f in gd_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         files = glob(f"{folder}/*.*")
