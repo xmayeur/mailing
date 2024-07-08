@@ -16,29 +16,30 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from getpass import getpass
 from glob import glob
-from smtplib import SMTP_SSL, SMTPAuthenticationError, SMTP
+from smtplib import SMTPAuthenticationError, SMTP
 from time import time, sleep
 import gspread
-import yaml
 from bs4 import BeautifulSoup
 from getSecrets import get_secret, get_user_pwd
 from oauth2client.service_account import ServiceAccountCredentials
-import json
-from googleDrive import
+import googleDriveLib as gd
 
-SHEETID = 'artscroisesDBmembreID'
-SA = 'artscroisesServiceAccount'
+
+SHEETID = "artscroisesDBmembreID"
+SA = "artscroisesServiceAccount"
 
 
 def openGoogleDBMembersSheet(sa=SA, id=SHEETID):
-    scope = ['https://www.googleapis.com/auth/spreadsheets',
-             'https://spreadsheets.google.com/feeds',
-             'https://www.googleapis.com/auth/drive']
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
 
     creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)
     gc = gspread.authorize(creds)
 
-    spreadsheet_id = get_secret(id)['ID']
+    spreadsheet_id = get_secret(id)["ID"]
     wb = gc.open_by_key(spreadsheet_id)
     return wb
 
@@ -52,6 +53,9 @@ def readAllSheet(wb, sheet_name: str = ""):
 
 
 def init_log():
+    if os.path.exists("sendMail.log"):
+        os.remove("sendMail.log")
+
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
@@ -131,7 +135,10 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
         img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
         mimetype = guess_type(img_path)
         if ";base64," not in img_path:
-            img.attrs["src"] = "data:%s;base64,%s" % (mimetype, file_to_base64(img_path))
+            img.attrs["src"] = "data:%s;base64,%s" % (
+                mimetype,
+                file_to_base64(img_path),
+            )
         else:
             # TODO Change by a regex to ensure the string start with data:.*?;base64...
             img.attrs["src"] = img_path[6:]
@@ -143,14 +150,14 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
 
 
 def send_mail(
-        param=None,
-        subject: str = "",
-        to: str = "",
-        cc: str = "",
-        bcc: str = "",
-        message: str = "",
-        images=None,
-        attachments=None,
+    param=None,
+    subject: str = "",
+    to: str = "",
+    cc: str = "",
+    bcc: str = "",
+    message: str = "",
+    images=None,
+    attachments=None,
 ):
     """
 
@@ -292,7 +299,7 @@ def generate_mailing(param):
         pause = param.pause  # config["PAUSE"]
     except AttributeError as e:
         log.critical(f"Missing or invalid configuration key {e}")
-        sys.exit(-1)
+        return "Error"
 
     n_add = 0
     n_mail = 0
@@ -311,16 +318,16 @@ def generate_mailing(param):
             reader = csv.reader(csvfile, delimiter=",", quotechar='"')
         except FileNotFoundError:
             log.critical(f"No such file or directory: '{db}'")
-            sys.exit(-1)
+            return "Error"
 
     # Get the header
     header = next(reader, None)
-    if header[0][:1] == '\ufeff':
+    if header[0][:1] == "\ufeff":
         header[0] = header[0][1:]
-    email_idx = header.index('Email')
-    group_idx = header.index('Groups')
-    selected_idx = header.index('Selected')
-    opt_out = header.index('Email status')
+    email_idx = header.index("Email")
+    group_idx = header.index("Groups")
+    selected_idx = header.index("Selected")
+    opt_out = header.index("Email status")
 
     # skip records before starting index if required
     if param.from_index:
@@ -397,12 +404,20 @@ def generate_mailing(param):
     log.info(
         f"Done. Processed {n_add} addresses in {n_mail + 1} email(s) in {int(elapsed) + 1} seconds"
     )
+    return "OK"
 
 
 def main():
     # Set the right directory
     abspath = os.path.abspath(__file__)
     os.chdir(os.path.dirname(abspath))
+
+    try:
+        # config = yaml.safe_load(open("config.yml", "r"))
+        config = get_secret("artscroisesmailing")
+    except FileNotFoundError:
+        log.critical(f"Config file 'config.yml' not found vault not available")
+        sys.exit(-1)
 
     # Get arguments
     parser = argparse.ArgumentParser()
@@ -452,21 +467,29 @@ def main():
         print(args.file)
 
     # test if attachment files exist
+    gd_files = []
+    service = None
+    folder = "input"
     if args.file:
         for f in args.file:
             if not os.path.isfile(f):
                 log.critical(f"File not found: {f}")
                 sys.exit(-1)
     else:
-        # download files from google drive
+        # download files from google drive into in
+        service = gd.connect_google_driver()
+        gd_files = gd.get_files(service, folder_id=config["mailing_folder"])
+        if len(gd_files) > 0:
+            gd_files = gd_files["files"]
+            gd.download_file(service, gd_files, "input")
 
-
-        files = glob('input/*.*')
+        # Attach files to the mail
+        files = glob(f"{folder}/*.*")
         for f in files:
             fb = os.path.basename(f)
             if fb.split(".")[-1] == "pdf" and not args.subject:
                 fn = fb.split(".")[0]
-                if 'letter' in fn.lower() or 'lettre' in fn.lower():
+                if "letter" in fn.lower() or "lettre" in fn.lower():
                     args.subject = fn
                     break
         args.file = files
@@ -476,13 +499,6 @@ def main():
 
     if args.doNotSend:
         log.info(f"No sending mode")
-
-    try:
-        # config = yaml.safe_load(open("config.yml", "r"))
-        config = get_secret('artscroisesmailing')
-    except FileNotFoundError:
-        log.critical(f"Config file 'config.yml' not found vault not available")
-        sys.exit(-1)
 
     # # Get configuration yaml - here an example
     #
@@ -534,7 +550,13 @@ def main():
     config.update(vars(args))
     # convert dict into class - all keys are converted in lower case
     param = Dict2Class(config)
-    generate_mailing(param)
+    ret = generate_mailing(param)
+    if ret == "OK" and not args.test:
+        for f in gd_files:
+            gd.rename_file(service, f["id"], f"published_{f['name']}")
+        files = glob(f"{folder}/*.*")
+        for f in files:
+            os.remove(f)
 
 
 if __name__ == "__main__":
