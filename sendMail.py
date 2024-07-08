@@ -307,8 +307,8 @@ def generate_mailing(param):
     else:
         # Read the subscriber's db
         try:
-            with open(db, "r", newline="") as csvfile:
-                reader = csv.reader(csvfile, delimiter=",", quotechar='"')
+            csvfile = open(db, "r", newline="")
+            reader = csv.reader(csvfile, delimiter=",", quotechar='"')
         except FileNotFoundError:
             log.critical(f"No such file or directory: '{db}'")
             sys.exit(-1)
@@ -408,7 +408,7 @@ def main():
 
     # Get arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("-s", "--subject", help="Subject of the mail", required=True)
+    parser.add_argument("-s", "--subject", help="Subject of the mail", required=False)
     parser.add_argument("-m", "--message", help="Text message of the mail", default="")
     parser.add_argument(
         "file",
@@ -459,6 +459,16 @@ def main():
             if not os.path.isfile(f):
                 log.critical(f"File not found: {f}")
                 sys.exit(-1)
+    else:
+        files = glob('input/*.*')
+        for f in files:
+            fb = os.path.basename(f)
+            if fb.split(".")[-1] == "pdf" and not args.subject:
+                fn = fb.split(".")[0]
+                if 'letter' in fn.lower() or 'lettre' in fn.lower():
+                    args.subject = fn
+                    break
+        args.file = files
 
     if args.test:
         log.info(f"Testing mode - send only to the Test Group subscribers")
