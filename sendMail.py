@@ -24,13 +24,13 @@ from bs4 import BeautifulSoup
 from getSecrets import get_secret, get_user_pwd
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+from googleDrive import
 
-SHEETID='artscroisesDBmembreID'
-SA='artscroisesServiceAccount'
+SHEETID = 'artscroisesDBmembreID'
+SA = 'artscroisesServiceAccount'
 
 
 def openGoogleDBMembersSheet(sa=SA, id=SHEETID):
-
     scope = ['https://www.googleapis.com/auth/spreadsheets',
              'https://spreadsheets.google.com/feeds',
              'https://www.googleapis.com/auth/drive']
@@ -43,7 +43,7 @@ def openGoogleDBMembersSheet(sa=SA, id=SHEETID):
     return wb
 
 
-def readAllSheet(wb, sheet_name: str=""):
+def readAllSheet(wb, sheet_name: str = ""):
     if sheet_name == "":
         ws = wb.sheet1
     else:
@@ -143,14 +143,14 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
 
 
 def send_mail(
-    param=None,
-    subject: str = "",
-    to: str = "",
-    cc: str = "",
-    bcc: str = "",
-    message: str = "",
-    images=None,
-    attachments=None,
+        param=None,
+        subject: str = "",
+        to: str = "",
+        cc: str = "",
+        bcc: str = "",
+        message: str = "",
+        images=None,
+        attachments=None,
 ):
     """
 
@@ -380,8 +380,6 @@ def generate_mailing(param):
                 print("+" * 80)
             sleep(3600)
 
-
-
     # Send the remaining mails
     if len(addressees) != 0:
         log.info(
@@ -397,7 +395,7 @@ def generate_mailing(param):
             )
     elapsed = time() - start
     log.info(
-        f"Done. Processed {n_add} addresses in {n_mail+1} email(s) in {int(elapsed)+1} seconds"
+        f"Done. Processed {n_add} addresses in {n_mail + 1} email(s) in {int(elapsed) + 1} seconds"
     )
 
 
@@ -460,6 +458,9 @@ def main():
                 log.critical(f"File not found: {f}")
                 sys.exit(-1)
     else:
+        # download files from google drive
+
+
         files = glob('input/*.*')
         for f in files:
             fb = os.path.basename(f)
@@ -526,7 +527,7 @@ def main():
     if args.wait:
         log.info(f"Start sending in {args.wait} minutes")
         for i in range(0, int(args.wait)):
-            print(f"Sleeping for {60-i} minutes      \r", end="", flush=True)
+            print(f"Sleeping for {60 - i} minutes      \r", end="", flush=True)
             sleep(int(60))
 
     # merge config and argument list into a single object
