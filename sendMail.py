@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 from getSecrets import get_secret, get_user_pwd
 from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
+from uuid import uuid4
 
 
 def init_log(log_file=None):
@@ -238,7 +239,9 @@ def send_mail(
         msg["Bcc"] = bcc
         addr += bcc
     msg["Date"] = email.utils.formatdate(localtime=True)
-    msg["Message-ID"] = email.utils.make_msgid(domain="artscroises.be")
+    msg["Message-ID"] = email.utils.make_msgid(
+        idstring=str(uuid4()), domain="artscroises.be"
+    )
 
     if message != "":
         msg.attach(MIMEText(message, "plain"))
@@ -282,6 +285,8 @@ def send_mail(
                     )
             # All parts are added to the message structure
             msg.attach(part)
+    # if param.verbose:
+    #     print(msg.as_string())
 
     # the message is now being sent
     try:
@@ -361,6 +366,7 @@ def generate_mailing(param):
         nrow += 1
 
         # skip inactive records and opt-out ones
+
         if row[opt_out] != "active":
             continue
 
@@ -498,6 +504,9 @@ def main():
                 sys.exit(-1)
     else:
         # alternatively, download files from google drive mailing folder
+        files = glob(f"{folder}/*.*")
+        for f in files:
+            os.remove(f)
         service = gd.connect_google_driver()
         gd_files = gd.get_files(service, folder_id=config["mailing_folder"])
         if len(gd_files) > 0:
@@ -507,6 +516,7 @@ def main():
         # Attach files to the mail
         newsletter_name = ""
         files = glob(f"{folder}/*.*")
+        files = [f for f in files if not "published" in f]
         if len(files) == 0:
             log.critical(f"No files found to attach to the mail - non content!")
             sys.exit(-1)
@@ -594,7 +604,7 @@ PS: Veuillez utiliser notre adresse info@artscroises.be pour toute correspondanc
     param = Dict2Class(config)
     # Generate the mailing mail and send it to all 'active' recipients from the database
     ret = generate_mailing(param)
-    if ret == "OK":
+    if ret == "OK" and not args.test:
         for f in gd_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         files = glob(f"{folder}/*.*")

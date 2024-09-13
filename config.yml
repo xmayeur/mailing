@@ -9,5 +9,5 @@ db: data/Subscribers.csv
 MAX_ADDR_PER_MAIL: 100
 MAX_MAILS_PER_HOUR: 2000
 PAUSE: 10
-SENT_FOLDER: sent
+SENT_FOLDER: mailing
 
