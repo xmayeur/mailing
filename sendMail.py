@@ -364,7 +364,8 @@ def generate_mailing(param):
     # loop all other records
     for row in reader:
         nrow += 1
-
+        if nrow > int(param.to_index):
+            break
         # skip inactive records and opt-out ones
 
         if row[opt_out] != "active":
@@ -479,6 +480,9 @@ def main():
         "-f", "--from_index", help="Starting index in the database", default=None
     )
     parser.add_argument(
+        "-to", "--to_index", help="Stopping index in the database", default=None
+    )
+    parser.add_argument(
         "-w",
         "--wait",
         help="Wait x minutes before restarting sending mail",
@@ -487,10 +491,17 @@ def main():
     parser.add_argument(
         "--selected", action="store_true", help="Only send selected mail", default=False
     )
+
+    parser.add_argument("--body")
+
     args = parser.parse_args()
 
     if args.verbose:
         print(args.file)
+
+    body_txt = ""
+    if args.body:
+        body_txt = args.body
 
     # test if attachment files exist
     gd_files = []
@@ -530,6 +541,9 @@ def main():
                     args.subject = fn
                     newsletter_name = fb
                     break
+            elif "body.txt" in fb:
+                body_txt = open(f, encoding="utf-8").read()
+                files.remove(f)
         args.file = files
 
         # define a default message body
@@ -537,8 +551,12 @@ def main():
             args.message = f"""
 Chers amies et amis des Arts Croisés,
 
+{body_txt}
 Veuillez trouvez en pièce jointe notre newsletter {newsletter_name}.
 Bonne lecture!
+
+
+
 
 L'équipe Arts Croisés, asbl
 
