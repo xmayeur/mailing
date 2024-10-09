@@ -39,10 +39,10 @@ def init_log(log_file=None):
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
 
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setLevel(logging.DEBUG)
-    stdout_handler.setFormatter(formatter)
-    logger.addHandler(stdout_handler)
+    # stdout_handler = logging.StreamHandler(sys.stdout)
+    # stdout_handler.setLevel(logging.DEBUG)
+    # stdout_handler.setFormatter(formatter)
+    # logger.addHandler(stdout_handler)
 
     if log_file is not None:
         file_handler = logging.FileHandler(log_file)
@@ -540,7 +540,6 @@ def main():
                 if "letter" in fn.lower() or "lettre" in fn.lower():
                     args.subject = fn
                     newsletter_name = fb
-                    break
             elif "body.txt" in fb:
                 body_txt = open(f, encoding="utf-8").read()
                 files.remove(f)
