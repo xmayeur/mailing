@@ -16,7 +16,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from getpass import getpass
 from glob import glob
-from smtplib import SMTPAuthenticationError, SMTP
+from smtplib import SMTPAuthenticationError, SMTP, SMTPException
 from time import time, sleep
 import gspread
 from bs4 import BeautifulSoup
@@ -289,13 +289,29 @@ def send_mail(
     #     print(msg.as_string())
 
     # the message is now being sent
+    success = True
+    ret = {}
     try:
         ret = conn.sendmail(
             msg["From"],
             addr.split(","),
             msg.as_string(),
         )
+    except SMTPException as e:
+        # retry
+        sleep(10)
+        try:
+            ret = conn.sendmail(
+                msg["From"],
+                addr.split(","),
+                msg.as_string(),
+            )
+        except SMTPException as e:
+            log.critical(f"SMTP error after two tries: {e}")
+            log.info(ret)
+            success = False
 
+    if success:
         # a copy of the message in kept in the sent folder
         imap = imaplib.IMAP4_SSL(imap_host, imap_port)
         imap.login(username, password)
@@ -306,8 +322,7 @@ def send_mail(
             msg.as_string().encode("utf8"),
         )
         imap.logout()
-    except Exception as e:
-        log.error(f"SMTP error: {e}")
+
     conn.quit()
 
 
@@ -364,7 +379,7 @@ def generate_mailing(param):
     # loop all other records
     for row in reader:
         nrow += 1
-        if nrow > int(param.to_index):
+        if param.to_index is not None and nrow > int(param.to_index):
             break
         # skip inactive records and opt-out ones
 
