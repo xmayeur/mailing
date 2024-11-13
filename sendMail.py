@@ -243,9 +243,6 @@ def send_mail(
         idstring=str(uuid4()), domain="artscroises.be"
     )
 
-    if message != "":
-        msg.attach(MIMEText(message, "plain"))
-
     # Attach inline images if any
     if images is not None:
         if type(images) is not list:
@@ -271,6 +268,7 @@ def send_mail(
                     # images referred in the html code are embedded into the html code, no more as separate files
                     html = make_html_images_inline(att, "out.html")
                     part = MIMEText(html, "html")
+                    message = ""
                 elif att[-3:] == "txt":
                     part = MIMEText(fd.read().decode())
                 # PDF files are managed as attached documents
@@ -289,6 +287,9 @@ def send_mail(
     #     print(msg.as_string())
 
     # the message is now being sent
+    if message != "":
+        msg.attach(MIMEText(message, "plain"))
+
     success = True
     ret = {}
     try:
@@ -300,6 +301,14 @@ def send_mail(
     except SMTPException as e:
         # retry
         sleep(10)
+        conn = SMTP(host, port)
+        conn.starttls(context=context)
+        conn.ehlo()
+        try:
+            conn.login(username, password)
+        except SMTPAuthenticationError:
+            log.critical("Invalid SMTP credentials")
+            sys.exit(-1)
         try:
             ret = conn.sendmail(
                 msg["From"],
@@ -311,19 +320,21 @@ def send_mail(
             log.info(ret)
             success = False
 
+    conn.quit()
     if success:
         # a copy of the message in kept in the sent folder
-        imap = imaplib.IMAP4_SSL(imap_host, imap_port)
-        imap.login(username, password)
-        imap.append(
-            sent_folder,
-            "\\Seen",
-            imaplib.Time2Internaldate(time()),
-            msg.as_string().encode("utf8"),
-        )
-        imap.logout()
-
-    conn.quit()
+        try:
+            imap = imaplib.IMAP4_SSL(imap_host, imap_port)
+            imap.login(username, password)
+            imap.append(
+                sent_folder,
+                "\\Seen",
+                imaplib.Time2Internaldate(time()),
+                msg.as_string().encode("utf8"),
+            )
+            imap.logout()
+        except Exception as e:
+            log.warning(e)
 
 
 def generate_mailing(param):
@@ -365,10 +376,11 @@ def generate_mailing(param):
     header = next(reader, None)
     if header[0][:1] == "\ufeff":
         header[0] = header[0][1:]
-    email_idx = header.index("Email")
-    group_idx = header.index("Groups")
-    selected_idx = header.index("Selected")
-    opt_out = header.index("Email status")
+    email_idx = header.index("email")
+    group_idx = header.index("mailing_list")
+    selected_idx = header.index("selected")
+    opt_out = header.index("status")
+    user_idx = header.index("id")
 
     # skip records before starting index if required
     if param.from_index:
@@ -399,6 +411,7 @@ def generate_mailing(param):
         if row[email_idx] == "" or row[email_idx] is None:
             continue
 
+        user_id = row[user_idx]
         # create a group of 'max_add' addresses and send to all of them in BCC
         addressees.append(row[email_idx])
         n_add += 1
@@ -414,7 +427,7 @@ def generate_mailing(param):
                 send_mail(
                     param=param,
                     subject=param.subject,
-                    message=param.message,
+                    message=eval('f"""' + param.message + '"""'),
                     bcc=",".join(addressees),
                     attachments=param.file,
                 )
@@ -509,6 +522,17 @@ def main():
 
     parser.add_argument("--body")
 
+    parser.add_argument(
+        "-mh",
+        "--max-mails-per-hour",
+        default=int(config["max_mails_per_hour"]),
+        type=int,
+    )
+    parser.add_argument(
+        "-na", "--max-addr-per-mail", default=int(config["max_addr_per_mail"]), type=int
+    )
+    parser.add_argument("-p", "--pause", default=int(config["pause"]), type=int)
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -523,6 +547,7 @@ def main():
     service = None
     folder = "input"
     # if file paths are passes as argument, get them & test existence
+    files = args.file
     if args.file:
         for f in args.file:
             if not os.path.isfile(f):
@@ -543,26 +568,29 @@ def main():
         newsletter_name = ""
         files = glob(f"{folder}/*.*")
         files = [f for f in files if not "published" in f]
-        if len(files) == 0:
-            log.critical(f"No files found to attach to the mail - non content!")
-            sys.exit(-1)
+        # if len(files) == 0:
+        #    log.critical(f"No files found to attach to the mail - non content!")
+        #    sys.exit(-1)
 
-        # Derive the message subject
-        for f in files:
-            fb = os.path.basename(f)
-            if fb.split(".")[-1] == "pdf" and not args.subject:
-                fn = fb.split(".")[0]
-                if "letter" in fn.lower() or "lettre" in fn.lower():
-                    args.subject = fn
-                    newsletter_name = fb
-            elif "body.txt" in fb:
-                body_txt = open(f, encoding="utf-8").read()
-                files.remove(f)
-        args.file = files
+    # Derive the message subject
+    for f in files:
+        fb = os.path.basename(f)
+        if (
+            fb.split(".")[-1] == "pdf" or fb.split(".")[-1] == "html"
+        ) and not args.subject:
+            fn = fb.split(".")[0]
+            if "letter" in fn.lower() or "lettre" in fn.lower():
+                args.subject = fn
+                newsletter_name = fb
+        elif "body.txt" in fb:
+            body_txt = open(f, encoding="utf-8").read()
+            files.remove(f)
 
-        # define a default message body
-        if not args.message:
-            args.message = f"""
+    args.file = files
+
+    # define a default message body
+    if not args.message:
+        args.message = f"""
 Chers amies et amis des Arts Croisés,
 
 {body_txt}
@@ -575,8 +603,8 @@ Bonne lecture!
 L'équipe Arts Croisés, asbl
 
 PS: Veuillez utiliser notre adresse info@artscroises.be pour toute correspondance et ne pas répondre à ce mail
-    Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
-            """
+Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
+        """
 
     if args.test:
         log.info(f"Testing mode - send only to the Test Group subscribers")
@@ -632,6 +660,7 @@ PS: Veuillez utiliser notre adresse info@artscroises.be pour toute correspondanc
 
     # merge config and argument list into a single object
     config.update(vars(args))
+
     # convert dict into class - all keys are converted in lower case
     param = Dict2Class(config)
     # Generate the mailing mail and send it to all 'active' recipients from the database

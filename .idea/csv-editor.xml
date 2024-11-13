@@ -10,20 +10,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="$USER_HOME$/anaconda3/lib/python3.11/site-packages/bokeh/sampledata/_data/elements.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="$USER_HOME$/anaconda3/lib/python3.11/site-packages/intake/cli/sample/states_2.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="$USER_HOME$/anaconda3/lib/python3.11/site-packages/statsmodels/nonparametric/tests/results/test_lowess_simple.csv">
           <value>
             <Attribute>
@@ -32,6 +18,13 @@
           </value>
         </entry>
         <entry key="/data/Cotisations.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/data/DBmembres - Membres.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

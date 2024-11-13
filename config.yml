@@ -6,8 +6,8 @@ username: mailing@artscroises.be
 SENDER: mailing@artscroises.be
 sendername: Arts Croisés asbl
 db: data/Subscribers.csv
-MAX_ADDR_PER_MAIL: 100
+MAX_ADDR_PER_MAIL: 1
 MAX_MAILS_PER_HOUR: 2000
-PAUSE: 10
-SENT_FOLDER: mailing
+PAUSE: 1
+SENT_FOLDER: sent
 
