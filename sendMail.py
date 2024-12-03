@@ -673,5 +673,6 @@ Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
             os.remove(f)
 
 
+
 if __name__ == "__main__":
     main()

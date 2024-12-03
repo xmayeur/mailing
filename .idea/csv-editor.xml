@@ -24,13 +24,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="/data/DBmembres - Membres.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="/data/Subscribers.csv">
           <value>
             <Attribute>
