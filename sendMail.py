@@ -319,7 +319,7 @@ def send_mail(
             log.critical(f"SMTP error after two tries: {e}")
             log.info(ret)
             success = False
-
+    log.info("sent")
     conn.quit()
     if success:
         # a copy of the message in kept in the sent folder
@@ -334,7 +334,20 @@ def send_mail(
             )
             imap.logout()
         except Exception as e:
-            log.warning(e)
+            log.warning(f"Retrying copying sent message in sent folder{e}")
+            try:
+                imap = imaplib.IMAP4_SSL(imap_host, imap_port)
+                imap.login(username, password)
+                imap.append(
+                    sent_folder,
+                    "\\Seen",
+                    imaplib.Time2Internaldate(time()),
+                    msg.as_string().encode("utf8"),
+                )
+                imap.logout()
+            except Exception as e:
+                log.error(f"Error copying sent message in sent folder{e}")
+        log.info("stored in sent folder")
 
 
 def generate_mailing(param):
@@ -671,7 +684,6 @@ Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
         files = glob(f"{folder}/*.*")
         for f in files:
             os.remove(f)
-
 
 
 if __name__ == "__main__":
