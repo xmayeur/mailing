@@ -319,7 +319,10 @@ def send_mail(
             log.critical(f"SMTP error after two tries: {e}")
             log.info(ret)
             success = False
-    log.info("sent")
+
+    if param.verbose:
+        log.info("sent")
+
     conn.quit()
     if success:
         # a copy of the message in kept in the sent folder
@@ -347,7 +350,9 @@ def send_mail(
                 imap.logout()
             except Exception as e:
                 log.error(f"Error copying sent message in sent folder{e}")
-        log.info("stored in sent folder")
+
+        if param.verbose:
+            log.info("stored in sent folder")
 
 
 def generate_mailing(param):
