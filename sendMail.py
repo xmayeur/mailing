@@ -88,14 +88,11 @@ def readAllSheet(wb, sheet_name: str = ""):
     :param sheet_name: sheet name - default=sheet1
     :return: range of value (array of arrays)
     """
-    if sheet_name == "":
-        ws = wb.sheet1
-    else:
-        ws = wb.get_sheet_by_name(sheet_name)
+    ws = wb.sheet1 if not sheet_name else wb.worksheet(sheet_name)
     return ws.get_all_values()
 
 
-class Dict2Class(object):
+class Dict2Class:
     """
     Convert a dict to a class
     """
@@ -152,20 +149,19 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
     :returns the html data with inline images
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
-    soup = BeautifulSoup(open(in_filepath, "r"), "html.parser")
+    with open(in_filepath, "r") as file:
+        soup = BeautifulSoup(file, "html.parser")
     for img in soup.find_all("img"):
         img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
         mimetype = guess_type(img_path)
         if ";base64," not in img_path:
-            img.attrs["src"] = "data:%s;base64,%s" % (
-                mimetype,
-                file_to_base64(img_path),
-            )
+            img.attrs["src"] = f"data:{mimetype};base64,{file_to_base64(img_path)}"
+
         else:
             # TODO Change by a regex to ensure the string start with data:.*?;base64...
             img.attrs["src"] = img_path[6:]
 
-    if out_filepath is not None:
+    if out_filepath:
         with open(out_filepath, "w") as of:
             of.write(str(soup))
     return str(soup)
@@ -229,13 +225,12 @@ def send_mail(
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"] = formataddr((sender_name, sender))
-    addr = ""
     msg["To"] = to + "," + formataddr((sender_name, sender))
-    addr += to
-    if cc != "":
+    addr = to
+    if cc:
         msg["Cc"] = cc
         addr += cc
-    if bcc != "":
+    if bcc:
         msg["Bcc"] = bcc
         addr += bcc
     msg["Date"] = email.utils.formatdate(localtime=True)
@@ -244,12 +239,14 @@ def send_mail(
     )
 
     # Attach inline images if any
-    if images is not None:
-        if type(images) is not list:
+    if images:
+        if not isinstance(images, list):
             images = [images]
         for img in images:
             try:
-                img_data = open(img, "rb").read()  # read the image binary data
+                with open(img, "rb") as img_file:
+                    img_data = img_file.read()
+
                 # attach the image data to MIMEMultipart using MIMEImage, we add
                 # the given filename use os.basename
                 msg.attach(MIMEImage(img_data, name=os.path.basename(img)))
@@ -257,22 +254,19 @@ def send_mail(
                 log.error(f"Could not find file '{img}' - skipping attachment")
 
     # Manage attachments
-    if attachments is not None:
-        if type(attachments) is not list:
+    if attachments:
+        if not isinstance(attachments, list):
             attachments = [attachments]
 
         for att in attachments:
             with open(att, "rb") as fd:
-                # HTML and text attachments are embedded in the message body, not attached
-                if att[-3:] == "htm" or att[-4:] == "html":
-                    # images referred in the html code are embedded into the html code, no more as separate files
-                    html = make_html_images_inline(att, "out.html")
+                if att.endswith(("htm", "html")):
+                    html = make_html_images_inline(att)
                     part = MIMEText(html, "html")
                     message = ""
-                elif att[-3:] == "txt":
+                elif att.endswith("txt"):
                     part = MIMEText(fd.read().decode())
-                # PDF files are managed as attached documents
-                elif att[-3:] == "pdf":
+                elif att.endswith("pdf"):
                     part = email.mime.application.MIMEApplication(
                         fd.read(), _subtype="pdf"
                     )
@@ -286,18 +280,12 @@ def send_mail(
     # if param.verbose:
     #     print(msg.as_string())
 
-    # the message is now being sent
-    if message != "":
+    if message:
         msg.attach(MIMEText(message, "plain"))
 
     success = True
-    ret = {}
     try:
-        ret = conn.sendmail(
-            msg["From"],
-            addr.split(","),
-            msg.as_string(),
-        )
+        conn.sendmail(msg["From"], addr.split(","), msg.as_string())
     except SMTPException as e:
         # retry
         sleep(10)
@@ -310,14 +298,9 @@ def send_mail(
             log.critical("Invalid SMTP credentials")
             sys.exit(-1)
         try:
-            ret = conn.sendmail(
-                msg["From"],
-                addr.split(","),
-                msg.as_string(),
-            )
+            conn.sendmail(msg["From"], addr.split(","), msg.as_string())
         except SMTPException as e:
             log.critical(f"SMTP error after two tries: {e}")
-            log.info(ret)
             success = False
 
     if param.verbose:
@@ -337,7 +320,7 @@ def send_mail(
             )
             imap.logout()
         except Exception as e:
-            log.warning(f"Retrying copying sent message in sent folder{e}")
+            log.warning(f"Retrying copying sent message in sent folder: {e}")
             try:
                 imap = imaplib.IMAP4_SSL(imap_host, imap_port)
                 imap.login(username, password)
@@ -349,7 +332,7 @@ def send_mail(
                 )
                 imap.logout()
             except Exception as e:
-                log.error(f"Error copying sent message in sent folder{e}")
+                log.error(f"Error copying sent message in sent folder: {e}")
 
         if param.verbose:
             log.info("stored in sent folder")
@@ -384,7 +367,7 @@ def generate_mailing(param):
     else:
         # Read the subscriber's db
         try:
-            csvfile = open(db, "r", newline="")
+            with open(db, "r", newline="") as csvfile:
             reader = csv.reader(csvfile, delimiter=",", quotechar='"')
         except FileNotFoundError:
             log.critical(f"No such file or directory: '{db}'")
@@ -409,7 +392,7 @@ def generate_mailing(param):
     # loop all other records
     for row in reader:
         nrow += 1
-        if param.to_index is not None and nrow > int(param.to_index):
+        if param.to_index and nrow > int(param.to_index):
             break
         # skip inactive records and opt-out ones
 
@@ -426,7 +409,7 @@ def generate_mailing(param):
         if param.verbose:
             print("', ".join(row))
 
-        if row[email_idx] == "" or row[email_idx] is None:
+        if not row[email_idx]:
             continue
 
         user_id = row[user_idx]
@@ -461,8 +444,7 @@ def generate_mailing(param):
                 print("+" * 80)
             sleep(3600)
 
-    # Send the remaining mails
-    if len(addressees) != 0:
+    if addressees:
         log.info(
             f'Sending {n_add} addressees, up to index {nrow}: {", ".join(addressees)}'
         )
@@ -496,12 +478,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--subject", help="Subject of the mail", required=False)
     parser.add_argument("-m", "--message", help="Text message of the mail", default="")
-    parser.add_argument(
-        "file",
-        nargs="*",
-        # type=argparse.FileType("r"),
-        help="files to attach to the mail",
-    )
+    parser.add_argument("file", nargs="*", help="files to attach to the mail")
     parser.add_argument(
         "-t",
         "--test",
@@ -509,16 +486,10 @@ def main():
         help="test mode - send only to the tester group",
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        help="increase output verbosity",
-        action="store_true",
+        "-v", "--verbose", help="increase output verbosity", action="store_true"
     )
     parser.add_argument(
-        "-x",
-        "--doNotSend",
-        action="store_true",
-        help="Do not send any mail",
+        "-x", "--doNotSend", action="store_true", help="Do not send any mail"
     )
     # parser.add_argument("-p", "--password", help="password for the mail", default=None)
     parser.add_argument("-db", "--database", help="database path", default=None)
@@ -578,24 +549,19 @@ def main():
             os.remove(f)
         service = gd.connect_google_driver()
         gd_files = gd.get_files(service, folder_id=config["mailing_folder"])
-        if len(gd_files) > 0:
+        if gd_files:
             gd_files = gd_files["files"]
             gd.download_file(service, gd_files, "input")
 
         # Attach files to the mail
         newsletter_name = ""
         files = glob(f"{folder}/*.*")
-        files = [f for f in files if not "published" in f]
-        # if len(files) == 0:
-        #    log.critical(f"No files found to attach to the mail - non content!")
-        #    sys.exit(-1)
+        files = [f for f in files if "published" not in f]
 
     # Derive the message subject
     for f in files:
         fb = os.path.basename(f)
-        if (
-            fb.split(".")[-1] == "pdf" or fb.split(".")[-1] == "html"
-        ) and not args.subject:
+        if fb.split(".")[-1] in ["pdf", "html"] and not args.subject:
             fn = fb.split(".")[0]
             if "letter" in fn.lower() or "lettre" in fn.lower():
                 args.subject = fn
@@ -657,11 +623,9 @@ Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
     # SELECTED: False
 
     if "password" not in config:
-        if args.password:
-            pwd = args.password
-        else:
-            pwd = getpass("Enter mail user's password")
-        config["password"] = pwd
+        config["password"] = (
+            args.password if args.password else getpass("Enter mail user's password")
+        )
 
     # Override default database path
     if args.database:
@@ -672,9 +636,9 @@ Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
     # delay sending if required
     if args.wait:
         log.info(f"Start sending in {args.wait} minutes")
-        for i in range(0, int(args.wait)):
+        for i in range(int(args.wait)):
             print(f"Sleeping for {60 - i} minutes      \r", end="", flush=True)
-            sleep(int(60))
+            sleep(60)
 
     # merge config and argument list into a single object
     config.update(vars(args))
