@@ -321,6 +321,7 @@ def send_mail(
             imap.logout()
         except Exception as e:
             log.warning(f"Retrying copying sent message in sent folder: {e}")
+            sleep(10)
             try:
                 imap = imaplib.IMAP4_SSL(imap_host, imap_port)
                 imap.login(username, password)
@@ -358,16 +359,16 @@ def generate_mailing(param):
     n_mail = 0
     addressees = []
     nrow = 1
-
+    csvfile = None
     start = time()
-    reader = iter([])
+    # reader = iter([])
     if db is None:
         wb = openGoogleDBMembersSheet()
         reader = iter(readAllSheet(wb))
     else:
         # Read the subscriber's db
         try:
-            with open(db, "r", newline="") as csvfile:
+            csvfile = open(db, "r", newline="")
             reader = csv.reader(csvfile, delimiter=",", quotechar='"')
         except FileNotFoundError:
             log.critical(f"No such file or directory: '{db}'")
@@ -443,6 +444,9 @@ def generate_mailing(param):
             if param.verbose:
                 print("+" * 80)
             sleep(3600)
+
+    if csvfile is not None:
+        csvfile.close()
 
     if addressees:
         log.info(
