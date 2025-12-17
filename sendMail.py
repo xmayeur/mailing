@@ -24,6 +24,7 @@ from getSecrets import get_secret, get_user_pwd
 from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
 from uuid import uuid4
+import re
 
 
 def init_log(log_file=None):
@@ -425,11 +426,16 @@ def generate_mailing(param):
             log.info(
                 f'Sending {n_add} addressees, up to index {nrow}: {", ".join(addressees)}'
             )
+            msg_txt = re.sub(r"\${(.*)}", r"{row[header.index('\1')]}", param.message)
+            try:
+                msg_txt = eval('f"""' + msg_txt + '"""')
+            except NameError as e:
+                log.error(f"Error evaluating message: {e}")
             if not param.donotsend:
                 send_mail(
                     param=param,
                     subject=param.subject,
-                    message=eval('f"""' + param.message + '"""'),
+                    message=msg_txt,
                     bcc=",".join(addressees),
                     attachments=param.file,
                 )
@@ -565,13 +571,16 @@ def main():
     # Derive the message subject
     for f in files:
         fb = os.path.basename(f)
-        if fb.split(".")[-1] in ["pdf", "html"] and not args.subject:
+        if fb.split(".")[-1] in ["pdf", "html"]:
             fn = fb.split(".")[0]
+            args.subject = fn if not args.subject else args.subject
             if "letter" in fn.lower() or "lettre" in fn.lower():
-                args.subject = fn
                 newsletter_name = fb
+            if fb.split(".")[-1] == "html":
+                args.message = "html"
         elif "body.txt" in fb:
             body_txt = open(f, encoding="utf-8").read()
+            args.message = body_txt
             files.remove(f)
 
     args.file = files
