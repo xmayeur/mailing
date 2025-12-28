@@ -380,7 +380,12 @@ def send_mail(
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"] = formataddr((param.sendername, param.sender))
-    msg["To"] = f"{to},{formataddr((param.sendername, param.sender))}"
+    if param.cotisation:
+        to = bcc
+        bcc = None
+        msg["To"] = to
+    else:
+        msg["To"] = f"{to},{formataddr((param.sendername, param.sender))}"
     if cc:
         msg["Cc"] = cc
     if bcc:
@@ -420,6 +425,8 @@ def send_mail(
 
     # 3. Send and Store
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
+    if param.verbose:
+        log.info(f"Sending email to {recipients}")
     success = False
     for attempt in range(2):
         conn = _get_smtp_connection(param)
@@ -487,6 +494,7 @@ def generate_mailing(param):
         if not header:
             return "Error"
 
+        # mapping des headers
         indices = {
             "email": header.index("email"),
             "id": header.index("id"),
@@ -568,7 +576,7 @@ def generate_mailing(param):
 
                 param.message = f"""
                     <html>
-                    Cher(e) {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
+                    Chère/cher {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
                     Nous vous souhaitons tous nos meilleurs voeux pour {param.cotisation_year}.<br/><br/>
                     Voici le temps de renouveler votre cotisation en temps que membre de notre association Arts Croisés.<br/><br/>
                     Si vous souhaitez rester membre, par sympathie ou pour pouvoir participer à nos activités, veuillez payer le montant 
