@@ -510,6 +510,8 @@ def generate_mailing(param):
                     
                     Si vous ne souhaitez plus être membre, nous vous saurons gré de bien vouloir répondre à cet email et nous le faire savoir, de façon à ne plus vous contacter l'année prochaine.
                     <br/><br/>
+                    
+                    Cordialement,<br/>
                     L'équipe Arts Croisés<br/>
                     {email}
                     
