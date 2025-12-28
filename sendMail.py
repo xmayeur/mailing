@@ -780,8 +780,8 @@ def main():
     config.update(vars(args))
     if "password" not in config:
         config["password"] = getpass("Enter mail user's password")
-    if args.database:
-        config["db"] = args.database
+
+    config["db"] = args.database if args.database else None
 
     param = Dict2Class(config)
     param.file = files  # Mise à jour explicite des fichiers filtrés
