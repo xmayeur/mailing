@@ -241,6 +241,7 @@ class Invoice:
         """
         data = {
             "PartyID": row[indices["id"]],
+            "Nr": row[indices["id"]],
             "Name": row[indices["first_name"]] + " " + row[indices["last_name"]],
             "Mobile": row[indices["mobile_phone"]],
             "Phone": row[indices["phone"]],
@@ -469,6 +470,63 @@ def _format_message(template, row, header):
     except (NameError, KeyError, IndexError) as e:
         log.error(f"Erreur d'évaluation du message : {e}")
         return template
+
+
+def _sync(param):
+
+    reader, csvfile = _get_subscriber_reader(param)
+    header = next(reader, None)
+    if not header:
+        return "Error"
+
+    # mapping des headers
+    indices = {
+        "email": header.index("email"),
+        "id": header.index("id"),
+        "first_name": header.index("first_name"),
+        "last_name": header.index("last_name"),
+        "phone": header.index("phone"),
+        "mobile_phone": header.index("mobile_phone"),
+        "address": header.index("address"),
+        "city": header.index("city"),
+        "zip": header.index("zip"),
+        "member": header.index("member"),
+        "membershippaid": header.index("membershippaid"),
+        "group": header.index("mailing_list"),
+        "selected": header.index("selected"),
+        "status": header.index("status"),
+    }
+    # Sauter les enregistrements initiaux
+    current_row_idx = 1
+    if param.from_index:
+        log.info(f"Reprise à l'index {param.from_index}")
+        for _ in range(2, int(param.from_index)):
+            next(reader, None)
+            current_row_idx += 1
+
+    for row in reader:
+        current_row_idx += 1
+        if param.to_index and current_row_idx > int(param.to_index):
+            break
+        # Filtres de sélection - skip if false
+        if param.cotisation:
+            is_member = row[indices["member"]] == "yes"
+            not_paid = (
+                row[indices["membershippaid"]] is None
+                or row[indices["membershippaid"]] == ""
+            )
+            has_email = bool(row[indices["email"]])
+            if not (is_member and not_paid and has_email):
+                continue
+            # Create or update client
+            client_id = param.invoice._create_client(row, indices)
+            if client_id == -1:
+                log.error(f"Failed to create client for {row[indices['id']]}.")
+                continue
+            client = param.invoice._get_client(client_id)
+            if not client:
+                continue
+    return "Done"
 
 
 def generate_mailing(param):
@@ -711,6 +769,7 @@ def setup_argparse(config):
         "-na", "--max_addr_per_mail", default=int(config["max_addr_per_mail"]), type=int
     )
     parser.add_argument("-p", "--pause", default=int(config["pause"]), type=int)
+    parser.add_argument("--sync", action="store_true")
     return parser.parse_args()
 
 
@@ -790,7 +849,11 @@ def main():
         param.invoice = Invoice(prod=not args.test)
         param.subject = f"Arts Croisés - Cotisation {param.cotisation_year}"
 
-    if generate_mailing(param) == "OK" and not args.test:
+    if args.sync:
+        param.invoice = Invoice(prod=not args.test)
+        _sync(param)
+
+    elif generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         for f in glob("input/*.*"):
