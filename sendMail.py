@@ -24,32 +24,31 @@ from getSecrets import get_secret, get_user_pwd
 from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
 from uuid import uuid4
+import requests
+from certifi import where
+import datetime as dt
 import re
+
+import logging
+
+DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 
 
 def init_log(log_file=None):
     """
-    Initialize the logging module to the sdterr output and to the log file
-    :param log_file: the log file path
-    :return: a logger object
+    Initialise le module de journalisation vers la sortie standard et un fichier optionnel.
+    :param log_file: Le chemin du fichier de log.
+    :return: Un objet logger configuré.
     """
-    # if os.path.exists("sendMail.log"):
-    #     os.remove("sendMail.log")
-
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
 
-    # stdout_handler = logging.StreamHandler(sys.stdout)
-    # stdout_handler.setLevel(logging.DEBUG)
-    # stdout_handler.setFormatter(formatter)
-    # logger.addHandler(stdout_handler)
+    formatter = logging.Formatter(DEFAULT_LOG_FORMAT)
 
-    if log_file is not None:
+    if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
-
         logger.addHandler(file_handler)
 
     return logger
@@ -166,6 +165,73 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
         with open(out_filepath, "w") as of:
             of.write(str(soup))
     return str(soup)
+
+
+class Invoice:
+    EXPIRY_DAYS = 30
+
+    def __init__(self, prod=False):
+        token_dict = get_secret("ArtsCroisesAPIToken")
+        if prod:
+            self.token = token_dict["token"]
+            self.base = token_dict["baseUrl"]
+        else:
+            self.token = token_dict["devToken"]
+            self.base = token_dict["devBaseUrl"]
+        self.headers = {"apiKey": self.token, "accept": "application/json"}
+
+    def _make_request(self, method, endpoint, json=None):
+        url = self.base + endpoint
+        headers = (
+            {**self.headers, "content-type": "text/json"} if json else self.headers
+        )
+        response = requests.request(
+            method, url, headers=headers, json=json, verify=where()
+        )
+        if response.status_code != 200:
+            log.error(f"{method} {endpoint} failed: {response.text}")
+            return None
+        return response
+
+    def _get_client(self, client_id):
+        response = self._make_request("GET", f"parties?fullTextSearch={client_id}")
+        return response.json()["Items"][0] if response else None
+
+    def create_invoice(self, client_id="", product_name="", price=0.0, qty=1):
+        client = self._get_client(client_id)
+        if not client:
+            return -1
+
+        today = dt.date.today()
+        order_data = {
+            "OrderType": "Invoice",
+            "OrderDirection": "Income",
+            "OrderDate": today.isoformat(),
+            "ExpiryDate": (today + dt.timedelta(days=self.EXPIRY_DAYS)).isoformat(),
+            "OrderTitle": product_name,
+            "OrderLines": [
+                {
+                    "Quantity": qty,
+                    "UnitPriceExcl": price,
+                    "Description": product_name,
+                    "VATPercentage": 0.0,
+                }
+            ],
+            "Customer": client,
+        }
+
+        response = self._make_request("POST", "orders", json=order_data)
+        if not response:
+            return -1
+
+        order_id = response.text
+        log.debug(f"OrderID: {order_id}")
+
+        # Refresh order details
+        if not self._make_request("GET", f"orders/{order_id}"):
+            return -1
+
+        return order_id
 
 
 def send_mail(
