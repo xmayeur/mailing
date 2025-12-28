@@ -6,7 +6,6 @@ import datetime as dt
 import email.mime.application
 import email.utils
 import imaplib
-import json
 import logging
 import os
 import ssl
@@ -27,8 +26,6 @@ from bs4 import BeautifulSoup
 from certifi import where
 from getSecrets import get_secret
 from oauth2client.service_account import ServiceAccountCredentials
-from sympy.codegen.ast import continue_
-
 import googleDriveLib as gd
 import csv
 import re
@@ -398,60 +395,22 @@ def _format_message(template, row, header):
         return template
 
 
-def _get_invoice_body(param, row, indices, order):
-    """Génère le corps HTML pour une relance de cotisation."""
-    supplier = order["Supplier"]
-    bank = supplier["BankAccounts"][0]
-    acc_name = bank.get("Name", supplier["Name"])
-
-    return f"""
-        <html>
-        Cher(e) {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
-        Voici le temps de renouveler votre cotisation {param.cotisation_year} à notre association Arts Croisés<br/><br/>
-        Si vous souhaitez rester membre, veuillez payer le montant de {param.cotisation_amount} {bank['Currency']} sur le compte :<br/><br/>
-        {acc_name}<br/>
-        IBAN : {bank['IBAN']}<br/>
-        Communication: {order["PaymentReference"]}<br/><br/>
-        L'équipe Arts Croisés<br/>
-        {supplier['Email']}
-        </html>
-    """
-
-
-def _process_cotisation(param, row, indices):
-    """Gère la création de facture et retourne le message mis à jour."""
-    client_id = param.invoice._create_client(row, indices)
-    if client_id == -1:
-        log.error(f"Échec création client pour ID {row[indices['id']]}.")
-        return None
-
-    client = param.invoice._get_client(client_id)
-    order = param.invoice.create_order(
-        client=client,
-        product_name=f"Cotisation {param.cotisation_year}",
-        price=param.cotisation_amount,
-        qty=1,
-    )
-
-    if order.get("OrderID") == -1:
-        log.error(f"Échec facture pour ID {row[indices['id']]}.")
-        return None
-
-    return _get_invoice_body(param, row, indices, order)
-
-
 def generate_mailing(param):
     """Génère un envoi groupé basé sur une liste d'abonnés."""
     try:
-        max_add = 1 if param.cotisation else getattr(param, "max_addr_per_mail", 1)
-        pause = 0 if param.cotisation else getattr(param, "pause", 0)
-        max_mail = getattr(param, "max_mails_per_hour", 100)
+        if param.cotisation:
+            max_add = 1
+            pause = 0
+        else:
+            max_add = param.max_addr_per_mail
+            pause = param.pause
+        max_mail = param.max_mails_per_hour
     except AttributeError as e:
-        log.critical(f"Configuration manquante : {e}")
+        log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
 
     reader, csvfile = _get_subscriber_reader(param)
-    if not reader:
+    if reader is None:
         return "Error"
 
     try:
@@ -460,28 +419,33 @@ def generate_mailing(param):
             return "Error"
 
         indices = {
-            col: header.index(col)
-            for col in [
-                "email",
-                "id",
-                "first_name",
-                "last_name",
-                "status",
-                "mailing_list",
-                "selected",
-                "member",
-                "membershippaid",
-            ]
+            "email": header.index("email"),
+            "id": header.index("id"),
+            "first_name": header.index("first_name"),
+            "last_name": header.index("last_name"),
+            "phone": header.index("phone"),
+            "mobile_phone": header.index("mobile_phone"),
+            "address": header.index("address"),
+            "city": header.index("city"),
+            "zip": header.index("zip"),
+            "member": header.index("member"),
+            "membershippaid": header.index("membershippaid"),
+            "group": header.index("mailing_list"),
+            "selected": header.index("selected"),
+            "status": header.index("status"),
         }
 
+        # Sauter les enregistrements initiaux
         current_row_idx = 1
-        # Skip rows
         if param.from_index:
+            log.info(f"Reprise à l'index {param.from_index}")
             for _ in range(2, int(param.from_index)):
                 next(reader, None)
                 current_row_idx += 1
 
-        addressees, recipient_count, batch_count = [], 0, 0
+        addressees = []
+        recipient_count = 0
+        mail_batch_count = 0
         start_time = time()
 
         for row in reader:
@@ -489,41 +453,94 @@ def generate_mailing(param):
             if param.to_index and current_row_idx > int(param.to_index):
                 break
 
+            # Filtres de sélection - skip if false
             if param.cotisation:
-                is_eligible = (
-                    row[indices["member"]] == "yes"
-                    and not row[indices["membershippaid"]]
-                    and row[indices["email"]]
+                is_member = row[indices["member"]] == "yes"
+                not_paid = (
+                    row[indices["membershippaid"]] is None
+                    or row[indices["membershippaid"]] == ""
                 )
-                if not is_eligible:
+                has_email = bool(row[indices["email"]])
+                if not (is_member and not_paid and has_email):
                     continue
 
-                msg_content = _process_cotisation(param, row, indices)
-                if not msg_content:
+                # Create or update client
+                client_id = param.invoice._create_client(row, indices)
+                if client_id == -1:
+                    log.error(f"Failed to create client for {row[indices['id']]}.")
                     continue
-                param.message = msg_content
+                client = param.invoice._get_client(client_id)
+                if not client:
+                    continue
+                # create an invoice and get the order id
+
+                order = param.invoice.create_order(
+                    client=client,
+                    product_name=f"Cotisation Arts Croisés {param.cotisation_year}",
+                    price=param.cotisation_amount,
+                    qty=1,
+                )
+                if order["OrderID"] == -1:
+                    log.error(f"Failed to create invoice for {row[indices['id']]}.")
+                    continue
+
+                # Build body message
+                ref = order["PaymentReference"]
+                qr_url = order["PaymentLinks"][0]["QRImageUrl"]
+                supplier = order["Supplier"]["Name"]
+                iban = order["Supplier"]["BankAccounts"][0]["IBAN"]
+                cur = order["Supplier"]["BankAccounts"][0]["Currency"]
+                acc_name = (
+                    order["Supplier"]["BankAccounts"][0]["Name"]
+                    if "Name" in order["Supplier"]["BankAccounts"][0]
+                    else supplier
+                )
+                email = order["Supplier"]["Email"]
+
+                param.message = f"""
+                    <html>
+                    Cher(e) {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
+                    Voici le temps de renouveler votre cotisation {param.cotisation_year} à notre association Arts Croisés
+                    
+                    <br/><br/>
+                    Si vous souhaitez rester membre, par sympathie ou pour pouvoir participer à nos activités, veuillez payer le montant de {param.cotisation_amount} {cur} par personne sur le compte bancaire suivant :<br/><br/>
+                    {acc_name}<br/>
+                    IBAN : {iban}<br/>
+                    Communication: {ref}<br/><br/>
+                    
+                    Si vous ne souhaitez plus être membre, nous vous saurons gré de bien vouloir répondre à cet email et nous le faire savoir, de façon à ne plus vous contacter l'année prochaine.
+                    <br/><br/>
+                    L'équipe Arts Croisés<br/>
+                    {email}
+                    
+                    </html>
+
+                """
+                pass
+
             else:
                 is_active = row[indices["status"]] == "active"
-                is_test = not param.test or "Test" in row[indices["mailing_list"]]
+                is_test_match = not param.test or "Test" in row[indices["group"]]
                 is_selected = (
                     not param.selected or row[indices["selected"]].lower() == "x"
                 )
-                if not (
-                    is_active and is_test and is_selected and row[indices["email"]]
-                ):
+                has_email = bool(row[indices["email"]])
+                if not (is_active and is_test_match and is_selected and has_email):
                     continue
+
+            if param.verbose:
+                print(", ".join(row))
 
             addressees.append(row[indices["email"]])
             recipient_count += 1
 
+            # Envoi par lots
             if len(addressees) >= max_add:
-                log.info(f"Envoi lot (Index: {current_row_idx})")
-                msg_body = (
-                    _format_message(param.message, row, header)
-                    if not param.cotisation
-                    else param.message
+                log.info(
+                    f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})"
                 )
 
+                msg_body = _format_message(param.message, row, header)
                 if not param.donotsend:
                     send_mail(
                         param=param,
@@ -533,24 +550,33 @@ def generate_mailing(param):
                         attachments=param.file,
                     )
 
-                addressees, batch_count = [], batch_count + 1
+                addressees = []
+                mail_batch_count += 1
                 sleep(pause)
+
                 if recipient_count % max_mail == 0:
-                    log.info("Pause horaire...")
+                    log.info("Limite horaire atteinte. Pause d'une heure...")
                     sleep(3600)
 
-        if addressees and not param.donotsend:
-            send_mail(
-                param=param,
-                subject=param.subject,
-                message=param.message,
-                bcc=",".join(addressees),
-                attachments=param.file,
-            )
-            batch_count += 1
+        # Envoi du reliquat
+        if addressees:
+            log.info(f"Envoi final à {len(addressees)} destinataires.")
+            if not param.donotsend:
+                send_mail(
+                    param=param,
+                    subject=param.subject,
+                    message=param.message,
+                    bcc=",".join(addressees),
+                    attachments=param.file,
+                )
+            mail_batch_count += 1
 
-        log.info(f"Terminé: {recipient_count} traités en {batch_count} envois.")
+        elapsed = time() - start_time
+        log.info(
+            f"Terminé. {recipient_count} adresses traitées en {mail_batch_count} envois ({int(elapsed)}s)"
+        )
         return "OK"
+
     finally:
         if csvfile:
             csvfile.close()
