@@ -169,6 +169,26 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
 
 
 class Invoice:
+    """
+    Handles invoicing and order management operations using an external API.
+
+    The Invoice class provides functionality to interact with the Billit.be third-party
+    API to manage orders and clients. It allows creating clients, managing
+    invoices, and interacting with API endpoints for various operations.
+
+    Class Attributes:
+    :ivar EXPIRY_DAYS: Number of days after which an invoice expires.
+    :type EXPIRY_DAYS: int
+
+    Instance Attributes:
+    :ivar token: API token for authentication.
+    :type token: str
+    :ivar base: Base URL for the API (depends on the environment).
+    :type base: str
+    :ivar headers: Headers used for API requests, including authentication.
+    :type headers: dict
+    """
+
     EXPIRY_DAYS = 30
 
     def __init__(self, prod=False):
@@ -182,6 +202,13 @@ class Invoice:
         self.headers = {"apiKey": self.token, "accept": "application/json"}
 
     def _make_request(self, method, endpoint, json=None):
+        """
+        Makes a request to the Billit.be API using the specified method and endpoint.
+        :param method:
+        :param endpoint:
+        :param json:
+        :return:
+        """
         url = self.base + endpoint
         headers = (
             {**self.headers, "content-type": "text/json"} if json else self.headers
@@ -195,12 +222,23 @@ class Invoice:
         return response
 
     def _get_client(self, client_id):
+        """
+        Retrieves details for a client using its ID.
+        :param client_id:
+        :return:
+        """
         response = self._make_request("GET", f"parties/{client_id}")
         if response.status_code != 200:
             return None
         return response.json()
 
     def _create_client(self, row, indices):
+        """
+        Creates or update a new client using the provided row data.
+        :param row:
+        :param indices:
+        :return:
+        """
         data = {
             "PartyID": row[indices["id"]],
             "Name": row[indices["first_name"]] + " " + row[indices["last_name"]],
@@ -217,6 +255,14 @@ class Invoice:
         return response.text
 
     def create_order(self, client=None, product_name="", price=0.0, qty=1):
+        """
+        Creates a new order for the specified client.
+        :param client:          "client" object returned by _get_client()
+        :param product_name:    product_name
+        :param price:           product unit price
+        :param qty:             product qua,tity
+        :return:                an "order" object
+        """
 
         if not client:
             return -1
@@ -255,6 +301,11 @@ class Invoice:
 
 
 def _get_smtp_connection(param):
+    """
+    Open a connection to the SMTP server.
+    :param param:
+    :return:
+    """
     context = ssl.create_default_context()
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -271,6 +322,12 @@ def _get_smtp_connection(param):
 
 
 def _save_to_sent(param, msg):
+    """
+    Store the message in the Sent folder using IMAP.
+    :param param:
+    :param msg:
+    :return:
+    """
     for attempt in range(2):
         try:
             imap = imaplib.IMAP4_SSL(param.imap_host, param.imap_port)
@@ -303,6 +360,18 @@ def send_mail(
     images=None,
     attachments=None,
 ):
+    """
+    Send an email message using SMTP.
+    :param param:
+    :param subject:
+    :param to:
+    :param cc:
+    :param bcc:
+    :param message:
+    :param images:
+    :param attachments:
+    :return:
+    """
     if param is None:
         log.critical("Missing configuration parameter")
         sys.exit(-1)
@@ -500,10 +569,10 @@ def generate_mailing(param):
                 param.message = f"""
                     <html>
                     Cher(e) {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
-                    Voici le temps de renouveler votre cotisation {param.cotisation_year} à notre association Arts Croisés
-                    
-                    <br/><br/>
-                    Si vous souhaitez rester membre, par sympathie ou pour pouvoir participer à nos activités, veuillez payer le montant de {param.cotisation_amount} {cur} par personne sur le compte bancaire suivant :<br/><br/>
+                    Nous vous souhaitons tous nos meilleurs voeux pour {param.cotisation_year}.<br/><br/>
+                    Voici le temps de renouveler votre cotisation en temps que membre de notre association Arts Croisés.<br/><br/>
+                    Si vous souhaitez rester membre, par sympathie ou pour pouvoir participer à nos activités, veuillez payer le montant 
+                    de {param.cotisation_amount} {cur} par personne sur le compte bancaire suivant :<br/><br/>
                     {acc_name}<br/>
                     IBAN : {iban}<br/>
                     Communication: {ref}<br/><br/>
