@@ -347,7 +347,9 @@ def send_mail(
                 )
                 msg.attach(part)
 
-    if message:
+    if message and "<html>" in message:
+        msg.attach(MIMEText(message, "html"))
+    else:
         msg.attach(MIMEText(message, "plain"))
 
     # 3. Send and Store
@@ -474,16 +476,51 @@ def generate_mailing(param):
                 if not client:
                     continue
                 # create an invoice and get the order id
+
                 order = param.invoice.create_order(
                     client=client,
-                    product_name="Cotisation Arts Croisés 2026",
-                    price=15,
+                    product_name=f"Cotisation Arts Croisés {param.cotisation_year}",
+                    price=param.cotisation_amount,
                     qty=1,
                 )
-                if order["order_id"] == -1:
+                if order["OrderID"] == -1:
                     log.error(f"Failed to create invoice for {row[indices['id']]}.")
-                print(json.dumps(order, indent=4))
+                    continue
+
+                # Build body message
+                ref = order["PaymentReference"]
+                qr_url = order["PaymentLinks"][0]["QRImageUrl"]
+                supplier = order["Supplier"]["Name"]
+                iban = order["Supplier"]["BankAccounts"][0]["IBAN"]
+                cur = order["Supplier"]["BankAccounts"][0]["Currency"]
+                acc_name = (
+                    order["Supplier"]["BankAccounts"][0]["Name"]
+                    if "Name" in order["Supplier"]["BankAccounts"][0]
+                    else supplier
+                )
+                email = order["Supplier"]["Email"]
+
+                param.message = f"""
+                    <html>
+                    Cher(e) {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
+                    Voici le temps de renouveler votre cotisation {param.cotisation_year} à notre association Arts Croisés
+                    
+                    <br/><br/>
+                    Si vous souhaitez rester membre, par sympathie ou pour pouvoir participer à nos activités, veuillez payer le montant de {param.cotisation_amount} {cur} par personne sur le compte bancaire suivant :<br/><br/>
+                    {acc_name}<br/>
+                    IBAN : {iban}<br/>
+                    Communication: {ref}<br/><br/>
+                    
+                    Si vous ne souhaitez plus être membre, nous vous saurons gré de bien vouloir répondre à cet email et nous le faire savoir, de façon à ne plus vous contacter l'année prochaine.
+                    <br/><br/>
+                    L'équipe Arts Croisés<br/>
+                    {email}
+                    
+                    </html>
+
+                """
                 pass
+
             else:
                 is_active = row[indices["status"]] == "active"
                 is_test_match = not param.test or "Test" in row[indices["group"]]
@@ -583,6 +620,12 @@ def setup_argparse(config):
         "--cotisation", help="Generate cotisation reminder mail", action="store_true"
     )
     parser.add_argument(
+        "-y", "--cotisation_year", help="Cotisation year", default="2026"
+    )
+    parser.add_argument(
+        "-amt", "--cotisation_amount", help="Cotisation amount", default="15.00"
+    )
+    parser.add_argument(
         "-mh",
         "--max-mails-per-hour",
         default=int(config["max_mails_per_hour"]),
@@ -669,6 +712,7 @@ def main():
 
     if args.cotisation:
         param.invoice = Invoice(prod=not args.test)
+        param.subject = f"Arts Croisés - Cotisation {param.cotisation_year}"
 
     if generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:
