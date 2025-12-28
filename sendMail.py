@@ -2,34 +2,35 @@
 # coding: utf-8
 
 import argparse
-import csv
+import datetime as dt
 import email.mime.application
+import email.utils
 import imaplib
 import logging
 import os
 import ssl
 import sys
 import urllib.parse
+from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from getpass import getpass
 from glob import glob
-from smtplib import SMTPAuthenticationError, SMTP, SMTPException
-from time import time, sleep
+from smtplib import SMTP, SMTPAuthenticationError, SMTPException
+from uuid import uuid4
 import gspread
+import requests
 from bs4 import BeautifulSoup
-from getSecrets import get_secret, get_user_pwd
+from certifi import where
+from getSecrets import get_secret
 from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
-from uuid import uuid4
-import requests
-from certifi import where
-import datetime as dt
+import csv
 import re
+from time import time, sleep
 
-import logging
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 
@@ -234,325 +235,256 @@ class Invoice:
         return order_id
 
 
-def send_mail(
-    param=None,
-    subject: str = "",
-    to: str = "",
-    cc: str = "",
-    bcc: str = "",
-    message: str = "",
-    images=None,
-    attachments=None,
-):
-    """
-
-    :param param: configuration dictionary with email settings
-    :param subject: mail subject
-    :param to: comma-separated to recipient list
-    :param cc: comma-separated hidden recipient
-    :param bcc: comma-separated hidden recipient
-    :param message: text body message
-    :param images: list of images to attach
-    :param attachments: attachment list. .txt and .html will be managed as message parts, not attachment
-    :return:
-    """
-
-    if param is None:
-        log.critical("Missing configuration parameter")
-        sys.exit(-1)
-
-    try:
-        # get configuration parameters
-        host = param.smtp_host  # config["HOST"]
-        port = param.smtp_port  # config["PORT"]
-        username = param.username  # config["USERNAME"]
-        sender = param.sender  # config["SENDER"]
-        sender_name = param.sendername  # config["SENDERNAME"]
-        password = param.password  # config["PASSWORD"]
-        imap_host = param.imap_host  # config["IMAP_HOST"]
-        imap_port = param.imap_port  # config["IMAP_PORT"]
-        sent_folder = param.sent_folder  # config["SENT_FOLDER"]
-
-    except AttributeError as e:
-        log.critical(f"Missing or invalid key '{e}' in config file")
-        sys.exit(-1)
-
-    # Initiate secured SMTP protocol
+def _get_smtp_connection(param):
     context = ssl.create_default_context()
-    conn = SMTP(host, port)
-    conn.starttls(context=context)
-    conn.ehlo()
     try:
-        conn.login(username, password)
+        conn = SMTP(param.smtp_host, param.smtp_port)
+        conn.starttls(context=context)
+        conn.ehlo()
+        conn.login(param.username, param.password)
+        return conn
     except SMTPAuthenticationError:
         log.critical("Invalid SMTP credentials")
         sys.exit(-1)
+    except Exception as e:
+        log.error(f"Failed to connect to SMTP: {e}")
+        return None
 
-    # create message structure
-    msg = MIMEMultipart("mixed")
-    msg["Subject"] = subject
-    msg["From"] = formataddr((sender_name, sender))
-    msg["To"] = to + "," + formataddr((sender_name, sender))
-    addr = to
-    if cc:
-        msg["Cc"] = cc
-        addr += cc
-    if bcc:
-        msg["Bcc"] = bcc
-        addr += bcc
-    msg["Date"] = email.utils.formatdate(localtime=True)
-    msg["Message-ID"] = email.utils.make_msgid(
-        idstring=str(uuid4()), domain="artscroises.be"
-    )
 
-    # Attach inline images if any
-    if images:
-        if not isinstance(images, list):
-            images = [images]
-        for img in images:
-            try:
-                with open(img, "rb") as img_file:
-                    img_data = img_file.read()
-
-                # attach the image data to MIMEMultipart using MIMEImage, we add
-                # the given filename use os.basename
-                msg.attach(MIMEImage(img_data, name=os.path.basename(img)))
-            except FileNotFoundError:
-                log.error(f"Could not find file '{img}' - skipping attachment")
-
-    # Manage attachments
-    if attachments:
-        if not isinstance(attachments, list):
-            attachments = [attachments]
-
-        for att in attachments:
-            with open(att, "rb") as fd:
-                if att.endswith(("htm", "html")):
-                    html = make_html_images_inline(att)
-                    part = MIMEText(html, "html")
-                    message = ""
-                elif att.endswith("txt"):
-                    part = MIMEText(fd.read().decode())
-                elif att.endswith("pdf"):
-                    part = email.mime.application.MIMEApplication(
-                        fd.read(), _subtype="pdf"
-                    )
-                    part.add_header(
-                        "Content-Disposition",
-                        "attachment",
-                        filename=os.path.basename(att),
-                    )
-            # All parts are added to the message structure
-            msg.attach(part)
-    # if param.verbose:
-    #     print(msg.as_string())
-
-    if message:
-        msg.attach(MIMEText(message, "plain"))
-
-    success = True
-    try:
-        conn.sendmail(msg["From"], addr.split(","), msg.as_string())
-    except SMTPException as e:
-        # retry
-        sleep(10)
-        conn = SMTP(host, port)
-        conn.starttls(context=context)
-        conn.ehlo()
+def _save_to_sent(param, msg):
+    for attempt in range(2):
         try:
-            conn.login(username, password)
-        except SMTPAuthenticationError:
-            log.critical("Invalid SMTP credentials")
-            sys.exit(-1)
-        try:
-            conn.sendmail(msg["From"], addr.split(","), msg.as_string())
-        except SMTPException as e:
-            log.critical(f"SMTP error after two tries: {e}")
-            success = False
-
-    if param.verbose:
-        log.info("sent")
-
-    conn.quit()
-    if success:
-        # a copy of the message in kept in the sent folder
-        try:
-            imap = imaplib.IMAP4_SSL(imap_host, imap_port)
-            imap.login(username, password)
+            imap = imaplib.IMAP4_SSL(param.imap_host, param.imap_port)
+            imap.login(param.username, param.password)
             imap.append(
-                sent_folder,
+                param.sent_folder,
                 "\\Seen",
                 imaplib.Time2Internaldate(time()),
                 msg.as_string().encode("utf8"),
             )
             imap.logout()
+            if param.verbose:
+                log.info("stored in sent folder")
+            return
         except Exception as e:
-            log.warning(f"Retrying copying sent message in sent folder: {e}")
-            sleep(10)
-            try:
-                imap = imaplib.IMAP4_SSL(imap_host, imap_port)
-                imap.login(username, password)
-                imap.append(
-                    sent_folder,
-                    "\\Seen",
-                    imaplib.Time2Internaldate(time()),
-                    msg.as_string().encode("utf8"),
-                )
-                imap.logout()
-            except Exception as e:
-                log.error(f"Error copying sent message in sent folder: {e}")
+            if attempt == 0:
+                log.warning(f"Retrying IMAP storage: {e}")
+                sleep(10)
+            else:
+                log.error(f"Error copying to sent folder: {e}")
 
-        if param.verbose:
-            log.info("stored in sent folder")
+
+def send_mail(
+    param=None,
+    subject="",
+    to="",
+    cc="",
+    bcc="",
+    message="",
+    images=None,
+    attachments=None,
+):
+    if param is None:
+        log.critical("Missing configuration parameter")
+        sys.exit(-1)
+
+    # 1. Build Message
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = subject
+    msg["From"] = formataddr((param.sendername, param.sender))
+    msg["To"] = f"{to},{formataddr((param.sendername, param.sender))}"
+    if cc:
+        msg["Cc"] = cc
+    if bcc:
+        msg["Bcc"] = bcc
+    msg["Date"] = email.utils.formatdate(localtime=True)
+    msg["Message-ID"] = email.utils.make_msgid(
+        idstring=str(uuid4()), domain="artscroises.be"
+    )
+
+    # 2. Add Content & Attachments
+    for img in [images] if isinstance(images, str) else (images or []):
+        try:
+            with open(img, "rb") as f:
+                msg.attach(MIMEImage(f.read(), name=os.path.basename(img)))
+        except FileNotFoundError:
+            log.error(f"Could not find image '{img}'")
+
+    for att in [attachments] if isinstance(attachments, str) else (attachments or []):
+        with open(att, "rb") as f:
+            content = f.read()
+            if att.endswith(("htm", "html")):
+                msg.attach(MIMEText(make_html_images_inline(att), "html"))
+                message = ""
+            elif att.endswith("txt"):
+                msg.attach(MIMEText(content.decode()))
+            elif att.endswith("pdf"):
+                part = MIMEApplication(content, _subtype="pdf")
+                part.add_header(
+                    "Content-Disposition", "attachment", filename=os.path.basename(att)
+                )
+                msg.attach(part)
+
+    if message:
+        msg.attach(MIMEText(message, "plain"))
+
+    # 3. Send and Store
+    recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
+    success = False
+    for attempt in range(2):
+        conn = _get_smtp_connection(param)
+        if conn:
+            try:
+                conn.sendmail(msg["From"], recipients, msg.as_string())
+                conn.quit()
+                success = True
+                if param.verbose:
+                    log.info("sent")
+                break
+            except SMTPException as e:
+                log.error(f"SMTP error on attempt {attempt + 1}: {e}")
+                if attempt == 0:
+                    sleep(10)
+
+    if success:
+        _save_to_sent(param, msg)
+
+
+def _get_subscriber_reader(param):
+    """Extrait la logique de lecture de la source de données."""
+    if param.db is None:
+        wb = openGoogleDBMembersSheet()
+        return iter(readAllSheet(wb)), None
+
+    try:
+        csvfile = open(param.db, "r", newline="", encoding="utf-8-sig")
+        return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
+    except FileNotFoundError:
+        log.critical(f"Fichier introuvable : '{param.db}'")
+        return None, None
+
+
+def _format_message(template, row, header):
+    """Gère le remplacement des variables dans le corps du message."""
+    try:
+        msg_txt = re.sub(r"\${(.*)}", r"{row[header.index('\1')]}", template)
+        return eval('f"""' + msg_txt + '"""')
+    except (NameError, KeyError, IndexError) as e:
+        log.error(f"Erreur d'évaluation du message : {e}")
+        return template
 
 
 def generate_mailing(param):
-    """
-    Generate a mass mailing based on a CVS file of subscribers
-    :param param: configuration parameters
-    :return:
-    """
-
+    """Génère un envoi groupé basé sur une liste d'abonnés."""
     try:
-        db = param.db  # config["DB"]
-        max_add = param.max_addr_per_mail  # config["MAX_ADDR_PER_MAIL"]
-        max_mail = param.max_mails_per_hour  # config["MAX_MAILS_PER_HOUR"]
-        pause = param.pause  # config["PAUSE"]
+        max_add = param.max_addr_per_mail
+        max_mail = param.max_mails_per_hour
+        pause = param.pause
     except AttributeError as e:
-        log.critical(f"Missing or invalid configuration key {e}")
+        log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
 
-    n_add = 0
-    n_mail = 0
-    addressees = []
-    nrow = 1
-    csvfile = None
-    start = time()
-    # reader = iter([])
-    if db is None:
-        wb = openGoogleDBMembersSheet()
-        reader = iter(readAllSheet(wb))
-    else:
-        # Read the subscriber's db
-        try:
-            csvfile = open(db, "r", newline="")
-            reader = csv.reader(csvfile, delimiter=",", quotechar='"')
-        except FileNotFoundError:
-            log.critical(f"No such file or directory: '{db}'")
+    reader, csvfile = _get_subscriber_reader(param)
+    if reader is None:
+        return "Error"
+
+    try:
+        header = next(reader, None)
+        if not header:
             return "Error"
 
-    # Get the header
-    header = next(reader, None)
-    if header[0][:1] == "\ufeff":
-        header[0] = header[0][1:]
-    email_idx = header.index("email")
-    group_idx = header.index("mailing_list")
-    selected_idx = header.index("selected")
-    opt_out = header.index("status")
-    user_idx = header.index("id")
+        indices = {
+            "email": header.index("email"),
+            "group": header.index("mailing_list"),
+            "selected": header.index("selected"),
+            "status": header.index("status"),
+            "id": header.index("id"),
+        }
 
-    # skip records before starting index if required
-    if param.from_index:
-        log.info(f"Starting (re-)sending mails from index {param.from_index}")
-        for nrow in range(2, int(param.from_index)):
-            next(reader, None)
+        # Sauter les enregistrements initiaux
+        current_row_idx = 1
+        if param.from_index:
+            log.info(f"Reprise à l'index {param.from_index}")
+            for _ in range(2, int(param.from_index)):
+                next(reader, None)
+                current_row_idx += 1
 
-    # loop all other records
-    for row in reader:
-        nrow += 1
-        if param.to_index and nrow > int(param.to_index):
-            break
-        # skip inactive records and opt-out ones
+        addressees = []
+        recipient_count = 0
+        mail_batch_count = 0
+        start_time = time()
 
-        if row[opt_out] != "active":
-            continue
+        for row in reader:
+            current_row_idx += 1
+            if param.to_index and current_row_idx > int(param.to_index):
+                break
 
-        # skip records not belonging to the test group if requested
-        if param.test and "Test" not in row[group_idx]:
-            continue
+            # Filtres de sélection
+            is_active = row[indices["status"]] == "active"
+            is_test_match = not param.test or "Test" in row[indices["group"]]
+            is_selected = not param.selected or row[indices["selected"]].lower() == "x"
+            has_email = bool(row[indices["email"]])
 
-        if param.selected and row[selected_idx].lower() != "x":
-            continue
+            if not (is_active and is_test_match and is_selected and has_email):
+                continue
 
-        if param.verbose:
-            print("', ".join(row))
-
-        if not row[email_idx]:
-            continue
-
-        user_id = row[user_idx]
-        # create a group of 'max_add' addresses and send to all of them in BCC
-        addressees.append(row[email_idx])
-        n_add += 1
-        if n_add % max_add == 0:
             if param.verbose:
-                print("_" * 80)
-                print(", ".join(addressees))
-                print("_" * 80)
-            log.info(
-                f'Sending {n_add} addressees, up to index {nrow}: {", ".join(addressees)}'
-            )
-            msg_txt = re.sub(r"\${(.*)}", r"{row[header.index('\1')]}", param.message)
-            try:
-                msg_txt = eval('f"""' + msg_txt + '"""')
-            except NameError as e:
-                log.error(f"Error evaluating message: {e}")
+                print(", ".join(row))
+
+            addressees.append(row[indices["email"]])
+            recipient_count += 1
+
+            # Envoi par lots
+            if len(addressees) >= max_add:
+                log.info(
+                    f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})"
+                )
+
+                msg_body = _format_message(param.message, row, header)
+                if not param.donotsend:
+                    send_mail(
+                        param=param,
+                        subject=param.subject,
+                        message=msg_body,
+                        bcc=",".join(addressees),
+                        attachments=param.file,
+                    )
+
+                addressees = []
+                mail_batch_count += 1
+                sleep(pause)
+
+                if recipient_count % max_mail == 0:
+                    log.info("Limite horaire atteinte. Pause d'une heure...")
+                    sleep(3600)
+
+        # Envoi du reliquat
+        if addressees:
+            log.info(f"Envoi final à {len(addressees)} destinataires.")
             if not param.donotsend:
                 send_mail(
                     param=param,
                     subject=param.subject,
-                    message=msg_txt,
+                    message=param.message,
                     bcc=",".join(addressees),
                     attachments=param.file,
                 )
+            mail_batch_count += 1
 
-            addressees = []
-            n_mail += 1
-            sleep(pause)
-
-        # Control the limit of allowed mails to send as per email provider rules
-        if n_add % max_mail == 0:
-            log.info("Sleeping for 1 hour...")
-            if param.verbose:
-                print("+" * 80)
-            sleep(3600)
-
-    if csvfile is not None:
-        csvfile.close()
-
-    if addressees:
+        elapsed = time() - start_time
         log.info(
-            f'Sending {n_add} addressees, up to index {nrow}: {", ".join(addressees)}'
+            f"Terminé. {recipient_count} adresses traitées en {mail_batch_count} envois ({int(elapsed)}s)"
         )
-        if not param.donotsend:
-            send_mail(
-                param=param,
-                subject=param.subject,
-                message=param.message,
-                bcc=",".join(addressees),
-                attachments=param.file,
-            )
-    elapsed = time() - start
-    log.info(
-        f"Done. Processed {n_add} addresses in {n_mail + 1} email(s) in {int(elapsed) + 1} seconds"
-    )
-    return "OK"
+        return "OK"
+
+    finally:
+        if csvfile:
+            csvfile.close()
 
 
-def main():
-    # Set the right directory
-    abspath = os.path.abspath(__file__)
-    os.chdir(os.path.dirname(abspath))
-
-    # open secret config object
-    config = get_secret("artscroisesmailing")
-    if config is None:
-        log.critical(f"No secret configuration found")
-        sys.exit(1)
-
-    # Get arguments
+def setup_argparse(config):
     parser = argparse.ArgumentParser()
-    parser.add_argument("-s", "--subject", help="Subject of the mail", required=False)
+    parser.add_argument("-s", "--subject", help="Subject of the mail")
     parser.add_argument("-m", "--message", help="Text message of the mail", default="")
     parser.add_argument("file", nargs="*", help="files to attach to the mail")
     parser.add_argument(
@@ -567,7 +499,6 @@ def main():
     parser.add_argument(
         "-x", "--doNotSend", action="store_true", help="Do not send any mail"
     )
-    # parser.add_argument("-p", "--password", help="password for the mail", default=None)
     parser.add_argument("-db", "--database", help="database path", default=None)
     parser.add_argument(
         "-f", "--from_index", help="Starting index in the database", default=None
@@ -576,17 +507,12 @@ def main():
         "-to", "--to_index", help="Stopping index in the database", default=None
     )
     parser.add_argument(
-        "-w",
-        "--wait",
-        help="Wait x minutes before restarting sending mail",
-        default=None,
+        "-w", "--wait", help="Wait x minutes before restarting sending mail", type=int
     )
     parser.add_argument(
         "--selected", action="store_true", help="Only send selected mail", default=False
     )
-
     parser.add_argument("--body")
-
     parser.add_argument(
         "-mh",
         "--max-mails-per-hour",
@@ -597,141 +523,90 @@ def main():
         "-na", "--max-addr-per-mail", default=int(config["max_addr_per_mail"]), type=int
     )
     parser.add_argument("-p", "--pause", default=int(config["pause"]), type=int)
+    return parser.parse_args()
 
-    args = parser.parse_args()
 
-    if args.verbose:
-        print(args.file)
+def process_attachments(args, config, folder="input"):
+    service, google_drive_files = None, []
 
-    body_txt = ""
-    if args.body:
-        body_txt = args.body
-
-    # test if attachment files exist
-    gd_files = []
-    service = None
-    folder = "input"
-    # if file paths are passes as argument, get them & test existence
-    files = args.file
     if args.file:
         for f in args.file:
             if not os.path.isfile(f):
                 log.critical(f"File not found: {f}")
                 sys.exit(-1)
+        files = args.file
     else:
-        # alternatively, download files from google drive mailing folder
-        files = glob(f"{folder}/*.*")
-        for f in files:
+        # Nettoyage et téléchargement depuis Google Drive
+        for f in glob(f"{folder}/*.*"):
             os.remove(f)
         service = gd.connect_google_driver()
-        gd_files = gd.get_files(service, folder_id=config["mailing_folder"])
-        if gd_files:
-            gd_files = gd_files["files"]
-            gd.download_file(service, gd_files, "input")
+        result = gd.get_files(service, folder_id=config["mailing_folder"])
+        if result and "files" in result:
+            google_drive_files = result["files"]
+            gd.download_file(service, google_drive_files, folder)
+        files = [f for f in glob(f"{folder}/*.*") if "published" not in f]
 
-        # Attach files to the mail
-        newsletter_name = ""
-        files = glob(f"{folder}/*.*")
-        files = [f for f in files if "published" not in f]
+    return files, service, google_drive_files
 
-    # Derive the message subject
+
+def main():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    config = get_secret("artscroisesmailing")
+    if config is None:
+        log.critical("No secret configuration found")
+        sys.exit(1)
+
+    args = setup_argparse(config)
+    files, service, google_drive_files = process_attachments(args, config)
+
+    body_txt = args.body if args.body else ""
+    newsletter_name = ""
+
+    # Analyse des fichiers pour le sujet et le corps
     for f in files:
-        fb = os.path.basename(f)
-        if fb.split(".")[-1] in ["pdf", "html"]:
-            fn = fb.split(".")[0]
-            args.subject = fn if not args.subject else args.subject
-            if "letter" in fn.lower() or "lettre" in fn.lower():
-                newsletter_name = fb
-            if fb.split(".")[-1] == "html":
+        basename = os.path.basename(f)
+        ext = basename.split(".")[-1].lower()
+        name_part = basename.split(".")[0]
+
+        if ext in ["pdf", "html"]:
+            if not args.subject:
+                args.subject = name_part
+            if "letter" in name_part.lower() or "lettre" in name_part.lower():
+                newsletter_name = basename
+            if ext == "html":
                 args.message = "html"
-        elif "body.txt" in fb:
+        elif "body.txt" in basename:
             body_txt = open(f, encoding="utf-8").read()
             args.message = body_txt
             files.remove(f)
 
-    args.file = files
-
-    # define a default message body
     if not args.message:
-        args.message = f"""
-Chers amies et amis des Arts Croisés,
+        args.message = f"\nChers amies et amis des Arts Croisés,\n{body_txt}\nVeuillez trouver en pièce jointe notre newsletter {newsletter_name}.\nBonne lecture!\n\nL'équipe Arts Croisés, asbl\n..."
 
-{body_txt}
-Veuillez trouvez en pièce jointe notre newsletter {newsletter_name}.
-Bonne lecture!
-
-
-
-
-L'équipe Arts Croisés, asbl
-
-PS: Veuillez utiliser notre adresse info@artscroises.be pour toute correspondance et ne pas répondre à ce mail
-Pour vous désinscrire, envoyer un mail avec comme sujet "Se désinscrire"
-        """
-
-    if args.test:
-        log.info(f"Testing mode - send only to the Test Group subscribers")
-
-    if args.doNotSend:
-        log.info(f"No sending mode")
-
-    # # Get configuration yaml - here an example
-    #
-    # HOST: smtp.mail.ovh.net
-    # PORT: 465
-    # IMAP_HOST: imap.mail.ovh.net
-    # IMAP_PORT: 993
-    # USERNAME: info@artscroises.be
-    # PASSWORD
-    # SENDER: info@artscroises.be
-    # SENDERNAME: Arts Croisés asbl
-    # DB: data/Subscribers.csv
-    # MAX_ADDR_PER_MAIL: 50
-    # MAX_MAILS_PER_HOUR: 200
-    # PAUSE: 10
-    # SENT_FOLDER: INBOX.Mailing
-    #
-    # The following parameters may be overwritten by passed arguments
-    # SUBJECT: ""
-    # MESSAGE: ""
-    # TEST: False
-    # VERBOSE: False
-    # DONOTSEND: False
-    # FROM_INDEX: 0
-    # WAIT: 0
-    # SELECTED: False
-
-    if "password" not in config:
-        config["password"] = (
-            args.password if args.password else getpass("Enter mail user's password")
-        )
-
-    # Override default database path
-    if args.database:
-        config["db"] = args.database
-    else:
-        config["db"] = None
-
-    # delay sending if required
     if args.wait:
         log.info(f"Start sending in {args.wait} minutes")
-        for i in range(int(args.wait)):
-            print(f"Sleeping for {60 - i} minutes      \r", end="", flush=True)
+        for i in range(args.wait):
+            print(f"Sleeping for {args.wait - i} minutes      \r", end="", flush=True)
             sleep(60)
 
-    # merge config and argument list into a single object
     config.update(vars(args))
+    if "password" not in config:
+        config["password"] = getpass("Enter mail user's password")
+    if args.database:
+        config["db"] = args.database
 
-    # convert dict into class - all keys are converted in lower case
     param = Dict2Class(config)
-    # Generate the mailing mail and send it to all 'active' recipients from the database
-    ret = generate_mailing(param)
-    if ret == "OK" and not args.test:
-        for f in gd_files:
+    param.file = files  # Mise à jour explicite des fichiers filtrés
+
+    if generate_mailing(param) == "OK" and not args.test:
+        for f in google_drive_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
-        files = glob(f"{folder}/*.*")
-        for f in files:
+        for f in glob("input/*.*"):
             os.remove(f)
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
