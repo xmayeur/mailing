@@ -6,6 +6,7 @@ import datetime as dt
 import email.mime.application
 import email.utils
 import imaplib
+import json
 import logging
 import os
 import ssl
@@ -26,6 +27,8 @@ from bs4 import BeautifulSoup
 from certifi import where
 from getSecrets import get_secret
 from oauth2client.service_account import ServiceAccountCredentials
+from sympy.codegen.ast import continue_
+
 import googleDriveLib as gd
 import csv
 import re
@@ -195,11 +198,29 @@ class Invoice:
         return response
 
     def _get_client(self, client_id):
-        response = self._make_request("GET", f"parties?fullTextSearch={client_id}")
-        return response.json()["Items"][0] if response else None
+        response = self._make_request("GET", f"parties/{client_id}")
+        if response.status_code != 200:
+            return None
+        return response.json()
 
-    def create_invoice(self, client_id="", product_name="", price=0.0, qty=1):
-        client = self._get_client(client_id)
+    def _create_client(self, row, indices):
+        data = {
+            "PartyID": row[indices["id"]],
+            "Name": row[indices["first_name"]] + " " + row[indices["last_name"]],
+            "Mobile": row[indices["mobile_phone"]],
+            "Phone": row[indices["phone"]],
+            "Email": row[indices["email"]],
+            "ContactFirstName": row[indices["first_name"]],
+            "ContactLastName": row[indices["last_name"]],
+            "PartyType": "Customer",
+        }
+        response = self._make_request("POST", "parties", json=data)
+        if response.status_code != 200:
+            return -1
+        return response.text
+
+    def create_order(self, client=None, product_name="", price=0.0, qty=1):
+
         if not client:
             return -1
 
@@ -216,6 +237,7 @@ class Invoice:
                     "UnitPriceExcl": price,
                     "Description": product_name,
                     "VATPercentage": 0.0,
+                    "Reference": "C2026",
                 }
             ],
             "Customer": client,
@@ -229,10 +251,10 @@ class Invoice:
         log.debug(f"OrderID: {order_id}")
 
         # Refresh order details
-        if not self._make_request("GET", f"orders/{order_id}"):
+        response = self._make_request("GET", f"orders/{order_id}")
+        if not response:
             return -1
-
-        return order_id
+        return response.json()
 
 
 def _get_smtp_connection(param):
@@ -377,9 +399,13 @@ def _format_message(template, row, header):
 def generate_mailing(param):
     """Génère un envoi groupé basé sur une liste d'abonnés."""
     try:
-        max_add = param.max_addr_per_mail
+        if param.cotisation:
+            max_add = 1
+            pause = 0
+        else:
+            max_add = param.max_addr_per_mail
+            pause = param.pause
         max_mail = param.max_mails_per_hour
-        pause = param.pause
     except AttributeError as e:
         log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
@@ -395,10 +421,19 @@ def generate_mailing(param):
 
         indices = {
             "email": header.index("email"),
+            "id": header.index("id"),
+            "first_name": header.index("first_name"),
+            "last_name": header.index("last_name"),
+            "phone": header.index("phone"),
+            "mobile_phone": header.index("mobile_phone"),
+            "address": header.index("address"),
+            "city": header.index("city"),
+            "zip": header.index("zip"),
+            "member": header.index("member"),
+            "membershippaid": header.index("membershippaid"),
             "group": header.index("mailing_list"),
             "selected": header.index("selected"),
             "status": header.index("status"),
-            "id": header.index("id"),
         }
 
         # Sauter les enregistrements initiaux
@@ -419,14 +454,45 @@ def generate_mailing(param):
             if param.to_index and current_row_idx > int(param.to_index):
                 break
 
-            # Filtres de sélection
-            is_active = row[indices["status"]] == "active"
-            is_test_match = not param.test or "Test" in row[indices["group"]]
-            is_selected = not param.selected or row[indices["selected"]].lower() == "x"
-            has_email = bool(row[indices["email"]])
+            # Filtres de sélection - skip if false
+            if param.cotisation:
+                is_member = row[indices["member"]] == "yes"
+                not_paid = (
+                    row[indices["membershippaid"]] is None
+                    or row[indices["membershippaid"]] == ""
+                )
+                has_email = bool(row[indices["email"]])
+                if not (is_member and not_paid and has_email):
+                    continue
 
-            if not (is_active and is_test_match and is_selected and has_email):
-                continue
+                # Create or update client
+                client_id = param.invoice._create_client(row, indices)
+                if client_id == -1:
+                    log.error(f"Failed to create client for {row[indices['id']]}.")
+                    continue
+                client = param.invoice._get_client(client_id)
+                if not client:
+                    continue
+                # create an invoice and get the order id
+                order = param.invoice.create_order(
+                    client=client,
+                    product_name="Cotisation Arts Croisés 2026",
+                    price=15,
+                    qty=1,
+                )
+                if order["order_id"] == -1:
+                    log.error(f"Failed to create invoice for {row[indices['id']]}.")
+                print(json.dumps(order, indent=4))
+                pass
+            else:
+                is_active = row[indices["status"]] == "active"
+                is_test_match = not param.test or "Test" in row[indices["group"]]
+                is_selected = (
+                    not param.selected or row[indices["selected"]].lower() == "x"
+                )
+                has_email = bool(row[indices["email"]])
+                if not (is_active and is_test_match and is_selected and has_email):
+                    continue
 
             if param.verbose:
                 print(", ".join(row))
@@ -514,13 +580,16 @@ def setup_argparse(config):
     )
     parser.add_argument("--body")
     parser.add_argument(
+        "--cotisation", help="Generate cotisation reminder mail", action="store_true"
+    )
+    parser.add_argument(
         "-mh",
         "--max-mails-per-hour",
         default=int(config["max_mails_per_hour"]),
         type=int,
     )
     parser.add_argument(
-        "-na", "--max-addr-per-mail", default=int(config["max_addr_per_mail"]), type=int
+        "-na", "--max_addr_per_mail", default=int(config["max_addr_per_mail"]), type=int
     )
     parser.add_argument("-p", "--pause", default=int(config["pause"]), type=int)
     return parser.parse_args()
@@ -598,15 +667,14 @@ def main():
     param = Dict2Class(config)
     param.file = files  # Mise à jour explicite des fichiers filtrés
 
+    if args.cotisation:
+        param.invoice = Invoice(prod=not args.test)
+
     if generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         for f in glob("input/*.*"):
             os.remove(f)
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":
