@@ -473,6 +473,11 @@ def _format_message(template, row, header):
 
 
 def _sync(param):
+    """
+    Synchronize Arts Croisés members only database with Billit
+    :param param:
+    :return:
+    """
 
     reader, csvfile = _get_subscriber_reader(param)
     header = next(reader, None)
@@ -508,17 +513,13 @@ def _sync(param):
         current_row_idx += 1
         if param.to_index and current_row_idx > int(param.to_index):
             break
-        # Filtres de sélection - skip if false
-        if param.cotisation:
-            is_member = row[indices["member"]] == "yes"
-            not_paid = (
-                row[indices["membershippaid"]] is None
-                or row[indices["membershippaid"]] == ""
-            )
-            has_email = bool(row[indices["email"]])
-            if not (is_member and not_paid and has_email):
-                continue
-            # Create or update client
+
+        # Filtres de sélection
+        has_email = bool(row[indices["email"]])
+        is_member = row[indices["member"]] == "yes"
+
+        if is_member and has_email:
+            # Create or update member as client
             client_id = param.invoice._create_client(row, indices)
             if client_id == -1:
                 log.error(f"Failed to create client for {row[indices['id']]}.")
@@ -526,6 +527,10 @@ def _sync(param):
             client = param.invoice._get_client(client_id)
             if not client:
                 continue
+            log.info(
+                f"Client for {row[indices['first_name']]} {row[indices['last_name']] } sync'ed."
+            )
+
     return "Done"
 
 
