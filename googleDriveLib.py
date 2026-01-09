@@ -18,6 +18,7 @@ import sys
 
 
 def _init_log():
+    """Configures shared logger for console and file"""
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")

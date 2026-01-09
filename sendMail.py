@@ -251,7 +251,7 @@ class Invoice:
             "PartyType": "Customer",
         }
         response = self._make_request("POST", "parties", json=data)
-        if response.status_code != 200:
+        if not response or response.status_code != 200:
             return -1
         return response.text
 
@@ -496,7 +496,7 @@ def _sync(param):
         "city": header.index("city"),
         "zip": header.index("zip"),
         "member": header.index("member"),
-        "membershippaid": header.index("membershippaid"),
+        "membershippaid": header.index(f"Cotisation {param.cotisation_year}"),
         "group": header.index("mailing_list"),
         "selected": header.index("selected"),
         "status": header.index("status"),
@@ -518,7 +518,7 @@ def _sync(param):
         has_email = bool(row[indices["email"]])
         is_member = row[indices["member"]] == "yes"
 
-        if is_member and has_email:
+        if is_member:  # and has_email:
             # Create or update member as client
             client_id = param.invoice._create_client(row, indices)
             if client_id == -1:
