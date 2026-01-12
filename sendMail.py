@@ -785,7 +785,7 @@ def setup_argparse(config):
     )
     parser.add_argument("-p", "--pause", default=int(config["pause"]), type=int)
     parser.add_argument("--sync", action="store_true")
-    parser.add_argument("--spam_check", action="store_true")
+    parser.add_argument("--check_spam", action="store_true")
     return parser.parse_args()
 
 
