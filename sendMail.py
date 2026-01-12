@@ -30,6 +30,7 @@ import googleDriveLib as gd
 import csv
 import re
 from time import time, sleep
+import spamcheck
 
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
@@ -426,6 +427,15 @@ def send_mail(
 
     # 3. Send and Store
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
+
+    if param.check_spam:
+        spam_result = spamcheck.check(msg.as_string(), report=True)
+        print(spam_result["score"])
+        if spam_result["score"] > 0.5:
+            print(spam_result["report"])
+            log.critical("Message rejected by spam filter")
+            return
+
     if param.verbose:
         log.info(f"Sending email to {recipients}")
     success = False
@@ -775,6 +785,7 @@ def setup_argparse(config):
     )
     parser.add_argument("-p", "--pause", default=int(config["pause"]), type=int)
     parser.add_argument("--sync", action="store_true")
+    parser.add_argument("--spam_check", action="store_true")
     return parser.parse_args()
 
 
