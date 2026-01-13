@@ -1,5 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
+"""
+
+TODO: cambristi endpoint returns dict with variable nr of items.
+logics to handle this case:
+create a dataframe
+get header from columns
+get iterator from dataframe
+
+
+"""
+
+
 
 import argparse
 import datetime as dt
@@ -25,7 +37,7 @@ import requests
 import yaml
 from bs4 import BeautifulSoup
 from certifi import where
-from getSecrets import get_secret
+from getSecrets import get_secret, get_user_pwd
 from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
 import csv
@@ -106,6 +118,8 @@ def fetch_data(url, token):
     :param token: str
     :return: dict
     """
+    if not url:
+        return None
     n = 3
     while n > 0:
         try:
@@ -699,6 +713,21 @@ def _filter_artscroises(param, row, indices):
     return not (is_active and is_test_match and is_selected and has_email)
 
 
+def _filter_cambristi(param, row, indices, test):
+    if test:
+        try:
+            return not ('test' in row[indices["title"]] )
+        except IndexError:
+            log.warning(f"No title in row {row[indices['nom']]}, {row[indices['prenom']]}")
+            return True
+    else:
+        try:
+            is_active = row[indices["title"]] == "member"
+            has_mail = bool(row[indices["email"]])
+            return not (is_active and has_mail)
+        except IndexError:
+            return True
+
 def _get_indices(header):
     """
     Create a dictionary that maps each header element to its corresponding
@@ -805,7 +834,20 @@ def generate_mailing(param):
         log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
 
-    reader, csvfile = _get_subscriber_reader(param)
+    csvfile = None
+    if param.profile == 'artscroises':
+        reader, csvfile = _get_subscriber_reader(param)
+    elif param.profile == 'cambristi':
+        token = get_secret(param.wix_api_token_id)['password']
+        data = fetch_data(param.members, token)
+        members = data['items']
+        reader = [members[0].keys()]
+        for member in members:
+            reader.append(list(member.values()))
+        reader = iter(reader)
+
+    else:
+        return "N/A"
     if not reader:
         return "Error"
 
@@ -833,14 +875,18 @@ def generate_mailing(param):
                 break
 
             # filtering
-            if param.cotisation:
-                if not _process_membership_invoice(param, row, indices):
+            if param.profile == 'artscroises':
+                if param.cotisation:
+                    if not _process_membership_invoice(param, row, indices):
+                        continue
+                elif _filter_artscroises(param, row, indices):
                     continue
-            elif _filter_artscroises(param, row, indices):
-                continue
+            elif param.profile == 'cambristi':
+                if _filter_cambristi(param, row, indices, param.test):
+                    continue
 
             if param.verbose:
-                print(", ".join(row))
+                print(row[indices["email"]])
 
             addressees.append(row[indices["email"]])
             recipient_count += 1
@@ -927,7 +973,7 @@ def setup_argparse():
     parser.add_argument("-t", "--test", action="store_true", help="test mode - send only to the tester group")
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-x", "--doNotSend", action="store_true", help="Do not send any mail")
-    parser.add_argument("-db", "--database", help="database path", default=None)
+    parser.add_argument("-db", "--database", help="database path")
     parser.add_argument("-f", "--from_index", help="Starting index in the database", default=None)
     parser.add_argument("-to", "--to_index", help="Stopping index in the database", default=None)
     parser.add_argument("-w", "--wait", help="Wait x minutes before restarting sending mail", type=int)
@@ -1080,7 +1126,8 @@ def process_cambristi(args):
     """
     config = args.conf[args.profile]
     # config overrides secret data
-    config = {**get_secret(config["MAILCONFIG"]), **config }
+    if "MAILCONFIG" in config:
+        config = {**get_secret(config["MAILCONFIG"]), **config }
     if config is None:
         log.critical("No secret configuration found")
         sys.exit(1)
@@ -1093,7 +1140,7 @@ def process_cambristi(args):
         param.message = open(files[0], encoding="utf-8").read()
         param.file=files[1:]
     ret = generate_mailing(param)
-    print(ret)
+
 
 
 def main():
