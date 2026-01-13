@@ -40,11 +40,11 @@ def _init_log():
 _log = _init_log()
 
 
-def connect_google_driver():
+def connect_google_driver(service_account_id="artscroisesServiceAccount"):
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-            get_secret("artscroisesServiceAccount"), scope
+            get_secret(service_account_id), scope
         )
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:

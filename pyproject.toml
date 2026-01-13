@@ -1,0 +1,13 @@
+[project]
+name = "sendmail"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "google-api-python-client>=2.187.0",
+    "gspread>=6.2.1",
+    "spamcheck>=1.0.4",
+    "get_hc_secrets",
+    "oauth2client"
+]

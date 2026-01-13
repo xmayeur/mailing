@@ -10,13 +10,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="$USER_HOME$/anaconda3/lib/python3.11/site-packages/statsmodels/nonparametric/tests/results/test_lowess_simple.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="/data/Cotisations.csv">
           <value>
             <Attribute>

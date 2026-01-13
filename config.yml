@@ -1,13 +1,24 @@
-smtp_host: pro3.mail.ovh.net
-smtp_port: 587
-imap_host: pro3.mail.ovh.net
-imap_port: 993
-username: mailing@artscroises.be
-SENDER: mailing@artscroises.be
-sendername: Arts Croisés asbl
-db: data/Subscribers.csv
-MAX_ADDR_PER_MAIL: 100
-MAX_MAILS_PER_HOUR: 2000
-PAUSE: 1
-SENT_FOLDER: sent
+artscroises:
+  MAILCONFIG: 'artscroisesmailing'
+  database: data/Subscribers.csv
+  SHEETID: "artscroisesDBmembreID"
+  SA: "artscroisesServiceAccount"
 
+cambristi:
+  MAILCONFIG: 'cambristimailing'
+  SCOPES:
+    - 'https://www.googleapis.com/auth/gmail.readonly'
+    - 'https://www.googleapis.com/auth/gmail.modify'
+    - 'https://www.googleapis.com/auth/gmail.send'
+  TOKEN_FILE: 'token.json'
+  TOKEN_ID: "GmailToken"
+  CREDENTIALS_ID: "GmailCredentials"
+  WIX_API_TOKEN_ID: "cambristiApiToken"
+  FOLDER: "news_to_send"
+  MAIL: 'icambristi@gmail.com'
+  SA: 'cambristiGoogleServiceAccount'
+  max_addr_per_mail: 50
+  max_mails_per_hour: 100
+  pause: 1
+  sendername: "I Cambristi ASBL"
+  sender: 'icambristi@gmail.com'
