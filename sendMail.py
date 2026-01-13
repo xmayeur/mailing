@@ -395,6 +395,36 @@ def _save_to_sent(param, msg):
 
 
 def build_email(param, subject="",to="",cc="",bcc="",message="",images=None,attachments=None):
+    """
+    Builds an email message with optional attachments and inline images. The function
+    creates a `MIMEMultipart` message object, populates its headers and body content,
+    and prepares a list of recipients derived from the provided arguments. Attachments
+    and inline images are processed and attached to the message. This function
+    supports custom profiles for generating unique message IDs.
+
+    :param param: An object containing email configuration, sender details, and
+        profile-specific behaviors.
+    :type param: Any
+    :param subject: Email subject line.
+    :type subject: str, optional
+    :param to: Primary recipients of the email, separated by commas.
+    :type to: str, optional
+    :param cc: CC (Carbon Copy) recipients, separated by commas.
+    :type cc: str, optional
+    :param bcc: BCC (Blind Carbon Copy) recipients, separated by commas.
+    :type bcc: str, optional
+    :param message: Email body content to be used as plain text or HTML.
+    :type message: str, optional
+    :param images: A single image file path or a list of image file paths to
+        include as inline attachments in the email.
+    :type images: str or list[str], optional
+    :param attachments: A single file path or a list of file paths to include
+        as attachments in the email.
+    :type attachments: str or list[str], optional
+    :return: Returns a tuple containing the constructed email message (`msg`) and
+        a list of recipients (`recipients`).
+    :rtype: tuple[MIMEMultipart, list[str]]
+    """
     # 1. Build Message
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
@@ -451,26 +481,20 @@ def build_email(param, subject="",to="",cc="",bcc="",message="",images=None,atta
 
 def get_gmail_service(param):
     """
-    Initializes and returns a Gmail API service instance.
+    Fetches and returns the Gmail service object by authenticating through OAuth2. If valid credentials
+    are not found locally, the function retrieves them via authorized secrets or user authentication
+    interaction.
 
-    This function is responsible for establishing a connection to the Gmail API
-    using stored credentials or by performing an OAuth2 authentication flow. If
-    credentials are not valid or expired, the function refreshes them or initiates
-    a new authentication flow. The authenticated credentials are saved to a token
-    file for future use. Finally, a Gmail API service instance is returned.
-
-    TOKEN_FILE: A string representing the path to the file storing the
-                       OAuth2 token.
-    SCOPES: A list of strings specifying the OAuth2 scopes required by the
-                   application.
-    TOKEN_ID: A string identifying where to retrieve the access token from
-                     the secret management service.
-    CREDENTIALS_ID: A string identifying where to retrieve the OAuth2 client
-                           credentials from the secret management service.
-    :return: An instance of the Gmail API service client.
+    :param param: An object containing the following attributes:
+        - token_file: A path to the file holding the user's token information.
+        - scopes: A list of OAuth2 scopes required by the Gmail API.
+        - token_id: Identifier for fetching the token via secret management.
+        - credentials_id: Identifier for fetching OAuth2 client credentials via secret management.
+        - SCOPES: A list of OAuth2 scopes required for the authentication process.
+    :type param: object
+    :return: A Google API client service object for accessing the Gmail API.
     :rtype: googleapiclient.discovery.Resource
     """
-
     if os.path.exists(param.token_file):
         creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
     else:
@@ -492,7 +516,19 @@ def get_gmail_service(param):
 
 
 def send_gmail(service,message=None):
+    """
+    This function is used to send an email using the Gmail API. The provided `service`
+    object facilitates interaction with the Gmail API. An input `message` object must
+    also be provided, containing the email to be sent. The function encodes the email
+    in a URL-safe format and sends it using the API. In the case of an error during
+    transmission, the error is logged, and `None` is returned.
 
+    :param service: A resource object with methods for interacting with the Gmail API.
+    :param message: An email message object containing the data to send. Should
+       implement the `as_bytes` method for conversion to raw bytes format.
+    :return: The API response on successful email sending, or `None` if an error
+       occurs.
+    """
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
     body = {"raw": encoded_message}
@@ -504,6 +540,27 @@ def send_gmail(service,message=None):
 
 
 def send_mail(param=None,message=None, recipients=None):
+    """
+    Send an email message to specified recipients using SMTP.
+
+    This function attempts to send an email message to the specified list of
+    recipients using an SMTP connection. It retries sending the email up to two
+    times in case of a failure. Logging and other functionalities depend on the
+    settings provided in the `param` object. The email is saved to the sent records
+    if it is successfully sent.
+
+    :param param: A configuration object that determines the behavior of the
+        email-sending process, such as verbosity for logging.
+    :type param: Any
+    :param message: The email message to be sent, where the "From" field is
+        mandatory and expected to be correctly populated.
+    :type message: email.message.EmailMessage
+    :param recipients: A list of recipient email addresses to whom the message
+        should be sent.
+    :type recipients: list[str]
+    :return: A boolean indicating whether the email was successfully sent.
+    :rtype: bool
+    """
     if param.verbose:
         log.info(f"Sending email to {recipients}")
     success = False
@@ -556,7 +613,8 @@ def _sync(param):
     :param param:
     :return:
     """
-
+    if param.profile != 'artscroises':
+        return "N/A"
     reader, csvfile = _get_subscriber_reader(param)
     header = next(reader, None)
     if not header:
@@ -613,6 +671,25 @@ def _sync(param):
 
 
 def _filter_artscroises(param, row, indices):
+    """
+    Filters rows based on specific conditions such as status, group, selection,
+    and email presence. The function evaluates multiple constraints using the
+    provided parameters, data row, and column indices to determine the
+    exclusion or inclusion of the row.
+
+    :param param: An object containing filtering options such as test mode
+        and selection criteria.
+    :type param: Any
+    :param row: A list or array representing a single row of data to be
+        evaluated by the filter.
+    :type row: list
+    :param indices: A dictionary mapping column names to their respective
+        indices in the row for easy access to specific data points.
+    :type indices: dict
+    :return: A boolean value. True if the row should NOT pass the filter
+        (i.e., be excluded), False if it should pass.
+    :rtype: bool
+    """
     is_active = row[indices["status"]] == "active"
     is_test_match = not param.test or "Test" in row[indices["group"]]
     is_selected = (
@@ -623,12 +700,36 @@ def _filter_artscroises(param, row, indices):
 
 
 def _get_indices(header):
+    """
+    Create a dictionary that maps each header element to its corresponding
+    index in the list of headers.
+
+    :param header: List of header strings.
+    :type header: list
+    :return: A dictionary where keys are elements from the header list and
+             values are their corresponding indices.
+    :rtype: dict
+    """
     return {h: i for i, h in enumerate(header)}
 
 
-# ... existing code ...
 def _process_membership_invoice(param, row, indices):
-    """Gère la création de client, facture et le template de message pour les cotisations."""
+    """
+    Processes a membership invoice for the Arts Croisés association. The function validates the provided
+    information, creates a client if necessary, generates a membership invoice, and composes a message
+    for the member conveying payment details.
+
+    It ensures the client meets the criteria for membership renewal, attempts to handle the creation of
+    a client and order, and formats the final message detailing how to proceed with the payment.
+
+    :param param: An object that contains properties and behaviors necessary for invoice processing.
+    :param row: A dictionary-like object containing the details of a single member or transaction.
+    :param indices: A dictionary mapping field names to their corresponding indices within the row object.
+    :return: A boolean indicating whether the membership invoice was successfully processed. Returns
+        None if any mandatory step in processing fails.
+    """
+    if param.profile != 'artscroises':
+        return None
     if not (row[indices["member"]] == "yes" and
             not row[indices["membershippaid"]] and
             row[indices["email"]]):
@@ -675,7 +776,27 @@ def _process_membership_invoice(param, row, indices):
 
 
 def generate_mailing(param):
-    """Génère un envoi groupé basé sur une liste d'abonnés."""
+    """
+    Generates and sends email batches based on the specified parameters and subscription data.
+
+    The function processes subscriber data, filters the recipients based on given conditions,
+    formats the message body, and sends emails in batches while adhering to specified constraints
+    such as maximum recipients per mail and maximum emails per hour. Handles special cases like
+    membership-specific invoicing, restricts email sending to specific recipient indices,
+    and optionally resumes at a specified index.
+
+    :param param: Object containing configurations and parameters for the email generation
+                  and sending process (e.g., max address per mail, pause duration, verbose
+                  mode, subscription filters, etc.).
+    :type param: object
+
+    :return: A string indicating the result of the operation. Returns "OK" if successful, or
+             "Error" in case of a failure.
+    :rtype: str
+
+    :raises AttributeError: Raised if a required configuration key is missing in the
+                            `param` object.
+    """
     try:
         max_add = 1 if param.cotisation else param.max_addr_per_mail
         pause = 0 if param.cotisation else param.pause
@@ -761,6 +882,44 @@ def generate_mailing(param):
 
 
 def setup_argparse():
+    """
+    Sets up and parses command-line arguments for a mailing utility.
+
+    This function configures an argument parser with various command-line options
+    to customize email sending behavior. The options include mail subject, body,
+    attachments, database indices, test mode, verbosity, and other configurations
+    for controlling email sending and processing.
+
+    :return: Parsed arguments from the command line
+    :rtype: argparse.Namespace
+
+    Options:
+        - -s, --subject: Subject of the mail (default: None).
+        - -m, --message: Text message of the mail (default: an empty string).
+        - file: A list of files to attach to the mail (default: []).
+        - -t, --test: Test mode flag; sends only to a tester group (default: False).
+        - -v, --verbose: Flag to increase output verbosity (default: False).
+        - -x, --doNotSend: Flag to disable mail sending (default: False).
+        - -db, --database: Database path (default: None).
+        - -f, --from_index: Starting index in the database (default: None).
+        - -to, --to_index: Stopping index in the database (default: None).
+        - -w, --wait: Waiting time in minutes before restarting mail sending
+          (default: None).
+        - --selected: Flag to send only selected mail (default: False).
+        - --body: Specifies the email body (default: None).
+        - --cotisation: Generates a cotisation reminder mail (default: False).
+        - -y, --cotisation_year: Year for cotisation reminders (default: '2026').
+        - -amt, --cotisation_amount: Amount for cotisation reminders (default:
+          '15.00').
+        - -mh, --max-mails-per-hour: Maximum emails to send per hour (default:
+          1000).
+        - -na, --max_addr_per_mail: Maximum number of addresses per mail (default:
+          50).
+        - -p, --pause: Pause duration in seconds between operations (default: 3).
+        - --sync: Flag to enable synchronization mode (default: False).
+        - --check_spam: Flag to perform spam detection checks (default: False).
+        - --profile: Specifies the mail profile to use (default: None).
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--subject", help="Subject of the mail")
     parser.add_argument("-m", "--message", help="Text message of the mail", default="")
@@ -787,6 +946,22 @@ def setup_argparse():
 
 
 def process_attachments(args, config, folder="input"):
+    """
+    Processes attachments by either verifying file paths provided in the arguments or downloading files
+    from a Google Drive folder and cleaning up the local folder. Returns processed file paths, the Google
+    Drive service connection, and metadata about the downloaded files.
+
+    :param args: Command-line arguments containing file paths or other configurations.
+    :type args: Namespace
+    :param config: Configuration dictionary containing keys like 'SA' for service account and
+        'mailing_folder' for desired Google Drive folder ID.
+    :type config: dict
+    :param folder: Optional path to the local folder used for downloading files. Defaults to "input".
+    :type folder: str
+    :return: A tuple containing the list of processed file paths, the Google Drive service connection
+        object (or None if unused), and metadata about files fetched from Google Drive.
+    :rtype: tuple[list[str], Union[Resource, None], list[dict]]
+    """
     service, google_drive_files = None, []
     if args.file:
         for f in args.file:
@@ -811,6 +986,15 @@ def process_attachments(args, config, folder="input"):
 
 
 def process_artscroises(args):
+    """
+    Processes and configures the Arts Croisés mailing workflow including handling of
+    attachments, configuration settings, and messaging details derived from the provided
+    arguments and configurations.
+
+    :param args: Parsed arguments containing configuration details for mailing options.
+    :type args: argparse.Namespace
+    :return: None
+    """
     config = args.conf[args.profile]
     # config overrides secret data
     config = {**get_secret(config["MAILCONFIG"]), **config }
@@ -881,7 +1065,19 @@ def process_artscroises(args):
 
 
 def process_cambristi(args):
+    """
+    Processes and sends emails with optional attachment handling and message body
+    generation based on the provided profile configuration.
 
+    This function initializes the configuration based on the provided arguments,
+    combines it with secret configuration data, and processes any attachments.
+    It then uses the updated configuration to create and send mailing content
+    through a specified email service.
+
+    :param args: The argparse.Namespace object containing the command-line
+        arguments, including profile and other configurations.
+    :returns: None
+    """
     config = args.conf[args.profile]
     # config overrides secret data
     config = {**get_secret(config["MAILCONFIG"]), **config }
@@ -901,6 +1097,15 @@ def process_cambristi(args):
 
 
 def main():
+    """
+    Changes the current working directory to the directory of the executing file, parses
+    command-line arguments, and loads configuration settings from a YAML file. Based on
+    the specified profile in the arguments, it processes the respective profile logic.
+
+    :param args: The command-line arguments parsed by the argument setup function.
+    :type args: Any
+    :return: None
+    """
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     args = setup_argparse()
     args.conf = yaml.safe_load(open("config.yml"))
