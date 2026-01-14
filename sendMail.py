@@ -9,47 +9,46 @@ TODO: understand why image src from web are showed as attachment, not embedded i
 
 
 import argparse
+import base64
+import csv
 import datetime as dt
 import email.mime.application
 import email.utils
 import imaplib
 import logging
 import os
+import re
+import shutil
 import ssl
 import sys
+import tempfile
 import urllib.parse
 from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
-from email import message_from_bytes
 from getpass import getpass
 from glob import glob
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
+from time import time, sleep
 from uuid import uuid4
+
 import gspread
 import requests
 import yaml
+from PIL import Image
 from bs4 import BeautifulSoup
 from certifi import where
-from getSecrets import get_secret, get_user_pwd
-from oauth2client.service_account import ServiceAccountCredentials
-import googleDriveLib as gd
-import csv
-import re
-from time import time, sleep
-import spamcheck
+from getSecrets import get_secret
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient import errors
 from googleapiclient.discovery import build
-import base64
-import tempfile
-from PIL import Image
-import shutil
+from oauth2client.service_account import ServiceAccountCredentials
 
+import googleDriveLib as gd
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 
@@ -110,36 +109,6 @@ def readAllSheet(wb, sheet_name: str = ""):
     return ws.get_all_values()
 
 
-def fetch_data(url, token):
-    """
-    Fetch data from WIX API
-    :param url: str
-    :param token: str
-    :return: dict
-    """
-    if not url:
-        return None
-    n = 3
-    while n > 0:
-        try:
-            headers = {'Accept': 'application/json', 'auth': token}
-            resp = requests.get(url, headers=headers)
-            if resp.status_code == 200:
-                return resp.json()
-            else:
-                log.error(f'Error fetching data: {resp.status_code}')
-                return None
-
-        except Exception as e:
-            sleep(60)
-            n -= 1
-            log.error(f'Retrying fetching data')
-            continue
-
-    log.error('Error fetching data')
-    return None
-
-
 class Dict2Class:
     """
     Convert a dict to a class
@@ -181,7 +150,8 @@ def file_to_base64(filepath):
     """
     import base64
 
-    if ('http') in filepath:
+    encoded_str = ""
+    if 'http' in filepath:
         img = requests.get(filepath)
         if img.status_code != 200:
             return ''
@@ -271,7 +241,7 @@ class Invoice:
             return None
         return response
 
-    def _get_client(self, client_id):
+    def get_client(self, client_id):
         """
         Retrieves details for a client using its ID.
         :param client_id:
@@ -282,7 +252,7 @@ class Invoice:
             return None
         return response.json()
 
-    def _create_client(self, row, indices):
+    def create_client(self, row, indices):
         """
         Creates or update a new client using the provided row data.
         :param row:
@@ -455,6 +425,15 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"] = formataddr((param.sendername, param.sender))
+    
+    # Ajout de l'en-tête List-Unsubscribe
+    # Il est recommandé de fournir à la fois une URL (http) et une adresse mail (mailto)
+    # unsubscribe_url = "https://www.votre-site.be/unsubscribe" # À adapter selon vos paramètres
+    unsubscribe_mail = f"mailto:{param.sender}?subject=unsubscribe"
+    
+    msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"  # , <{unsubscribe_url}>"
+    msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click" # Recommandé par les nouveaux standards Gmail/Yahoo 2024
+
     if param.cotisation:
         to = bcc
         bcc = None
@@ -468,8 +447,8 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     msg["Date"] = email.utils.formatdate(localtime=True)
     if param.profile == 'artscroises':
         msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="artscroises.be")
-    elif param.profile == 'cambristi':
-        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
+    # elif param.profile == 'cambristi':
+    #    msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
 
     # Conteneur pour le corps du mail et ses images liées
     msg_related = MIMEMultipart("related")
@@ -710,11 +689,11 @@ def _sync(param):
 
         if is_member:  # and has_email:
             # Create or update member as client
-            client_id = param.invoice._create_client(row, indices)
+            client_id = param.invoice.create_client(row, indices)
             if client_id == -1:
                 log.error(f"Failed to create client for {row[indices['id']]}.")
                 continue
-            client = param.invoice._get_client(client_id)
+            client = param.invoice.get_client(client_id)
             if not client:
                 continue
             log.info(
@@ -804,12 +783,12 @@ def _process_membership_invoice(param, row, indices):
             row[indices["email"]]):
         return None
 
-    client_id = param.invoice._create_client(row, indices)
+    client_id = param.invoice.create_client(row, indices)
     if client_id == -1:
         log.error(f"Failed to create client for {row[indices['id']]}.")
         return None
 
-    client = param.invoice._get_client(client_id)
+    client = param.invoice.get_client(client_id)
     if not client:
         return None
 
@@ -875,19 +854,6 @@ def generate_mailing(param):
         return "Error"
 
     reader, csvfile = _get_subscriber_reader(param)
-    # if param.profile == 'artscroises':
-    #     reader, csvfile = _get_subscriber_reader(param)
-    # elif param.profile == 'cambristi':
-    #     token = get_secret(param.wix_api_token_id)['password']
-    #     data = fetch_data(param.members, token)
-    #     members = data['items']
-    #     reader = [members[0].keys()]
-    #     for member in members:
-    #         reader.append(list(member.values()))
-    #     reader = iter(reader)
-    #
-    # else:
-    #     return "N/A"
     if not reader:
         return "Error"
 
@@ -1190,7 +1156,7 @@ def process_cambristi(args):
     # if 'html' in files[0]:
     #     param.message = open(files[0], encoding="utf-8").read()
     #     param.file=files[1:]
-    ret = generate_mailing(param)
+    generate_mailing(param)
 
 
 def main():
@@ -1199,8 +1165,6 @@ def main():
     command-line arguments, and loads configuration settings from a YAML file. Based on
     the specified profile in the arguments, it processes the respective profile logic.
 
-    :param args: The command-line arguments parsed by the argument setup function.
-    :type args: Any
     :return: None
     """
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
