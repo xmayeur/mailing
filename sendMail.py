@@ -46,6 +46,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient import errors
 from googleapiclient.discovery import build
 import base64
+import tempfile
+from PIL import Image
+import shutil
 
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
@@ -191,19 +194,19 @@ def file_to_base64(filepath):
 
 def prepare_html_for_cid(in_filepath):
     """
-    Scanne le HTML, remplace les chemins locaux par des CID et retourne 
+    Scanne le HTML, remplace les chemins locaux par des CID et retourne
     le HTML modifié ainsi que la liste des chemins d'images à attacher.
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
     with open(in_filepath, "r", encoding="utf-8") as file:
         soup = BeautifulSoup(file, "html.parser")
-    
+
     image_paths = []
     for img in soup.find_all("img"):
         src = img.attrs.get("src", "")
         if 'http' in src or src.startswith("data:"):
             continue
-            
+
         # Résoudre le chemin local de l'image
         img_local_path = urllib.parse.unquote(os.path.join(basepath, src))
         if os.path.exists(img_local_path):
@@ -211,7 +214,7 @@ def prepare_html_for_cid(in_filepath):
             cid = email.utils.make_msgid(domain="inline.img")[1:-1]
             img.attrs["src"] = f"cid:{cid}"
             image_paths.append((img_local_path, cid))
-            
+
     return str(soup), image_paths
 
 
@@ -398,42 +401,81 @@ def _save_to_sent(param, msg):
                 log.error(f"Error copying to sent folder: {e}")
 
 
-def prepare_html_and_get_images(in_filepath):
+def prepare_html_and_get_images(in_filepath, max_width=800):
     """
-    Lit un fichier HTML, remplace les sources d'images locales par des CIDs
-    et retourne le HTML ainsi que la liste des images à attacher.
+    Lit un fichier HTML, remplace les images locales par des CIDs,
+    et redimensionne les images trop grandes pour réduire le poids du mail.
     """
+
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
     with open(in_filepath, "r", encoding="utf-8") as file:
         soup = BeautifulSoup(file, "html.parser")
 
     inline_images = []
+    # Créer un dossier temporaire pour les images optimisées
+    temp_dir = tempfile.mkdtemp()
+
     for img in soup.find_all("img"):
         src = img.attrs.get("src", "")
-        # On ignore les images web ou déjà en base64
-        if not src or 'http' in src or src.startswith("data:"):
+        if not src or src.startswith(('http', 'data:')):
             continue
 
         img_path = urllib.parse.unquote(os.path.join(basepath, src))
         if os.path.exists(img_path):
             cid = email.utils.make_msgid(domain="inline.img")[1:-1]
-            img.attrs["src"] = f"cid:{cid}"
-            inline_images.append({'path': img_path, 'cid': cid})
 
-    return str(soup), inline_images
+            # --- Logique de redimensionnement ---
+            try:
+                with Image.open(img_path) as im:
+                    # On ne redimensionne que si l'image est plus large que max_width
+                    if im.width > max_width:
+                        ratio = max_width / float(im.width)
+                        new_height = int(float(im.height) * float(ratio))
+                        im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)
+
+                    # Sauvegarde dans le dossier temporaire en JPEG compressé
+                    opt_img_name = f"{cid}.jpg"
+                    opt_img_path = os.path.join(temp_dir, opt_img_name)
+                    # On convertit en RGB pour le JPEG (au cas où c'est un PNG avec alpha)
+                    im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
+
+                    img.attrs["src"] = f"cid:{cid}"
+                    inline_images.append({'path': opt_img_path, 'cid': cid})
+            except Exception as e:
+                log.error(f"Impossible de traiter l'image {img_path}: {e}")
+                # Si erreur, on peut décider de ne pas l'inclure ou de garder l'original
+                continue
+
+    return str(soup), inline_images, temp_dir
+
 
 def build_email(param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None):
     # ... existing code ...
     # 1. Build Message
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
-    # ... existing code ...
-    if param.profile == 'cambristi':
+    msg["From"] = formataddr((param.sendername, param.sender))
+    if param.cotisation:
+        to = bcc
+        bcc = None
+        msg["To"] = to
+    else:
+        msg["To"] = f"{to},{formataddr((param.sendername, param.sender))}"
+    if cc:
+        msg["Cc"] = cc
+    if bcc:
+        msg["Bcc"] = bcc
+    msg["Date"] = email.utils.formatdate(localtime=True)
+    if param.profile == 'artscroises':
+        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="artscroises.be")
+    elif param.profile == 'cambristi':
         msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
 
     # Conteneur pour le corps du mail et ses images liées
     msg_related = MIMEMultipart("related")
     all_inline_images = []
+    temp_dirs = [] # Liste pour suivre les dossiers à nettoyer
+
 
     # 2. Add Content & Attachments
     # Gestion des images passées explicitement en argument (si elles ne sont pas dans le HTML)
@@ -447,9 +489,10 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     for att in [attachments] if isinstance(attachments, str) else (attachments or []):
         if att.endswith(("htm", "html")):
             # C'est ici que la magie opère pour le HTML
-            html_content, found_images = prepare_html_and_get_images(att)
+            html_content, found_images, t_dir = prepare_html_and_get_images(att)
             message = html_content
             all_inline_images.extend(found_images)
+            temp_dirs.append(t_dir)
         else:
             with open(att, "rb") as f:
                 content = f.read()
@@ -483,8 +526,11 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
 
     # 3. Recipients
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
-    return msg, recipients
 
+    # On attache la liste des dossiers temporaires à l'objet msg pour le nettoyage futur
+    msg._temp_dirs = temp_dirs
+
+    return msg, recipients
 
 
 def get_gmail_service(param):
@@ -891,10 +937,21 @@ def generate_mailing(param):
                 if not param.donotsend:
                     msg = build_email(param=param,subject=param.subject, message=msg_body,
                               bcc=",".join(addressees), attachments=param.file)
-                    if param.profile == 'artscroises':
-                        send_mail(param=param, message=msg)
-                    elif param.profile == 'cambristi':
-                        send_gmail(get_gmail_service(param), message= msg)
+                    try:
+                        if param.profile == 'artscroises':
+                            send_mail(param=param, message=msg)
+                        elif param.profile == 'cambristi':
+                            send_gmail(get_gmail_service(param), message= msg)
+                    finally:
+                        # Nettoyage des dossiers temporaires créés pour ce mail
+                        if hasattr(msg, '_temp_dirs'):
+                            for d in msg._temp_dirs:
+                                try:
+                                    shutil.rmtree(d)
+                                    if param.verbose:
+                                        log.info(f"Dossier temporaire supprimé : {d}")
+                                except Exception as e:
+                                    log.error(f"Erreur lors du nettoyage de {d}: {e}")
 
                 addressees, mail_batch_count = [], mail_batch_count + 1
                 sleep(pause)
