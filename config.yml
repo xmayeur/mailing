@@ -20,6 +20,6 @@ cambristi:
   max_mails_per_hour: 100
   pause: 1
   sendername: "I Cambristi ASBL"
-  sender: 'icambristi@gmail.com'
+  sender: "icambristi@gmail.com"   # "x@gmailapi.google.com"
   members: https://www.cambristi.com/_functions/members/
   SHEETID: 'cambristiMemberSheetID'

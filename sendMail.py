@@ -469,7 +469,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     if param.profile == 'artscroises':
         msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="artscroises.be")
     elif param.profile == 'cambristi':
-        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
+        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="google.com")
 
     # Conteneur pour le corps du mail et ses images liées
     msg_related = MIMEMultipart("related")
