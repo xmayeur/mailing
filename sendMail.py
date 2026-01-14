@@ -2,15 +2,10 @@
 # coding: utf-8
 """
 
-TODO: cambristi endpoint returns dict with variable nr of items.
-logics to handle this case:
-create a dataframe
-get header from columns
-get iterator from dataframe
+TODO: understand why image src from web are showed as attachment, not embedded in html
 
 
 """
-
 
 
 import argparse
@@ -28,6 +23,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
+from email import message_from_bytes
 from getpass import getpass
 from glob import glob
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
@@ -193,36 +189,30 @@ def file_to_base64(filepath):
     return encoded_str.decode("utf-8")
 
 
-def make_html_images_inline(in_filepath, out_filepath=None) -> str:
+def prepare_html_for_cid(in_filepath):
     """
-    Takes an HTML file and writes a new version with inline Base64 encoded
-    images.
-    :param in_filepath: Input file path (HTML)
-    :type in_filepath: str
-    :param out_filepath: Output file path (HTML) - if None, return the data
-    :type out_filepath: str
-    :returns the html data with inline images
+    Scanne le HTML, remplace les chemins locaux par des CID et retourne 
+    le HTML modifié ainsi que la liste des chemins d'images à attacher.
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
-    with open(in_filepath, "r") as file:
+    with open(in_filepath, "r", encoding="utf-8") as file:
         soup = BeautifulSoup(file, "html.parser")
+    
+    image_paths = []
     for img in soup.find_all("img"):
-        if 'http' in img.attrs["src"]:
-            img_path = urllib.parse.unquote(img.attrs["src"])
-        else:
-            img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
-        mimetype = guess_type(img_path)
-        if ";base64," not in img_path:
-            img.attrs["src"] = f"data:{mimetype};base64,{file_to_base64(img_path)}"
-
-        else:
-            # TODO Change by a regex to ensure the string start with data:.*?;base64...
-            img.attrs["src"] = img_path[6:]
-
-    if out_filepath:
-        with open(out_filepath, "w") as of:
-            of.write(str(soup))
-    return str(soup)
+        src = img.attrs.get("src", "")
+        if 'http' in src or src.startswith("data:"):
+            continue
+            
+        # Résoudre le chemin local de l'image
+        img_local_path = urllib.parse.unquote(os.path.join(basepath, src))
+        if os.path.exists(img_local_path):
+            # Créer un CID unique basé sur le nom du fichier ou un UUID
+            cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+            img.attrs["src"] = f"cid:{cid}"
+            image_paths.append((img_local_path, cid))
+            
+    return str(soup), image_paths
 
 
 class Invoice:
@@ -408,89 +398,93 @@ def _save_to_sent(param, msg):
                 log.error(f"Error copying to sent folder: {e}")
 
 
-def build_email(param, subject="",to="",cc="",bcc="",message="",images=None,attachments=None):
+def prepare_html_and_get_images(in_filepath):
     """
-    Builds an email message with optional attachments and inline images. The function
-    creates a `MIMEMultipart` message object, populates its headers and body content,
-    and prepares a list of recipients derived from the provided arguments. Attachments
-    and inline images are processed and attached to the message. This function
-    supports custom profiles for generating unique message IDs.
+    Lit un fichier HTML, remplace les sources d'images locales par des CIDs
+    et retourne le HTML ainsi que la liste des images à attacher.
+    """
+    basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
+    with open(in_filepath, "r", encoding="utf-8") as file:
+        soup = BeautifulSoup(file, "html.parser")
 
-    :param param: An object containing email configuration, sender details, and
-        profile-specific behaviors.
-    :type param: Any
-    :param subject: Email subject line.
-    :type subject: str, optional
-    :param to: Primary recipients of the email, separated by commas.
-    :type to: str, optional
-    :param cc: CC (Carbon Copy) recipients, separated by commas.
-    :type cc: str, optional
-    :param bcc: BCC (Blind Carbon Copy) recipients, separated by commas.
-    :type bcc: str, optional
-    :param message: Email body content to be used as plain text or HTML.
-    :type message: str, optional
-    :param images: A single image file path or a list of image file paths to
-        include as inline attachments in the email.
-    :type images: str or list[str], optional
-    :param attachments: A single file path or a list of file paths to include
-        as attachments in the email.
-    :type attachments: str or list[str], optional
-    :return: Returns a tuple containing the constructed email message (`msg`) and
-        a list of recipients (`recipients`).
-    :rtype: tuple[MIMEMultipart, list[str]]
-    """
+    inline_images = []
+    for img in soup.find_all("img"):
+        src = img.attrs.get("src", "")
+        # On ignore les images web ou déjà en base64
+        if not src or 'http' in src or src.startswith("data:"):
+            continue
+
+        img_path = urllib.parse.unquote(os.path.join(basepath, src))
+        if os.path.exists(img_path):
+            cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+            img.attrs["src"] = f"cid:{cid}"
+            inline_images.append({'path': img_path, 'cid': cid})
+
+    return str(soup), inline_images
+
+def build_email(param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None):
+    # ... existing code ...
     # 1. Build Message
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
-    msg["From"] = formataddr((param.sendername, param.sender))
-    if param.cotisation:
-        to = bcc
-        bcc = None
-        msg["To"] = to
-    else:
-        msg["To"] = f"{to},{formataddr((param.sendername, param.sender))}"
-    if cc:
-        msg["Cc"] = cc
-    if bcc:
-        msg["Bcc"] = bcc
-    msg["Date"] = email.utils.formatdate(localtime=True)
-    if param.profile == 'artscroises':
-        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="artscroises.be")
-    elif param.profile == 'cambristi':
+    # ... existing code ...
+    if param.profile == 'cambristi':
         msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
 
+    # Conteneur pour le corps du mail et ses images liées
+    msg_related = MIMEMultipart("related")
+    all_inline_images = []
+
     # 2. Add Content & Attachments
-    for img in [images] if isinstance(images, str) else (images or []):
-        try:
-            with open(img, "rb") as f:
-                msg.attach(MIMEImage(f.read(), name=os.path.basename(img)))
-        except FileNotFoundError:
-            log.error(f"Could not find image '{img}'")
+    # Gestion des images passées explicitement en argument (si elles ne sont pas dans le HTML)
+    for img_path in [images] if isinstance(images, str) else (images or []):
+        if os.path.exists(img_path):
+            cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+            all_inline_images.append({'path': img_path, 'cid': cid})
+            # Note: Si vous utilisez cette option, vous devrez manuellement
+            # mettre cid:id dans votre message texte.
 
     for att in [attachments] if isinstance(attachments, str) else (attachments or []):
-        with open(att, "rb") as f:
-            content = f.read()
-            if att.endswith(("htm", "html")):
-                msg.attach(MIMEText(make_html_images_inline(att), "html"))
-                message = ""
-            elif att.endswith("txt"):
-                msg.attach(MIMEText(content.decode()))
-            elif att.endswith("pdf"):
-                part = MIMEApplication(content, _subtype="pdf")
-                part.add_header(
-                    "Content-Disposition", "attachment", filename=os.path.basename(att)
-                )
-                msg.attach(part)
+        if att.endswith(("htm", "html")):
+            # C'est ici que la magie opère pour le HTML
+            html_content, found_images = prepare_html_and_get_images(att)
+            message = html_content
+            all_inline_images.extend(found_images)
+        else:
+            with open(att, "rb") as f:
+                content = f.read()
+                # ... existing code for other attachment types (pdf, txt, mhtml) ...
+                if att.endswith("pdf"):
+                    part = MIMEApplication(content, _subtype="pdf")
+                    part.add_header("Content-Disposition", "attachment", filename=os.path.basename(att))
+                    msg.attach(part)
+                elif att.endswith("txt"):
+                    msg.attach(MIMEText(content.decode()))
 
+    # Construction de la partie HTML avec images intégrées
     if message and "<html" in message:
-        msg.attach(MIMEText(message, "html"))
-    else:
+        part_html = MIMEText(message, "html")
+        msg_related.attach(part_html)
+
+        for img_info in all_inline_images:
+            try:
+                with open(img_info['path'], "rb") as f:
+                    img_part = MIMEImage(f.read())
+                    img_part.add_header("Content-ID", f"<{img_info['cid']}>")
+                    img_part.add_header("Content-Disposition", "inline",
+                                        filename=os.path.basename(img_info['path']))
+                    msg_related.attach(img_part)
+            except Exception as e:
+                log.error(f"Error attaching inline image {img_info['path']}: {e}")
+
+        msg.attach(msg_related)
+    elif message:
         msg.attach(MIMEText(message, "plain"))
 
-    # 3. Send and Store
+    # 3. Recipients
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
-
     return msg, recipients
+
 
 
 def get_gmail_service(param):
@@ -834,20 +828,20 @@ def generate_mailing(param):
         log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
 
-    csvfile = None
-    if param.profile == 'artscroises':
-        reader, csvfile = _get_subscriber_reader(param)
-    elif param.profile == 'cambristi':
-        token = get_secret(param.wix_api_token_id)['password']
-        data = fetch_data(param.members, token)
-        members = data['items']
-        reader = [members[0].keys()]
-        for member in members:
-            reader.append(list(member.values()))
-        reader = iter(reader)
-
-    else:
-        return "N/A"
+    reader, csvfile = _get_subscriber_reader(param)
+    # if param.profile == 'artscroises':
+    #     reader, csvfile = _get_subscriber_reader(param)
+    # elif param.profile == 'cambristi':
+    #     token = get_secret(param.wix_api_token_id)['password']
+    #     data = fetch_data(param.members, token)
+    #     members = data['items']
+    #     reader = [members[0].keys()]
+    #     for member in members:
+    #         reader.append(list(member.values()))
+    #     reader = iter(reader)
+    #
+    # else:
+    #     return "N/A"
     if not reader:
         return "Error"
 
@@ -1136,11 +1130,10 @@ def process_cambristi(args):
     config.update(vars(args))
     param = Dict2Class(config)
     param.file = files
-    if 'html' in files[0]:
-        param.message = open(files[0], encoding="utf-8").read()
-        param.file=files[1:]
+    # if 'html' in files[0]:
+    #     param.message = open(files[0], encoding="utf-8").read()
+    #     param.file=files[1:]
     ret = generate_mailing(param)
-
 
 
 def main():
