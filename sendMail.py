@@ -321,6 +321,96 @@ class Invoice:
         return response.json()
 
 
+
+def _process_membership_invoice(param, row, indices):
+    """
+    Processes a membership invoice for the Arts Croisés association. The function validates the provided
+    information, creates a client if necessary, generates a membership invoice, and composes a message
+    for the member conveying payment details.
+
+    It ensures the client meets the criteria for membership renewal, attempts to handle the creation of
+    a client and order, and formats the final message detailing how to proceed with the payment.
+
+    :param param: An object that contains properties and behaviors necessary for invoice processing.
+    :param row: A dictionary-like object containing the details of a single member or transaction.
+    :param indices: A dictionary mapping field names to their corresponding indices within the row object.
+    :return: A boolean indicating whether the membership invoice was successfully processed. Returns
+        None if any mandatory step in processing fails.
+    """
+    if param.profile != 'artscroises':
+        return None
+    if not (row[indices["member"]] == "yes" and
+            not row[indices["membershippaid"]] and
+            row[indices["email"]]):
+        return None
+
+    client_id = param.invoice.create_client(row, indices)
+    if client_id == -1:
+        log.error(f"Failed to create client for {row[indices['id']]}.")
+        return None
+
+    client = param.invoice.get_client(client_id)
+    if not client:
+        return None
+
+    order = param.invoice.create_order(
+        client=client,
+        product_name=f"Cotisation Arts Croisés {param.cotisation_year}",
+        price=param.cotisation_amount,
+        qty=1,
+    )
+    if order["OrderID"] == -1:
+        log.error(f"Failed to create invoice for {row[indices['id']]}.")
+        return None
+
+    bank = order["Supplier"]["BankAccounts"][0]
+    acc_name = bank.get("Name", order["Supplier"]["Name"])
+
+    param.message = f"""
+        <html>
+        Chère/cher {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
+        Nous vous souhaitons tous nos meilleurs voeux pour {param.cotisation_year}.<br/><br/>
+        Voici le temps de renouveler votre cotisation en tant que membre de notre association Arts Croisés.<br/><br/>
+        Si vous souhaitez rester membre, veuillez payer le montant de {param.cotisation_amount} {bank['Currency']} 
+        par personne sur le compte suivant :<br/><br/>
+        {acc_name}<br/>
+        IBAN : {bank['IBAN']}<br/>
+        Communication: {order["PaymentReference"]}<br/><br/>
+        Cordialement,<br/>
+        L'équipe Arts Croisés<br/>
+        {order["Supplier"]["Email"]}
+        </html>
+    """
+    return True
+
+def _get_subscriber_reader(param):
+    """Extrait la logique de lecture de la source de données."""
+    if param.database is None:
+        wb = openGoogleDBMembersSheet(sa=param.sa, id=param.sheetid)
+        return iter(readAllSheet(wb)), None
+
+    try:
+        csvfile = open(param.database, "r", newline="", encoding="utf-8-sig")
+        return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
+    except FileNotFoundError:
+        log.critical(f"Fichier introuvable : '{param.database}'")
+        return None, None
+
+
+def _get_indices(header):
+    """
+    Create a dictionary that maps each header element to its corresponding
+    index in the list of headers.
+
+    :param header: List of header strings.
+    :type header: list
+    :return: A dictionary where keys are elements from the header list and
+             values are their corresponding indices.
+    :rtype: dict
+    """
+    return {h: i for i, h in enumerate(header)}
+
+
 def _get_smtp_connection(param):
     """
     Open a connection to the SMTP server.
@@ -340,6 +430,42 @@ def _get_smtp_connection(param):
     except Exception as e:
         log.error(f"Failed to connect to SMTP: {e}")
         return None
+
+
+def get_gmail_service(param):
+    """
+    Fetches and returns the Gmail service object by authenticating through OAuth2. If valid credentials
+    are not found locally, the function retrieves them via authorized secrets or user authentication
+    interaction.
+
+    :param param: An object containing the following attributes:
+        - token_file: A path to the file holding the user's token information.
+        - scopes: A list of OAuth2 scopes required by the Gmail API.
+        - token_id: Identifier for fetching the token via secret management.
+        - credentials_id: Identifier for fetching OAuth2 client credentials via secret management.
+        - SCOPES: A list of OAuth2 scopes required for the authentication process.
+    :type param: object
+    :return: A Google API client service object for accessing the Gmail API.
+    :rtype: googleapiclient.discovery.Resource
+    """
+    if os.path.exists(param.token_file):
+        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
+    else:
+        token = get_secret(param.token_id)
+        creds = Credentials.from_authorized_user_info(token, param.scopes)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            credentials = get_secret(param.credentials_id)
+            # flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_ID, SCOPES)
+            flow = InstalledAppFlow.from_client_config(credentials, param.SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(param.token_file, 'w') as token:
+            token.write(creds.to_json())
+
+    return build('gmail', 'v1', credentials=creds)
 
 
 def _save_to_sent(param, msg):
@@ -419,6 +545,56 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
     return str(soup), inline_images, temp_dir
 
 
+def _format_message(template, row, header):
+    """Gère le remplacement des variables dans le corps du message."""
+    try:
+        msg_txt = re.sub(r"\${(.*)}", r"{row[header.index('\1')]}", template)
+        return eval('f"""' + msg_txt + '"""')
+    except (NameError, KeyError, IndexError, SyntaxError) as e:
+        # log.error(f"Erreur d'évaluation du message : {e}")
+        return template
+
+
+def process_attachments(args, config, folder="input"):
+    """
+    Processes attachments by either verifying file paths provided in the arguments or downloading files
+    from a Google Drive folder and cleaning up the local folder. Returns processed file paths, the Google
+    Drive service connection, and metadata about the downloaded files.
+
+    :param args: Command-line arguments containing file paths or other configurations.
+    :type args: Namespace
+    :param config: Configuration dictionary containing keys like 'SA' for service account and
+        'mailing_folder' for desired Google Drive folder ID.
+    :type config: dict
+    :param folder: Optional path to the local folder used for downloading files. Defaults to "input".
+    :type folder: str
+    :return: A tuple containing the list of processed file paths, the Google Drive service connection
+        object (or None if unused), and metadata about files fetched from Google Drive.
+    :rtype: tuple[list[str], Union[Resource, None], list[dict]]
+    """
+    service, google_drive_files = None, []
+    if args.file:
+        for f in args.file:
+            if not os.path.isfile(f):
+                log.critical(f"File not found: {f}")
+                sys.exit(-1)
+        files = args.file
+    else:
+        # Nettoyage et téléchargement depuis Google Drive
+        for f in glob(f"{folder}/*.*"):
+            os.remove(f)
+        service = gd.connect_google_driver(config['SA'])
+        if 'mailing_folder' not in config:
+            return [], service, []
+        result = gd.get_files(service, folder_id=config["mailing_folder"])
+        if result and "files" in result:
+            google_drive_files = result["files"]
+            gd.download_file(service, google_drive_files, folder)
+        files = [f for f in glob(f"{folder}/*.*") if "published" not in f]
+
+    return files, service, google_drive_files
+
+
 def build_email(param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None):
     # ... existing code ...
     # 1. Build Message
@@ -434,7 +610,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"  # , <{unsubscribe_url}>"
     msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click" # Recommandé par les nouveaux standards Gmail/Yahoo 2024
 
-    if param.cotisation:
+    if param.cotisation or param.max_addr_per_mail == 1:
         to = bcc
         bcc = None
         msg["To"] = to
@@ -510,317 +686,6 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     msg._temp_dirs = temp_dirs
 
     return msg, recipients
-
-
-def get_gmail_service(param):
-    """
-    Fetches and returns the Gmail service object by authenticating through OAuth2. If valid credentials
-    are not found locally, the function retrieves them via authorized secrets or user authentication
-    interaction.
-
-    :param param: An object containing the following attributes:
-        - token_file: A path to the file holding the user's token information.
-        - scopes: A list of OAuth2 scopes required by the Gmail API.
-        - token_id: Identifier for fetching the token via secret management.
-        - credentials_id: Identifier for fetching OAuth2 client credentials via secret management.
-        - SCOPES: A list of OAuth2 scopes required for the authentication process.
-    :type param: object
-    :return: A Google API client service object for accessing the Gmail API.
-    :rtype: googleapiclient.discovery.Resource
-    """
-    if os.path.exists(param.token_file):
-        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
-    else:
-        token = get_secret(param.token_id)
-        creds = Credentials.from_authorized_user_info(token, param.scopes)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            credentials = get_secret(param.credentials_id)
-            # flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_ID, SCOPES)
-            flow = InstalledAppFlow.from_client_config(credentials, param.SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open(param.token_file, 'w') as token:
-            token.write(creds.to_json())
-
-    return build('gmail', 'v1', credentials=creds)
-
-
-def send_gmail(service,message=None):
-    """
-    This function is used to send an email using the Gmail API. The provided `service`
-    object facilitates interaction with the Gmail API. An input `message` object must
-    also be provided, containing the email to be sent. The function encodes the email
-    in a URL-safe format and sends it using the API. In the case of an error during
-    transmission, the error is logged, and `None` is returned.
-
-    :param service: A resource object with methods for interacting with the Gmail API.
-    :param message: An email message object containing the data to send. Should
-       implement the `as_bytes` method for conversion to raw bytes format.
-    :return: The API response on successful email sending, or `None` if an error
-       occurs.
-    """
-    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-
-    body = {"raw": encoded_message}
-    try:
-        return service.users().messages().send(userId='me', body=body).execute()
-    except errors.HttpError as error:
-        log.error(f'Error sending message: {error} to {message["To"]}')
-        return None
-
-
-def send_mail(param=None,message=None, recipients=None):
-    """
-    Send an email message to specified recipients using SMTP.
-
-    This function attempts to send an email message to the specified list of
-    recipients using an SMTP connection. It retries sending the email up to two
-    times in case of a failure. Logging and other functionalities depend on the
-    settings provided in the `param` object. The email is saved to the sent records
-    if it is successfully sent.
-
-    :param param: A configuration object that determines the behavior of the
-        email-sending process, such as verbosity for logging.
-    :type param: Any
-    :param message: The email message to be sent, where the "From" field is
-        mandatory and expected to be correctly populated.
-    :type message: email.message.EmailMessage
-    :param recipients: A list of recipient email addresses to whom the message
-        should be sent.
-    :type recipients: list[str]
-    :return: A boolean indicating whether the email was successfully sent.
-    :rtype: bool
-    """
-    if param.verbose:
-        log.info(f"Sending email to {recipients}")
-    success = False
-    for attempt in range(2):
-        conn = _get_smtp_connection(param)
-        if conn:
-            try:
-                conn.sendmail(message["From"], recipients, message.as_string())
-                conn.quit()
-                success = True
-                if param.verbose:
-                    log.info("sent")
-                break
-            except SMTPException as e:
-                log.error(f"SMTP error on attempt {attempt + 1}: {e}")
-                if attempt == 0:
-                    sleep(10)
-
-    if success:
-        _save_to_sent(param, message)
-
-
-def _get_subscriber_reader(param):
-    """Extrait la logique de lecture de la source de données."""
-    if param.database is None:
-        wb = openGoogleDBMembersSheet(sa=param.sa, id=param.sheetid)
-        return iter(readAllSheet(wb)), None
-
-    try:
-        csvfile = open(param.database, "r", newline="", encoding="utf-8-sig")
-        return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
-    except FileNotFoundError:
-        log.critical(f"Fichier introuvable : '{param.database}'")
-        return None, None
-
-
-def _format_message(template, row, header):
-    """Gère le remplacement des variables dans le corps du message."""
-    try:
-        msg_txt = re.sub(r"\${(.*)}", r"{row[header.index('\1')]}", template)
-        return eval('f"""' + msg_txt + '"""')
-    except (NameError, KeyError, IndexError, SyntaxError) as e:
-        # log.error(f"Erreur d'évaluation du message : {e}")
-        return template
-
-
-def _sync(param):
-    """
-    Synchronize Arts Croisés members only database with Billit
-    :param param:
-    :return:
-    """
-    if param.profile != 'artscroises':
-        return "N/A"
-    reader, csvfile = _get_subscriber_reader(param)
-    header = next(reader, None)
-    if not header:
-        return "Error"
-
-    # mapping des headers
-    indices = {
-        "email": header.index("email"),
-        "id": header.index("id"),
-        "first_name": header.index("first_name"),
-        "last_name": header.index("last_name"),
-        "phone": header.index("phone"),
-        "mobile_phone": header.index("mobile_phone"),
-        "address": header.index("address"),
-        "city": header.index("city"),
-        "zip": header.index("zip"),
-        "member": header.index("member"),
-        "membershippaid": header.index(f"Cotisation {param.cotisation_year}"),
-        "group": header.index("mailing_list"),
-        "selected": header.index("selected"),
-        "status": header.index("status"),
-    }
-    # Sauter les enregistrements initiaux
-    current_row_idx = 1
-    if param.from_index:
-        log.info(f"Reprise à l'index {param.from_index}")
-        for _ in range(2, int(param.from_index)):
-            next(reader, None)
-            current_row_idx += 1
-
-    for row in reader:
-        current_row_idx += 1
-        if param.to_index and current_row_idx > int(param.to_index):
-            break
-
-        # Filtres de sélection
-        has_email = bool(row[indices["email"]])
-        is_member = row[indices["member"]] == "yes"
-
-        if is_member:  # and has_email:
-            # Create or update member as client
-            client_id = param.invoice.create_client(row, indices)
-            if client_id == -1:
-                log.error(f"Failed to create client for {row[indices['id']]}.")
-                continue
-            client = param.invoice.get_client(client_id)
-            if not client:
-                continue
-            log.info(
-                f"Client for {row[indices['first_name']]} {row[indices['last_name']] } sync'ed."
-            )
-
-    return "Done"
-
-
-def _filter_artscroises(param, row, indices):
-    """
-    Filters rows based on specific conditions such as status, group, selection,
-    and email presence. The function evaluates multiple constraints using the
-    provided parameters, data row, and column indices to determine the
-    exclusion or inclusion of the row.
-
-    :param param: An object containing filtering options such as test mode
-        and selection criteria.
-    :type param: Any
-    :param row: A list or array representing a single row of data to be
-        evaluated by the filter.
-    :type row: list
-    :param indices: A dictionary mapping column names to their respective
-        indices in the row for easy access to specific data points.
-    :type indices: dict
-    :return: A boolean value. True if the row should NOT pass the filter
-        (i.e., be excluded), False if it should pass.
-    :rtype: bool
-    """
-    is_active = row[indices["status"]] == "active"
-    is_test_match = not param.test or "Test" in row[indices["group"]]
-    is_selected = (
-            not param.selected or row[indices["selected"]].lower() == "x"
-    )
-    has_email = bool(row[indices["email"]])
-    return not (is_active and is_test_match and is_selected and has_email)
-
-
-def _filter_cambristi(param, row, indices, test):
-    if test:
-        try:
-            return not ('test' in row[indices["title"]] )
-        except IndexError:
-            log.warning(f"No title in row {row[indices['nom']]}, {row[indices['prenom']]}")
-            return True
-    else:
-        try:
-            is_active = row[indices["title"]] == "member"
-            has_mail = bool(row[indices["email"]])
-            return not (is_active and has_mail)
-        except IndexError:
-            return True
-
-def _get_indices(header):
-    """
-    Create a dictionary that maps each header element to its corresponding
-    index in the list of headers.
-
-    :param header: List of header strings.
-    :type header: list
-    :return: A dictionary where keys are elements from the header list and
-             values are their corresponding indices.
-    :rtype: dict
-    """
-    return {h: i for i, h in enumerate(header)}
-
-
-def _process_membership_invoice(param, row, indices):
-    """
-    Processes a membership invoice for the Arts Croisés association. The function validates the provided
-    information, creates a client if necessary, generates a membership invoice, and composes a message
-    for the member conveying payment details.
-
-    It ensures the client meets the criteria for membership renewal, attempts to handle the creation of
-    a client and order, and formats the final message detailing how to proceed with the payment.
-
-    :param param: An object that contains properties and behaviors necessary for invoice processing.
-    :param row: A dictionary-like object containing the details of a single member or transaction.
-    :param indices: A dictionary mapping field names to their corresponding indices within the row object.
-    :return: A boolean indicating whether the membership invoice was successfully processed. Returns
-        None if any mandatory step in processing fails.
-    """
-    if param.profile != 'artscroises':
-        return None
-    if not (row[indices["member"]] == "yes" and
-            not row[indices["membershippaid"]] and
-            row[indices["email"]]):
-        return None
-
-    client_id = param.invoice.create_client(row, indices)
-    if client_id == -1:
-        log.error(f"Failed to create client for {row[indices['id']]}.")
-        return None
-
-    client = param.invoice.get_client(client_id)
-    if not client:
-        return None
-
-    order = param.invoice.create_order(
-        client=client,
-        product_name=f"Cotisation Arts Croisés {param.cotisation_year}",
-        price=param.cotisation_amount,
-        qty=1,
-    )
-    if order["OrderID"] == -1:
-        log.error(f"Failed to create invoice for {row[indices['id']]}.")
-        return None
-
-    bank = order["Supplier"]["BankAccounts"][0]
-    acc_name = bank.get("Name", order["Supplier"]["Name"])
-
-    param.message = f"""
-        <html>
-        Chère/cher {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
-        Nous vous souhaitons tous nos meilleurs voeux pour {param.cotisation_year}.<br/><br/>
-        Voici le temps de renouveler votre cotisation en tant que membre de notre association Arts Croisés.<br/><br/>
-        Si vous souhaitez rester membre, veuillez payer le montant de {param.cotisation_amount} {bank['Currency']} 
-        par personne sur le compte suivant :<br/><br/>
-        {acc_name}<br/>
-        IBAN : {bank['IBAN']}<br/>
-        Communication: {order["PaymentReference"]}<br/><br/>
-        Cordialement,<br/>
-        L'équipe Arts Croisés<br/>
-        {order["Supplier"]["Email"]}
-        </html>
-    """
-    return True
 
 
 def generate_mailing(param):
@@ -901,11 +766,11 @@ def generate_mailing(param):
                 log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
                 msg_body = _format_message(param.message, row, header)
                 if not param.donotsend:
-                    msg = build_email(param=param,subject=param.subject, message=msg_body,
+                    msg, recipents = build_email(param=param,subject=param.subject, message=msg_body,
                               bcc=",".join(addressees), attachments=param.file)
                     try:
                         if param.profile == 'artscroises':
-                            send_mail(param=param, message=msg)
+                            send_mail(param=param, message=msg, recipients=recipents)
                         elif param.profile == 'cambristi':
                             send_gmail(get_gmail_service(param), message= msg)
                     finally:
@@ -944,108 +809,180 @@ def generate_mailing(param):
         if csvfile: csvfile.close()
 
 
-def setup_argparse():
+def _filter_artscroises(param, row, indices):
     """
-    Sets up and parses command-line arguments for a mailing utility.
+    Filters rows based on specific conditions such as status, group, selection,
+    and email presence. The function evaluates multiple constraints using the
+    provided parameters, data row, and column indices to determine the
+    exclusion or inclusion of the row.
 
-    This function configures an argument parser with various command-line options
-    to customize email sending behavior. The options include mail subject, body,
-    attachments, database indices, test mode, verbosity, and other configurations
-    for controlling email sending and processing.
-
-    :return: Parsed arguments from the command line
-    :rtype: argparse.Namespace
-
-    Options:
-        - -s, --subject: Subject of the mail (default: None).
-        - -m, --message: Text message of the mail (default: an empty string).
-        - file: A list of files to attach to the mail (default: []).
-        - -t, --test: Test mode flag; sends only to a tester group (default: False).
-        - -v, --verbose: Flag to increase output verbosity (default: False).
-        - -x, --doNotSend: Flag to disable mail sending (default: False).
-        - -db, --database: Database path (default: None).
-        - -f, --from_index: Starting index in the database (default: None).
-        - -to, --to_index: Stopping index in the database (default: None).
-        - -w, --wait: Waiting time in minutes before restarting mail sending
-          (default: None).
-        - --selected: Flag to send only selected mail (default: False).
-        - --body: Specifies the email body (default: None).
-        - --cotisation: Generates a cotisation reminder mail (default: False).
-        - -y, --cotisation_year: Year for cotisation reminders (default: '2026').
-        - -amt, --cotisation_amount: Amount for cotisation reminders (default:
-          '15.00').
-        - -mh, --max-mails-per-hour: Maximum emails to send per hour (default:
-          1000).
-        - -na, --max_addr_per_mail: Maximum number of addresses per mail (default:
-          50).
-        - -p, --pause: Pause duration in seconds between operations (default: 3).
-        - --sync: Flag to enable synchronization mode (default: False).
-        - --check_spam: Flag to perform spam detection checks (default: False).
-        - --profile: Specifies the mail profile to use (default: None).
+    :param param: An object containing filtering options such as test mode
+        and selection criteria.
+    :type param: Any
+    :param row: A list or array representing a single row of data to be
+        evaluated by the filter.
+    :type row: list
+    :param indices: A dictionary mapping column names to their respective
+        indices in the row for easy access to specific data points.
+    :type indices: dict
+    :return: A boolean value. True if the row should NOT pass the filter
+        (i.e., be excluded), False if it should pass.
+    :rtype: bool
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-s", "--subject", help="Subject of the mail")
-    parser.add_argument("-m", "--message", help="Text message of the mail", default="")
-    parser.add_argument("file", nargs="*", help="files to attach to the mail")
-    parser.add_argument("-t", "--test", action="store_true", help="test mode - send only to the tester group")
-    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-    parser.add_argument("-x", "--doNotSend", action="store_true", help="Do not send any mail")
-    parser.add_argument("-db", "--database", help="database path")
-    parser.add_argument("-f", "--from_index", help="Starting index in the database", default=None)
-    parser.add_argument("-to", "--to_index", help="Stopping index in the database", default=None)
-    parser.add_argument("-w", "--wait", help="Wait x minutes before restarting sending mail", type=int)
-    parser.add_argument("--selected", action="store_true", help="Only send selected mail", default=False)
-    parser.add_argument("--body")
-    parser.add_argument("--cotisation", help="Generate cotisation reminder mail", action="store_true", default=False)
-    parser.add_argument("-y", "--cotisation_year", help="Cotisation year", default="2026")
-    parser.add_argument("-amt", "--cotisation_amount", help="Cotisation amount", default="15.00")
-    parser.add_argument("-mh", "--max-mails-per-hour", default=1000, type=int)
-    parser.add_argument("-na", "--max_addr_per_mail", default=50, type=int)
-    parser.add_argument("-p", "--pause", default=3, type=int)
-    parser.add_argument("--sync", action="store_true")
-    parser.add_argument("--check_spam", action="store_true")
-    parser.add_argument("--profile", help="mail profile")
-    return parser.parse_args()
+    is_active = row[indices["status"]] == "active"
+    is_test_match = not param.test or "Test" in row[indices["group"]]
+    is_selected = (
+            not param.selected or row[indices["selected"]].lower() == "x"
+    )
+    has_email = bool(row[indices["email"]])
+    return not (is_active and is_test_match and is_selected and has_email)
 
 
-def process_attachments(args, config, folder="input"):
-    """
-    Processes attachments by either verifying file paths provided in the arguments or downloading files
-    from a Google Drive folder and cleaning up the local folder. Returns processed file paths, the Google
-    Drive service connection, and metadata about the downloaded files.
-
-    :param args: Command-line arguments containing file paths or other configurations.
-    :type args: Namespace
-    :param config: Configuration dictionary containing keys like 'SA' for service account and
-        'mailing_folder' for desired Google Drive folder ID.
-    :type config: dict
-    :param folder: Optional path to the local folder used for downloading files. Defaults to "input".
-    :type folder: str
-    :return: A tuple containing the list of processed file paths, the Google Drive service connection
-        object (or None if unused), and metadata about files fetched from Google Drive.
-    :rtype: tuple[list[str], Union[Resource, None], list[dict]]
-    """
-    service, google_drive_files = None, []
-    if args.file:
-        for f in args.file:
-            if not os.path.isfile(f):
-                log.critical(f"File not found: {f}")
-                sys.exit(-1)
-        files = args.file
+def _filter_cambristi(param, row, indices, test):
+    if test:
+        try:
+            return not ('test' in row[indices["title"]] )
+        except IndexError:
+            log.warning(f"No title in row {row[indices['nom']]}, {row[indices['prenom']]}")
+            return True
     else:
-        # Nettoyage et téléchargement depuis Google Drive
-        for f in glob(f"{folder}/*.*"):
-            os.remove(f)
-        service = gd.connect_google_driver(config['SA'])
-        if 'mailing_folder' not in config:
-            return [], service, []
-        result = gd.get_files(service, folder_id=config["mailing_folder"])
-        if result and "files" in result:
-            google_drive_files = result["files"]
-            gd.download_file(service, google_drive_files, folder)
-        files = [f for f in glob(f"{folder}/*.*") if "published" not in f]
+        try:
+            is_active = row[indices["title"]] == "member"
+            has_mail = bool(row[indices["email"]])
+            return not (is_active and has_mail)
+        except IndexError:
+            return True
 
-    return files, service, google_drive_files
+
+def send_gmail(service,message=None):
+    """
+    This function is used to send an email using the Gmail API. The provided `service`
+    object facilitates interaction with the Gmail API. An input `message` object must
+    also be provided, containing the email to be sent. The function encodes the email
+    in a URL-safe format and sends it using the API. In the case of an error during
+    transmission, the error is logged, and `None` is returned.
+
+    :param service: A resource object with methods for interacting with the Gmail API.
+    :param message: An email message object containing the data to send. Should
+       implement the `as_bytes` method for conversion to raw bytes format.
+    :return: The API response on successful email sending, or `None` if an error
+       occurs.
+    """
+    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
+    body = {"raw": encoded_message}
+    try:
+        return service.users().messages().send(userId='me', body=body).execute()
+    except errors.HttpError as error:
+        log.error(f'Error sending message: {error} to {message["To"]}')
+        return None
+
+
+def send_mail(param=None,message=None, recipients=None):
+    """
+    Send an email message to specified recipients using SMTP.
+
+    This function attempts to send an email message to the specified list of
+    recipients using an SMTP connection. It retries sending the email up to two
+    times in case of a failure. Logging and other functionalities depend on the
+    settings provided in the `param` object. The email is saved to the sent records
+    if it is successfully sent.
+
+    :param param: A configuration object that determines the behavior of the
+        email-sending process, such as verbosity for logging.
+    :type param: Any
+    :param message: The email message to be sent, where the "From" field is
+        mandatory and expected to be correctly populated.
+    :type message: email.message.EmailMessage
+    :param recipients: A list of recipient email addresses to whom the message
+        should be sent.
+    :type recipients: list[str]
+    :return: A boolean indicating whether the email was successfully sent.
+    :rtype: bool
+    """
+    if param.verbose:
+        log.info(f"Sending email to {recipients}")
+    success = False
+    for attempt in range(2):
+        conn = _get_smtp_connection(param)
+        if conn:
+            try:
+                conn.sendmail(message["From"], recipients, message.as_string())
+                conn.quit()
+                success = True
+                if param.verbose:
+                    log.info("sent")
+                break
+            except SMTPException as e:
+                log.error(f"SMTP error on attempt {attempt + 1}: {e}")
+                if attempt == 0:
+                    sleep(10)
+
+    if success:
+        _save_to_sent(param, message)
+
+
+def _sync(param):
+    """
+    Synchronize Arts Croisés members only database with Billit
+    :param param:
+    :return:
+    """
+    if param.profile != 'artscroises':
+        return "N/A"
+    reader, csvfile = _get_subscriber_reader(param)
+    header = next(reader, None)
+    if not header:
+        return "Error"
+
+    # mapping des headers
+    indices = {
+        "email": header.index("email"),
+        "id": header.index("id"),
+        "first_name": header.index("first_name"),
+        "last_name": header.index("last_name"),
+        "phone": header.index("phone"),
+        "mobile_phone": header.index("mobile_phone"),
+        "address": header.index("address"),
+        "city": header.index("city"),
+        "zip": header.index("zip"),
+        "member": header.index("member"),
+        "membershippaid": header.index(f"Cotisation {param.cotisation_year}"),
+        "group": header.index("mailing_list"),
+        "selected": header.index("selected"),
+        "status": header.index("status"),
+    }
+    # Sauter les enregistrements initiaux
+    current_row_idx = 1
+    if param.from_index:
+        log.info(f"Reprise à l'index {param.from_index}")
+        for _ in range(2, int(param.from_index)):
+            next(reader, None)
+            current_row_idx += 1
+
+    for row in reader:
+        current_row_idx += 1
+        if param.to_index and current_row_idx > int(param.to_index):
+            break
+
+        # Filtres de sélection
+        has_email = bool(row[indices["email"]])
+        is_member = row[indices["member"]] == "yes"
+
+        if is_member:  # and has_email:
+            # Create or update member as client
+            client_id = param.invoice.create_client(row, indices)
+            if client_id == -1:
+                log.error(f"Failed to create client for {row[indices['id']]}.")
+                continue
+            client = param.invoice.get_client(client_id)
+            if not client:
+                continue
+            log.info(
+                f"Client for {row[indices['first_name']]} {row[indices['last_name']] } sync'ed."
+            )
+
+    return "Done"
 
 
 def process_artscroises(args):
@@ -1157,6 +1094,70 @@ def process_cambristi(args):
     #     param.message = open(files[0], encoding="utf-8").read()
     #     param.file=files[1:]
     generate_mailing(param)
+
+
+def setup_argparse():
+    """
+    Sets up and parses command-line arguments for a mailing utility.
+
+    This function configures an argument parser with various command-line options
+    to customize email sending behavior. The options include mail subject, body,
+    attachments, database indices, test mode, verbosity, and other configurations
+    for controlling email sending and processing.
+
+    :return: Parsed arguments from the command line
+    :rtype: argparse.Namespace
+
+    Options:
+        - -s, --subject: Subject of the mail (default: None).
+        - -m, --message: Text message of the mail (default: an empty string).
+        - file: A list of files to attach to the mail (default: []).
+        - -t, --test: Test mode flag; sends only to a tester group (default: False).
+        - -v, --verbose: Flag to increase output verbosity (default: False).
+        - -x, --doNotSend: Flag to disable mail sending (default: False).
+        - -db, --database: Database path (default: None).
+        - -f, --from_index: Starting index in the database (default: None).
+        - -to, --to_index: Stopping index in the database (default: None).
+        - -w, --wait: Waiting time in minutes before restarting mail sending
+          (default: None).
+        - --selected: Flag to send only selected mail (default: False).
+        - --body: Specifies the email body (default: None).
+        - --cotisation: Generates a cotisation reminder mail (default: False).
+        - -y, --cotisation_year: Year for cotisation reminders (default: '2026').
+        - -amt, --cotisation_amount: Amount for cotisation reminders (default:
+          '15.00').
+        - -mh, --max-mails-per-hour: Maximum emails to send per hour (default:
+          1000).
+        - -na, --max_addr_per_mail: Maximum number of addresses per mail (default:
+          50).
+        - -p, --pause: Pause duration in seconds between operations (default: 3).
+        - --sync: Flag to enable synchronization mode (default: False).
+        - --check_spam: Flag to perform spam detection checks (default: False).
+        - --profile: Specifies the mail profile to use (default: None).
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--subject", help="Subject of the mail")
+    parser.add_argument("-m", "--message", help="Text message of the mail", default="")
+    parser.add_argument("file", nargs="*", help="files to attach to the mail")
+    parser.add_argument("-t", "--test", action="store_true", help="test mode - send only to the tester group")
+    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    parser.add_argument("-x", "--doNotSend", action="store_true", help="Do not send any mail")
+    parser.add_argument("-db", "--database", help="database path")
+    parser.add_argument("-f", "--from_index", help="Starting index in the database", default=None)
+    parser.add_argument("-to", "--to_index", help="Stopping index in the database", default=None)
+    parser.add_argument("-w", "--wait", help="Wait x minutes before restarting sending mail", type=int)
+    parser.add_argument("--selected", action="store_true", help="Only send selected mail", default=False)
+    parser.add_argument("--body")
+    parser.add_argument("--cotisation", help="Generate cotisation reminder mail", action="store_true", default=False)
+    parser.add_argument("-y", "--cotisation_year", help="Cotisation year", default="2026")
+    parser.add_argument("-amt", "--cotisation_amount", help="Cotisation amount", default="15.00")
+    parser.add_argument("-mh", "--max-mails-per-hour", default=1000, type=int)
+    parser.add_argument("-na", "--max_addr_per_mail", default=50, type=int)
+    parser.add_argument("-p", "--pause", default=3, type=int)
+    parser.add_argument("--sync", action="store_true")
+    parser.add_argument("--check_spam", action="store_true")
+    parser.add_argument("--profile", help="mail profile")
+    return parser.parse_args()
 
 
 def main():
