@@ -1004,7 +1004,7 @@ def process_artscroises(args):
 
     # and args overrides config data
     if config["max_mails_per_hour"]:
-        args.max_addr_per_mail = int(config["max_mails_per_hour"])
+        args.max_addr_per_mail = int(config["max_addr_per_mail"])
     if config["max_addr_per_mail"]:
         args.max_mails_per_hour = int(config["max_mails_per_hour"])
     if config["pause"]:
@@ -1034,7 +1034,7 @@ def process_artscroises(args):
             files.remove(f)
 
     if not args.message:
-        args.message = f"\nChers amies et amis des Arts Croisés,\n{body_txt}\nVeuillez trouver en pièce jointe notre newsletter {args.newsletter_name}.\nBonne lecture!\n\nL'équipe Arts Croisés, asbl\n..."
+        args.message = f"\nChers amies et amis des Arts Croisés,\n{body_txt}\nVeuillez trouver en pièce jointe notre newsletter {args.newsletter_name}.\nBonne lecture!\n\nL'équipe Arts Croisés, asbl.\n"
 
     if args.wait:
         log.info(f"Start sending in {args.wait} minutes")
