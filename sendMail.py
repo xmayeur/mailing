@@ -612,7 +612,7 @@ def _format_message(template, row, header):
     :rtype: str
     """
     try:
-        msg_txt = re.sub(r"\${(.*)}", r"{row[header.index('\1')]}", template)
+        msg_txt = re.sub(r"\${(.*?)}", r"{row[header.index('\1')]}", template)
         return eval('f"""' + msg_txt + '"""')
     except (NameError, KeyError, IndexError, SyntaxError) as e:
         # log.error(f"Erreur d'évaluation du message : {e}")
