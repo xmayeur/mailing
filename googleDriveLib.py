@@ -1,6 +1,23 @@
 """
+Module for interacting with Google Drive APIs through Service Account credentials.
+
+This module provides functionality to connect to Google Drive, retrieve file metadata,
+download files, upload files, and rename existing files in a Google Drive account.
+It uses the Google APIs Client Library for Python and requires `ServiceAccountCredentials`
+for authentication.
+
+Dependencies:
+- googleapiclient.discovery
+- googleapiclient.http
+- oauth2client.service_account
+- A function called `get_secret` for retrieving service account credentials.
+
+Logger output is configured to display messages on the console and to save them to a file
+called "sendMail.log".
+
 
 Based on : https://medium.com/@matheodaly.md/using-google-drive-api-with-python-and-a-service-account-d6ae1f6456c2
+
 
 """
 
@@ -18,7 +35,15 @@ import sys
 
 
 def _init_log():
-    """Configures shared logger for console and file"""
+    """
+    Configures and initializes a logger for console and file output.
+
+    Creates a logger that writes to both console (stdout) and a file named "sendMail.log".
+    Sets the logging level to INFO for the root logger and DEBUG for both handlers.
+
+    :return: Configured logger instance.
+    :rtype: logging.Logger
+    """
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
@@ -41,6 +66,14 @@ _log = _init_log()
 
 
 def connect_google_driver(service_account_id="artscroisesServiceAccount"):
+    """
+    Connects to Google Drive API using service account credentials.
+
+    :param service_account_id: The ID of the service account to retrieve from secrets.
+    :type service_account_id: str
+    :return: Google Drive API service object, or None if connection fails.
+    :rtype: googleapiclient.discovery.Resource or None
+    """
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(
@@ -53,6 +86,19 @@ def connect_google_driver(service_account_id="artscroisesServiceAccount"):
 
 
 def get_files(service=None, folder_id=None):
+    """
+    Retrieves a list of files from a specific Google Drive folder.
+
+    Lists files that are not marked as "published" from the specified folder.
+    Returns file metadata including ID, name, MIME type, size, and modification time.
+
+    :param service: Google Drive API service object.
+    :type service: googleapiclient.discovery.Resource
+    :param folder_id: The ID of the Google Drive folder to retrieve files from.
+    :type folder_id: str
+    :return: Dictionary containing file metadata, or None if operation fails.
+    :rtype: dict or None
+    """
     if service is None or folder_id is None:
         return None
 
@@ -72,6 +118,18 @@ def get_files(service=None, folder_id=None):
 
 
 def rename_file(service=None, fileId=None, newTitle=None):
+    """
+    Renames a file in Google Drive.
+
+    :param service: Google Drive API service object.
+    :type service: googleapiclient.discovery.Resource
+    :param fileId: The ID of the file to rename.
+    :type fileId: str
+    :param newTitle: The new name for the file.
+    :type newTitle: str
+    :return: Updated file metadata, or None if parameters are invalid.
+    :rtype: dict or None
+    """
     if service is None or fileId is None or newTitle is None:
         return
     body = {"name": newTitle}
@@ -79,6 +137,20 @@ def rename_file(service=None, fileId=None, newTitle=None):
 
 
 def download_file(service=None, files=[], folder="input"):
+    """
+    Downloads files from Google Drive to a local folder.
+
+    Downloads each file from the provided list to the specified local folder.
+    Progress is printed to console during download.
+
+    :param service: Google Drive API service object.
+    :type service: googleapiclient.discovery.Resource
+    :param files: List of file metadata dictionaries containing at least 'id' and 'name'.
+    :type files: list[dict]
+    :param folder: Local folder path where files will be saved. Defaults to "input".
+    :type folder: str
+    :return: None
+    """
     if service is None or files is None or folder is None:
         return
     for f in files:
@@ -100,6 +172,18 @@ def download_file(service=None, files=[], folder="input"):
 
 
 def upload_file(service, file, mimetype="text/csv"):
+    """
+    Uploads a file to Google Drive.
+
+    :param service: Google Drive API service object.
+    :type service: googleapiclient.discovery.Resource
+    :param file: Path to the local file to upload.
+    :type file: str
+    :param mimetype: MIME type of the file. Defaults to "text/csv".
+    :type mimetype: str
+    :return: Uploaded file metadata containing the file ID.
+    :rtype: dict
+    """
     fb = basename(file)
     file_metadata = {"name": fb}
     media = MediaFileUpload(file, mimetype)
