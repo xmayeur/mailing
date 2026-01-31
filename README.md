@@ -378,9 +378,13 @@ sphinx-build -b html docs docs/_build/html
 
 View at `docs/_build/html/index.html`
 
+## Copyright
+
+Copyright ©  2022-2026 Xavier Mayeur
+
 ## License
 
-[Your License Here]
+This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.txt) as published by the Free Software Foundation, version 3 of the License
 
 ## Support
 
