@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
+Utilities to handle logging, Google Sheets, file manipulation, and API interactions.
 
-TODO: understand why image src from web are showed as attachment, not embedded in html
-
+This module provides functions and classes for initializing logging, working with Google Sheets,
+manipulating files (e.g., determining MIME types or encoding files in Base64), and API interactions
+such as those for invoicing with a third-party service. It also includes utilities for processing
+HTML content and converting data structures.
 
 """
 
@@ -55,9 +58,16 @@ DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 
 def init_log(log_file=None):
     """
-    Initialise le module de journalisation vers la sortie standard et un fichier optionnel.
-    :param log_file: Le chemin du fichier de log.
-    :return: Un objet logger configuré.
+    Initializes and configures a logger for logging messages. The logger writes
+    messages to the console and optionally to a log file, using a predefined
+    format for log messages. This function sets the logger's default level to
+    INFO and the file handler's level to DEBUG if a file logger is enabled.
+
+    :param log_file: Path to the file where log messages will be stored. If None,
+        no file logging is enabled. Optional.
+    :type log_file: str, optional
+    :return: Configured logger instance.
+    :rtype: logging.Logger
     """
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -164,8 +174,20 @@ def file_to_base64(filepath):
 
 def prepare_html_for_cid(in_filepath):
     """
-    Scanne le HTML, remplace les chemins locaux par des CID et retourne
-    le HTML modifié ainsi que la liste des chemins d'images à attacher.
+    Prepare HTML content for embedding inline images as Content-ID (CID) references.
+
+    This function processes an HTML file, reads its content, identifies the <img>
+    tags, and replaces their `src` attributes with Content-ID (CID) references,
+    allowing the images to be embedded inline in emails. It handles local image
+    paths and excludes external or base64-encoded images. A mapping of the local
+    image paths and the generated CIDs is returned.
+
+    :param in_filepath: The file path to the HTML file to be processed.
+    :type in_filepath: str
+    :return: A tuple containing the modified HTML content as a string and a list
+        of tuples, where each tuple includes the local image file path and its
+        associated CID.
+    :rtype: tuple[str, list[tuple[str, str]]]
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
     with open(in_filepath, "r", encoding="utf-8") as file:
@@ -188,7 +210,7 @@ def prepare_html_for_cid(in_filepath):
     return str(soup), image_paths
 
 
-class Invoice:
+class Billit:
     """
     Handles invoicing and order management operations using an external API.
 
@@ -321,7 +343,6 @@ class Invoice:
         return response.json()
 
 
-
 def _process_membership_invoice(param, row, indices):
     """
     Processes a membership invoice for the Arts Croisés association. The function validates the provided
@@ -384,7 +405,22 @@ def _process_membership_invoice(param, row, indices):
     return True
 
 def _get_subscriber_reader(param):
-    """Extrait la logique de lecture de la source de données."""
+    """
+    Returns a reader object and file handle for retrieving subscriber
+    data based on the given parameter. The function retrieves the data
+    either from a Google Sheets document or a local CSV file, depending
+    on the configuration in the parameter. If the database file is not
+    found, it logs the error and returns None, None.
+
+    :param param: The configuration object containing details for data
+                  retrieval (e.g., Google Sheets credentials or CSV
+                  database path).
+    :type param: object
+    :return: A tuple consisting of a data reader object (either for
+             Google Sheets or CSV) and a file handle. If the database
+             is not found, it returns (None, None).
+    :rtype: tuple(iterator | None, file | None)
+    """
     if param.database is None:
         wb = openGoogleDBMembersSheet(sa=param.sa, id=param.sheetid)
         return iter(readAllSheet(wb)), None
@@ -499,8 +535,17 @@ def _save_to_sent(param, msg):
 
 def prepare_html_and_get_images(in_filepath, max_width=800):
     """
-    Lit un fichier HTML, remplace les images locales par des CIDs,
-    et redimensionne les images trop grandes pour réduire le poids du mail.
+    Processes an HTML file to embed inline images and resize them for optimized usage.
+
+    :param in_filepath: The path to the input HTML file.
+    :type in_filepath: str
+    :param max_width: The maximum allowable width for images. Images wider than this will be resized.
+                      Defaults to 800.
+    :type max_width: int, optional
+    :return: A tuple containing the modified HTML content as a string, a list of inline image metadata
+             dictionaries with optimized file paths and their corresponding CID references, and the path
+             to the temporary directory used for storing the optimized images.
+    :rtype: tuple[str, list[dict[str, str]], str]
     """
 
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
@@ -546,7 +591,26 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
 
 
 def _format_message(template, row, header):
-    """Gère le remplacement des variables dans le corps du message."""
+    """
+    Formats a message template by replacing placeholders with corresponding values
+    from the `row` list, based on the column names provided in the `header`.
+
+    The placeholders within the template follow the syntax `${column_name}`,
+    where `column_name` corresponds to an entry in the `header` list. If any
+    error occurs during formatting, the original template is returned unchanged.
+
+    :param template: The template string containing placeholders to be replaced.
+    :type template: str
+    :param row: A list of values where indexes correspond to the column names in the
+        `header`.
+    :type row: list
+    :param header: A list of column names, where the index of each column
+        corresponds to positional values in `row`.
+    :type header: list
+    :return: A formatted string with placeholders substituted with values from the
+        `row` list, or the original template in case of an error.
+    :rtype: str
+    """
     try:
         msg_txt = re.sub(r"\${(.*)}", r"{row[header.index('\1')]}", template)
         return eval('f"""' + msg_txt + '"""')
@@ -596,7 +660,30 @@ def process_attachments(args, config, folder="input"):
 
 
 def build_email(param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None):
-    # ... existing code ...
+    """
+    Constructs an email message with specified subject, recipients, message body,
+    attachments, or inline images. The email includes advanced configurations such as
+    List-Unsubscribe headers and inline attachment handling. Designed to
+    support both simple and complex email requirements with flexibility.
+
+    :param param: A configuration object containing sender details, profiles, and rules.
+    :param subject: The subject of the email. Defaults to an empty string.
+    :type subject: str, optional
+    :param to: Comma-separated email addresses for primary recipients. Defaults to an empty string.
+    :type to: str, optional
+    :param cc: Comma-separated email addresses for carbon copy recipients. Defaults to an empty string.
+    :type cc: str, optional
+    :param bcc: Comma-separated email addresses for blind carbon copy recipients. Defaults to an empty string.
+    :type bcc: str, optional
+    :param message: The plain text or HTML content of the email body. Defaults to an empty string.
+    :type message: str, optional
+    :param images: File paths of inline images to include in the email body. Can be a string or a list of strings. Defaults to None.
+    :type images: Union[str, list[str]], optional
+    :param attachments: File paths of attachments to include in the email. Can be a string or a list of strings. Defaults to None.
+    :type attachments: Union[str, list[str]], optional
+    :return: A tuple containing the constructed email message (MIMEMultipart object) and list of recipient email addresses.
+    :rtype: Tuple[MIMEMultipart, list[str]]
+    """
     # 1. Build Message
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
@@ -839,6 +926,29 @@ def _filter_artscroises(param, row, indices):
 
 
 def _filter_cambristi(param, row, indices, test):
+    """
+    Filters data based on specific conditions related to membership status and test mode.
+
+    This function implements a filtering mechanism to process a given row of data based on
+    conditions defined by the input parameters. It differentiates behaviors depending on
+    whether the test mode is enabled or not.
+
+    :param param: Context-specific parameter used for processing. Implementation details
+                  of this parameter are not specified in the function body.
+    :type param: Any
+    :param row: The current row of data to process.
+    :type row: List[Any]
+    :param indices: A dictionary mapping relevant column names to their respective indices
+                    in the row.
+    :type indices: Dict[str, int]
+    :param test: A flag indicating whether the function operates in test mode (`True`) or
+                 normal mode (`False`).
+    :type test: bool
+    :return: Indicates whether the row passes the filtering conditions.
+             Returns `True` if the row does not satisfy the filtering criteria and should
+             be excluded; `False` otherwise.
+    :rtype: bool
+    """
     if test:
         try:
             return not ('test' in row[indices["title"]] )
@@ -1050,11 +1160,11 @@ def process_artscroises(args):
     param.file = files  # Mise à jour explicite des fichiers filtrés
 
     if args.cotisation:
-        param.invoice = Invoice(prod=not args.test)
+        param.invoice = Billit(prod=not args.test)
         param.subject = f"Arts Croisés - Cotisation {param.cotisation_year}"
 
     if args.sync:
-        param.invoice = Invoice(prod=not args.test)
+        param.invoice = Billit(prod=not args.test)
         _sync(param)
 
     elif generate_mailing(param) == "OK" and not args.test:
