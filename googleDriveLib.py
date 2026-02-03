@@ -74,10 +74,11 @@ def connect_google_driver(service_account_id="artscroisesServiceAccount"):
     :return: Google Drive API service object, or None if connection fails.
     :rtype: googleapiclient.discovery.Resource or None
     """
+    creds = get_secret(service_account_id)
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-            get_secret(service_account_id), scope
+            creds, scope
         )
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
@@ -196,6 +197,7 @@ def upload_file(service, file, mimetype="text/csv"):
 
 
 if __name__ == "__main__":
+
     conn = connect_google_driver()
     id = get_secret("artscroisesmailing")["mailing_folder"]
     items = get_files(conn, folder_id=id)

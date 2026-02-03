@@ -484,7 +484,7 @@ View at `docs/_build/html/index.html`
 
 ## Copyright
 
-Copyright ©  2022-2026 Xavier Mayeur
+© Copyright 2022-2026 Xavier Mayeur
 
 ## License
 
