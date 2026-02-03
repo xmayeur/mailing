@@ -142,11 +142,9 @@ def guess_type(filepath):
     """
     try:
         import magic  # python-magic
-
         return magic.from_file(filepath, mime=True)
     except ImportError:
         import mimetypes
-
         return mimetypes.guess_type(filepath)[0]
 
 
@@ -614,7 +612,7 @@ def _format_message(template, row, header):
     try:
         msg_txt = re.sub(r"\${(.*?)}", r"{row[header.index('\1')]}", template)
         return eval('f"""' + msg_txt + '"""')
-    except (NameError, KeyError, IndexError, SyntaxError) as e:
+    except (NameError, KeyError, IndexError, SyntaxError, ValueError) as e:
         # log.error(f"Erreur d'évaluation du message : {e}")
         return template
 
