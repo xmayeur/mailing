@@ -1,0 +1,20 @@
+# Core dependencies
+beautifulsoup4>=4.14.3
+certifi
+google-api-python-client>=2.187.0
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+gspread>=6.2.1
+oauth2client
+pillow>=12.1.0
+PyYAML
+requests
+
+# Custom/local dependencies
+get_hc_secrets
+
+# Development dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0

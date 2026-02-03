@@ -10,11 +10,19 @@ import io
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Mock external dependencies
+# Mock external dependencies before importing
+mock_get_secret = MagicMock(return_value={"key": "value"})
 sys.modules['getSecrets'] = MagicMock()
+sys.modules['getSecrets'].get_secret = mock_get_secret
+
+# Create a proper HttpError that inherits from Exception
+class MockHttpError(Exception):
+    pass
+
 sys.modules['googleapiclient'] = MagicMock()
 sys.modules['googleapiclient.discovery'] = MagicMock()
 sys.modules['googleapiclient.errors'] = MagicMock()
+sys.modules['googleapiclient.errors'].HttpError = MockHttpError
 sys.modules['googleapiclient.http'] = MagicMock()
 sys.modules['oauth2client'] = MagicMock()
 sys.modules['oauth2client.service_account'] = MagicMock()
@@ -160,8 +168,9 @@ class TestDownloadFile:
     """Tests for download_file function"""
 
     @patch('googleDriveLib.MediaIoBaseDownload')
+    @patch('googleDriveLib.io.BytesIO')
     @patch('builtins.open', create=True)
-    def test_download_file_success(self, mock_open, mock_downloader_class):
+    def test_download_file_success(self, mock_open_file, mock_bytesio, mock_downloader_class):
         """Test successful file download"""
         mock_service = Mock()
         mock_files = Mock()
@@ -170,11 +179,17 @@ class TestDownloadFile:
         mock_service.files.return_value = mock_files
         mock_files.get_media.return_value = mock_get_media
 
-        # Mock downloader
+        # Mock BytesIO
+        mock_file = Mock()
+        mock_file.getvalue.return_value = b"file content"
+        mock_bytesio.return_value = mock_file
+
+        # Mock downloader - next_chunk returns (status, done)
         mock_downloader = Mock()
         mock_status = Mock()
         mock_status.progress.return_value = 1.0
-        mock_downloader.next_chunk.return_value = (mock_status, True)
+        # First call returns (status, False), second call returns (status, True)
+        mock_downloader.next_chunk.side_effect = [(mock_status, False), (mock_status, True)]
         mock_downloader_class.return_value = mock_downloader
 
         files = [{"id": "file123", "name": "test.pdf"}]
@@ -206,72 +221,77 @@ class TestDownloadFile:
 class TestUploadFile:
     """Tests for upload_file function"""
 
-    @patch('googleDriveLib.MediaFileUpload')
-    @patch('googleDriveLib.basename')
-    def test_upload_file_success(self, mock_basename, mock_media_upload):
+    def test_upload_file_success(self):
         """Test successful file upload"""
-        mock_service = Mock()
-        mock_files = Mock()
-        mock_create = Mock()
-        mock_execute = Mock(return_value={"id": "uploaded123"})
+        with patch('googleDriveLib.MediaFileUpload') as mock_media_upload, \
+             patch('googleDriveLib.basename') as mock_basename:
 
-        mock_service.files.return_value = mock_files
-        mock_files.create.return_value = mock_create
-        mock_create.execute.return_value = {"id": "uploaded123"}
+            mock_service = Mock()
+            mock_files = Mock()
+            mock_create = Mock()
+            mock_execute = Mock(return_value={"id": "uploaded123"})
 
-        mock_basename.return_value = "test.csv"
-        mock_media_upload.return_value = Mock()
+            mock_service.files.return_value = mock_files
+            mock_files.create.return_value = mock_create
+            mock_create.execute.return_value = {"id": "uploaded123"}
 
-        gd.upload_file(
-            service=mock_service,
-            file="/path/to/test.csv",
-            mimetype="text/csv"
-        )
+            mock_basename.return_value = "test.csv"
+            mock_media_upload.return_value = Mock()
 
-        mock_files.create.assert_called_once()
-        assert mock_media_upload.called
+            gd.upload_file(
+                service=mock_service,
+                file="/path/to/test.csv",
+                mimetype="text/csv"
+            )
 
-    @patch('googleDriveLib.MediaFileUpload')
-    @patch('googleDriveLib.basename')
-    def test_upload_file_custom_mimetype(self, mock_basename, mock_media_upload):
+            mock_files.create.assert_called_once()
+            mock_media_upload.assert_called_once_with("/path/to/test.csv", "text/csv")
+
+    def test_upload_file_custom_mimetype(self):
         """Test file upload with custom MIME type"""
-        mock_service = Mock()
-        mock_files = Mock()
-        mock_create = Mock()
-        mock_create.execute.return_value = {"id": "uploaded123"}
+        with patch('googleDriveLib.MediaFileUpload') as mock_media_upload, \
+             patch('googleDriveLib.basename') as mock_basename:
 
-        mock_service.files.return_value = mock_files
-        mock_files.create.return_value = mock_create
+            mock_service = Mock()
+            mock_files = Mock()
+            mock_create = Mock()
+            mock_create.execute.return_value = {"id": "uploaded123"}
 
-        mock_basename.return_value = "test.pdf"
-        mock_media_upload.return_value = Mock()
+            mock_service.files.return_value = mock_files
+            mock_files.create.return_value = mock_create
 
-        gd.upload_file(
-            service=mock_service,
-            file="/path/to/test.pdf",
-            mimetype="application/pdf"
-        )
+            mock_basename.return_value = "test.pdf"
+            mock_media_upload.return_value = Mock()
 
-        # Verify MediaFileUpload was called with the custom mimetype
-        mock_media_upload.assert_called_once_with("/path/to/test.pdf", "application/pdf")
+            gd.upload_file(
+                service=mock_service,
+                file="/path/to/test.pdf",
+                mimetype="application/pdf"
+            )
+
+            # Verify MediaFileUpload was called with the custom mimetype
+            mock_media_upload.assert_called_once_with("/path/to/test.pdf", "application/pdf")
 
 
 class TestInitLog:
     """Tests for _init_log function"""
 
-    @patch('googleDriveLib.logging.FileHandler')
-    @patch('googleDriveLib.logging.StreamHandler')
-    @patch('googleDriveLib.logging.getLogger')
-    def test_init_log_creates_handlers(self, mock_get_logger, mock_stream, mock_file):
+    def test_init_log_creates_handlers(self):
         """Test that _init_log creates both handlers"""
-        mock_logger = Mock()
-        mock_get_logger.return_value = mock_logger
+        with patch('logging.FileHandler') as mock_file, \
+             patch('logging.StreamHandler') as mock_stream, \
+             patch('logging.getLogger') as mock_get_logger:
 
-        result = gd._init_log()
+            mock_logger = Mock()
+            mock_get_logger.return_value = mock_logger
+            mock_file.return_value = Mock()
+            mock_stream.return_value = Mock()
 
-        # Verify logger setup
-        mock_logger.setLevel.assert_called()
-        assert mock_logger.addHandler.call_count >= 2  # Should add both handlers
+            result = gd._init_log()
+
+            # Verify logger setup
+            mock_logger.setLevel.assert_called()
+            assert mock_logger.addHandler.call_count == 2  # Should add both handlers
 
 
 def test_module_imports():
