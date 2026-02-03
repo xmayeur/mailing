@@ -1,7 +1,7 @@
 # sendMail - Email Campaign Management System
 
 [![Tests](https://github.com/YOUR_USERNAME/sendMail/workflows/Tests/badge.svg)](https://github.com/YOUR_USERNAME/sendMail/actions)
-[![codecov](https://codecov.io/gh/YOUR_USERNAME/sendMail/branch/master/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/sendMail)
+[![codecov](https://codecov.io/gh/xmayeur/sendMail/branch/master/graph/badge.svg)](https://codecov.io/gh/xmayeur/sendMail)
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -106,47 +106,47 @@ python sendMail.py --profile <profile_name> [options] [files...]
 
 #### Basic Options
 
-| Argument | Type | Description |
-|----------|------|-------------|
-| `--profile` | string | **Required**. Mail profile to use (`artscroises` or `cambristi`) |
-| `-s, --subject` | string | Subject of the email |
-| `-m, --message` | string | Text message body of the email |
-| `file` | list | Files to attach to the email (positional argument) |
+| Argument        | Type   | Description                                                      |
+|-----------------|--------|------------------------------------------------------------------|
+| `--profile`     | string | **Required**. Mail profile to use (`artscroises` or `cambristi`) |
+| `-s, --subject` | string | Subject of the email                                             |
+| `-m, --message` | string | Text message body of the email                                   |
+| `file`          | list   | Files to attach to the email (positional argument)               |
 
 #### Test & Debug Options
 
-| Argument | Type | Description |
-|----------|------|-------------|
-| `-t, --test` | flag | Test mode - send only to the tester group |
-| `-v, --verbose` | flag | Increase output verbosity |
-| `-x, --doNotSend` | flag | Do not send any mail (dry run) |
+| Argument          | Type | Description                               |
+|-------------------|------|-------------------------------------------|
+| `-t, --test`      | flag | Test mode - send only to the tester group |
+| `-v, --verbose`   | flag | Increase output verbosity                 |
+| `-x, --doNotSend` | flag | Do not send any mail (dry run)            |
 
 #### Database Options
 
-| Argument | Type | Description |
-|----------|------|-------------|
-| `-db, --database` | string | Path to CSV database file (alternative to Google Sheets) |
-| `-f, --from_index` | integer | Starting index in the database |
-| `-to, --to_index` | integer | Stopping index in the database |
-| `--selected` | flag | Only send to selected recipients |
+| Argument           | Type    | Description                                              |
+|--------------------|---------|----------------------------------------------------------|
+| `-db, --database`  | string  | Path to CSV database file (alternative to Google Sheets) |
+| `-f, --from_index` | integer | Starting index in the database                           |
+| `-to, --to_index`  | integer | Stopping index in the database                           |
+| `--selected`       | flag    | Only send to selected recipients                         |
 
 #### Rate Limiting & Batch Options
 
-| Argument | Type | Description |
-|----------|------|-------------|
-| `-mh, --max-mails-per-hour` | integer | Maximum emails to send per hour (default: 1000) |
-| `-na, --max_addr_per_mail` | integer | Maximum number of addresses per mail (default: 50) |
-| `-p, --pause` | integer | Pause duration in seconds between operations (default: 3) |
-| `-w, --wait` | integer | Wait x minutes before starting to send mail |
+| Argument                    | Type    | Description                                               |
+|-----------------------------|---------|-----------------------------------------------------------|
+| `-mh, --max-mails-per-hour` | integer | Maximum emails to send per hour (default: 1000)           |
+| `-na, --max_addr_per_mail`  | integer | Maximum number of addresses per mail (default: 50)        |
+| `-p, --pause`               | integer | Pause duration in seconds between operations (default: 3) |
+| `-w, --wait`                | integer | Wait x minutes before starting to send mail               |
 
 #### Membership & Invoice Options
 
-| Argument | Type | Description |
-|----------|------|-------------|
-| `--cotisation` | flag | Generate cotisation reminder mail |
-| `-y, --cotisation_year` | string | Cotisation year (default: "2026") |
-| `-amt, --cotisation_amount` | string | Cotisation amount (default: "15.00") |
-| `--sync` | flag | Synchronize members database with Billit |
+| Argument                    | Type   | Description                              |
+|-----------------------------|--------|------------------------------------------|
+| `--cotisation`              | flag   | Generate cotisation reminder mail        |
+| `-y, --cotisation_year`     | string | Cotisation year (default: "2026")        |
+| `-amt, --cotisation_amount` | string | Cotisation amount (default: "15.00")     |
+| `--sync`                    | flag   | Synchronize members database with Billit |
 
 ## Usage Examples
 
@@ -426,16 +426,16 @@ The test suite covers:
 
 Tests run automatically on every push and pull request via GitHub Actions:
 
-- ✅ Multiple Python versions (3.7, 3.8, 3.9, 3.10, 3.11)
+- ✅ Multiple Python versions (3.10, 3.11)
 - ✅ Multiple operating systems (Ubuntu, macOS, Windows)
 - ✅ Code coverage reporting via Codecov
 - ✅ Linting with flake8 and black
 
 ### Test Status
 
-| Component | Status | Coverage |
-|-----------|--------|----------|
-| sendMail.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg) |
+| Component         | Status                                                               | Coverage                                                                 |
+|-------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------|
+| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg) |
 | googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg) |
 
 ### Writing New Tests
