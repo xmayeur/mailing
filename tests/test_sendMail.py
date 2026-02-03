@@ -58,10 +58,12 @@ class TestFileUtilities:
 
     def test_guess_type_with_magic(self):
         """Test MIME type guessing with magic library"""
-        with patch('sendMail.magic') as mock_magic:
-            mock_magic.from_file.return_value = "application/pdf"
+        mock_magic = MagicMock()
+        mock_magic.from_file.return_value = "application/pdf"
+        with patch.dict('sys.modules', {'magic': mock_magic}):
             result = sendMail.guess_type("test.pdf")
             assert result == "application/pdf"
+            mock_magic.from_file.assert_called_once_with("test.pdf", mime=True)
 
     def test_guess_type_without_magic(self):
         """Test MIME type guessing without magic library"""
@@ -290,6 +292,303 @@ class TestArgumentParser:
         args = sendMail.setup_argparse()
         assert args.test == True
         assert args.verbose == True
+
+
+class TestHTMLProcessing:
+    """Tests for HTML processing functions"""
+
+    @patch('builtins.open', mock_open(read_data='<html><body><img src="test.jpg"/></body></html>'))
+    @patch('os.path.exists')
+    @patch('os.path.join')
+    @patch('sendMail.BeautifulSoup')
+    def test_prepare_html_for_cid(self, mock_bs, mock_join, mock_exists):
+        """Test HTML CID preparation"""
+        mock_exists.return_value = True
+        mock_join.return_value = "/basepath/test.jpg"
+
+        # Create a mock img tag
+        mock_img = Mock()
+        mock_img.attrs = {"src": "test.jpg"}
+
+        # Create a mock soup object
+        mock_soup = Mock()
+        mock_soup.find_all.return_value = [mock_img]
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:test@inline.img"/></body></html>')
+
+        mock_bs.return_value = mock_soup
+
+        html, images = sendMail.prepare_html_for_cid("/basepath/test.html")
+
+        assert "cid:" in html
+        assert len(images) > 0
+        assert images[0][0] == "/basepath/test.jpg"
+
+    @patch('builtins.open', mock_open(read_data='<html><body><img src="http://example.com/test.jpg"/></body></html>'))
+    @patch('os.path.exists')
+    def test_prepare_html_for_cid_external_images(self, mock_exists):
+        """Test HTML CID preparation skips external images"""
+        mock_exists.return_value = True
+
+        html, images = sendMail.prepare_html_for_cid("/basepath/test.html")
+
+        assert len(images) == 0  # External images should be skipped
+
+    @patch('builtins.open', mock_open(read_data='<html><body><img src="test.jpg"/></body></html>'))
+    @patch('os.path.exists')
+    @patch('os.path.join')
+    @patch('tempfile.mkdtemp')
+    @patch('sendMail.Image')
+    @patch('sendMail.BeautifulSoup')
+    def test_prepare_html_and_get_images(self, mock_bs, mock_image, mock_temp, mock_join, mock_exists):
+        """Test HTML processing with image optimization"""
+        mock_exists.return_value = True
+        mock_join.return_value = "/basepath/test.jpg"
+        mock_temp.return_value = "/tmp/test_dir"
+
+        # Mock PIL Image
+        mock_img = Mock()
+        mock_img.width = 1000
+        mock_img.height = 800
+        mock_img.resize.return_value = mock_img
+        mock_img.convert.return_value = mock_img
+        mock_image.open.return_value.__enter__.return_value = mock_img
+
+        # Create a mock img tag
+        mock_img_tag = Mock()
+        mock_img_tag.attrs = {"src": "test.jpg"}
+
+        # Create a mock soup object
+        mock_soup = Mock()
+        mock_soup.find_all.return_value = [mock_img_tag]
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:test@inline.img"/></body></html>')
+
+        mock_bs.return_value = mock_soup
+
+        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
+
+        assert "cid:" in html
+        assert len(images) > 0
+        assert temp_dir == "/tmp/test_dir"
+
+
+class TestAttachmentProcessing:
+    """Tests for attachment processing"""
+
+    @patch('os.path.isfile')
+    def test_process_attachments_with_files(self, mock_isfile):
+        """Test processing with file arguments"""
+        mock_isfile.return_value = True
+
+        args = Mock()
+        args.file = ["test1.pdf", "test2.pdf"]
+        config = {}
+
+        files, service, gd_files = sendMail.process_attachments(args, config)
+
+        assert len(files) == 2
+        assert service is None
+        assert gd_files == []
+
+    @patch('os.path.isfile')
+    def test_process_attachments_file_not_found(self, mock_isfile):
+        """Test processing with missing file"""
+        mock_isfile.return_value = False
+
+        args = Mock()
+        args.file = ["missing.pdf"]
+        config = {}
+
+        with pytest.raises(SystemExit):
+            sendMail.process_attachments(args, config)
+
+
+class TestSMTPConnection:
+    """Tests for SMTP connection handling"""
+
+    @patch('sendMail.SMTP')
+    @patch('ssl.create_default_context')
+    def test_get_smtp_connection_success(self, mock_ssl, mock_smtp):
+        """Test successful SMTP connection"""
+        param = Mock()
+        param.smtp_host = "smtp.example.com"
+        param.smtp_port = 587
+        param.username = "user@example.com"
+        param.password = "password123"
+
+        mock_conn = Mock()
+        mock_smtp.return_value = mock_conn
+
+        result = sendMail._get_smtp_connection(param)
+
+        assert result == mock_conn
+        mock_conn.starttls.assert_called_once()
+        mock_conn.login.assert_called_once_with("user@example.com", "password123")
+
+    @patch('sendMail.SMTP')
+    @patch('ssl.create_default_context')
+    def test_get_smtp_connection_auth_error(self, mock_ssl, mock_smtp):
+        """Test SMTP connection with authentication error"""
+        from smtplib import SMTPAuthenticationError
+
+        param = Mock()
+        param.smtp_host = "smtp.example.com"
+        param.smtp_port = 587
+        param.username = "user@example.com"
+        param.password = "wrong_password"
+
+        mock_conn = Mock()
+        mock_conn.login.side_effect = SMTPAuthenticationError(535, "Authentication failed")
+        mock_smtp.return_value = mock_conn
+
+        with pytest.raises(SystemExit):
+            sendMail._get_smtp_connection(param)
+
+
+class TestEmailSending:
+    """Tests for email sending functions"""
+
+    @patch('sendMail._get_smtp_connection')
+    @patch('sendMail._save_to_sent')
+    def test_send_mail_success(self, mock_save, mock_conn_func):
+        """Test successful email sending"""
+        param = Mock()
+        param.verbose = False
+
+        mock_conn = Mock()
+        mock_conn_func.return_value = mock_conn
+
+        msg = MagicMock()
+        msg.__getitem__.return_value = "sender@example.com"
+        msg.as_string.return_value = "email content"
+
+        recipients = ["recipient@example.com"]
+
+        result = sendMail.send_mail(param=param, message=msg, recipients=recipients)
+
+        mock_conn.sendmail.assert_called_once()
+        mock_conn.quit.assert_called_once()
+        mock_save.assert_called_once()
+
+    @patch('sendMail._get_smtp_connection')
+    def test_send_mail_connection_failure(self, mock_conn_func):
+        """Test email sending with connection failure"""
+        param = Mock()
+        param.verbose = False
+
+        mock_conn_func.return_value = None
+
+        msg = Mock()
+        recipients = ["recipient@example.com"]
+
+        # Should handle gracefully without raising exception
+        sendMail.send_mail(param=param, message=msg, recipients=recipients)
+
+    @patch('sendMail.imaplib.IMAP4_SSL')
+    @patch('sendMail.time')
+    def test_save_to_sent_success(self, mock_time, mock_imap):
+        """Test saving message to sent folder"""
+        param = Mock()
+        param.imap_host = "imap.example.com"
+        param.imap_port = 993
+        param.username = "user@example.com"
+        param.password = "password123"
+        param.sent_folder = "Sent"
+        param.verbose = False
+
+        mock_time.return_value = 1234567890
+
+        mock_conn = Mock()
+        mock_imap.return_value = mock_conn
+
+        msg = Mock()
+        msg.as_string.return_value = "email content"
+
+        sendMail._save_to_sent(param, msg)
+
+        mock_conn.login.assert_called_once()
+        mock_conn.append.assert_called_once()
+        mock_conn.logout.assert_called_once()
+
+
+class TestGmailFunctions:
+    """Tests for Gmail API functions"""
+
+    @patch('sendMail.base64.urlsafe_b64encode')
+    def test_send_gmail_success(self, mock_b64):
+        """Test successful Gmail sending"""
+        mock_b64.return_value.decode.return_value = "encoded_message"
+
+        mock_service = Mock()
+        mock_service.users().messages().send().execute.return_value = {"id": "12345"}
+
+        msg = MagicMock()
+        msg.as_bytes.return_value = b"email content"
+        msg.__getitem__.return_value = "recipient@example.com"
+
+        result = sendMail.send_gmail(mock_service, msg)
+
+        assert result is not None
+        assert result["id"] == "12345"
+
+
+class TestProcessMembershipInvoice:
+    """Tests for membership invoice processing"""
+
+    @patch('sendMail.get_secret')
+    def test_process_membership_invoice_wrong_profile(self, mock_secret):
+        """Test invoice processing with wrong profile"""
+        param = Mock()
+        param.profile = "cambristi"
+
+        result = sendMail._process_membership_invoice(param, [], {})
+
+        assert result is None
+
+    @patch('sendMail.get_secret')
+    def test_process_membership_invoice_not_member(self, mock_secret):
+        """Test invoice processing for non-member"""
+        param = Mock()
+        param.profile = "artscroises"
+
+        row = ["no", "", "test@example.com"]
+        indices = {"member": 0, "membershippaid": 1, "email": 2}
+
+        result = sendMail._process_membership_invoice(param, row, indices)
+
+        assert result is None
+
+
+class TestGetSubscriberReader:
+    """Tests for subscriber reader function"""
+
+    @patch('sendMail.openGoogleDBMembersSheet')
+    @patch('sendMail.readAllSheet')
+    def test_get_subscriber_reader_google_sheets(self, mock_read, mock_open):
+        """Test getting subscriber reader from Google Sheets"""
+        param = Mock()
+        param.database = None
+        param.sa = "service_account"
+        param.sheetid = "sheet_id"
+
+        mock_wb = Mock()
+        mock_open.return_value = mock_wb
+        mock_read.return_value = [["header1", "header2"], ["data1", "data2"]]
+
+        reader, csvfile = sendMail._get_subscriber_reader(param)
+
+        assert csvfile is None
+        assert reader is not None
+
+    @patch('builtins.open', mock_open(read_data="name,email\nJohn,john@example.com"))
+    def test_get_subscriber_reader_csv(self):
+        """Test getting subscriber reader from CSV"""
+        param = Mock()
+        param.database = "test.csv"
+
+        reader, csvfile = sendMail._get_subscriber_reader(param)
+
+        assert reader is not None
+        assert csvfile is not None
 
 
 def test_module_imports():
