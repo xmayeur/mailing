@@ -432,6 +432,8 @@ class TestYourFeature:
 
 ## Documentation
 
+Online documentation is available at https://mailing.readthedocs.io/.
+
 Full API documentation is available in the `docs/` directory. Build with:
 
 ```bash
