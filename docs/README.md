@@ -65,8 +65,6 @@ The main configuration file is `conf.py`, which includes:
 - `index.rst` - Main documentation page
 - `sendMail.rst` - sendMail module API reference
 - `googleDriveLib.rst` - Google Drive library API reference
-- `makeHtml.rst` - HTML utility documentation
-- `decode_spam_cause.rst` - Spam detection utility documentation
 - `conf.py` - Sphinx configuration
 - `Makefile` - Build commands (Unix/Mac)
 - `make.bat` - Build commands (Windows)

@@ -14,7 +14,7 @@ HTML content and converting data structures.
 import argparse
 import base64
 import csv
-import datetime as dt
+
 import email.mime.application
 import email.utils
 import imaplib
@@ -42,7 +42,7 @@ import requests
 import yaml
 from PIL import Image
 from bs4 import BeautifulSoup
-from certifi import where
+
 from getSecrets import get_secret
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -207,200 +207,6 @@ def prepare_html_for_cid(in_filepath):
 
     return str(soup), image_paths
 
-
-class Billit:
-    """
-    Handles invoicing and order management operations using an external API.
-
-    The Invoice class provides functionality to interact with the Billit.be third-party
-    API to manage orders and clients. It allows creating clients, managing
-    invoices, and interacting with API endpoints for various operations.
-
-    Class Attributes:
-    :ivar EXPIRY_DAYS: Number of days after which an invoice expires.
-    :type EXPIRY_DAYS: int
-
-    Instance Attributes:
-    :ivar token: API token for authentication.
-    :type token: str
-    :ivar base: Base URL for the API (depends on the environment).
-    :type base: str
-    :ivar headers: Headers used for API requests, including authentication.
-    :type headers: dict
-    """
-
-    EXPIRY_DAYS = 30
-
-    def __init__(self, prod=False):
-        token_dict = get_secret("ArtsCroisesAPIToken")
-        if prod:
-            self.token = token_dict["token"]
-            self.base = token_dict["baseUrl"]
-        else:
-            self.token = token_dict["devToken"]
-            self.base = token_dict["devBaseUrl"]
-        self.headers = {"apiKey": self.token, "accept": "application/json"}
-
-    def _make_request(self, method, endpoint, json=None):
-        """
-        Makes a request to the Billit.be API using the specified method and endpoint.
-        :param method:
-        :param endpoint:
-        :param json:
-        :return:
-        """
-        url = self.base + endpoint
-        headers = (
-            {**self.headers, "content-type": "text/json"} if json else self.headers
-        )
-        response = requests.request(
-            method, url, headers=headers, json=json, verify=where()
-        )
-        if response.status_code != 200:
-            log.error(f"{method} {endpoint} failed: {response.text}")
-            return None
-        return response
-
-    def get_client(self, client_id):
-        """
-        Retrieves details for a client using its ID.
-        :param client_id:
-        :return:
-        """
-        response = self._make_request("GET", f"parties/{client_id}")
-        if response.status_code != 200:
-            return None
-        return response.json()
-
-    def create_client(self, row, indices):
-        """
-        Creates or update a new client using the provided row data.
-        :param row:
-        :param indices:
-        :return:
-        """
-        data = {
-            "PartyID": row[indices["id"]],
-            "Nr": row[indices["id"]],
-            "Name": row[indices["first_name"]] + " " + row[indices["last_name"]],
-            "Mobile": row[indices["mobile_phone"]],
-            "Phone": row[indices["phone"]],
-            "Email": row[indices["email"]],
-            "ContactFirstName": row[indices["first_name"]],
-            "ContactLastName": row[indices["last_name"]],
-            "PartyType": "Customer",
-        }
-        response = self._make_request("POST", "parties", json=data)
-        if not response or response.status_code != 200:
-            return -1
-        return response.text
-
-    def create_order(self, client=None, product_name="", price=0.0, qty=1):
-        """
-        Creates a new order for the specified client.
-        :param client:          "client" object returned by _get_client()
-        :param product_name:    product_name
-        :param price:           product unit price
-        :param qty:             product qua,tity
-        :return:                an "order" object
-        """
-
-        if not client:
-            return -1
-
-        today = dt.date.today()
-        order_data = {
-            "OrderType": "Invoice",
-            "OrderDirection": "Income",
-            "OrderDate": today.isoformat(),
-            "ExpiryDate": (today + dt.timedelta(days=self.EXPIRY_DAYS)).isoformat(),
-            "OrderTitle": product_name,
-            "OrderLines": [
-                {
-                    "Quantity": qty,
-                    "UnitPriceExcl": price,
-                    "Description": product_name,
-                    "VATPercentage": 0.0,
-                    "Reference": "C2026",
-                }
-            ],
-            "Customer": client,
-        }
-
-        response = self._make_request("POST", "orders", json=order_data)
-        if not response:
-            return -1
-
-        order_id = response.text
-        log.debug(f"OrderID: {order_id}")
-
-        # Refresh order details
-        response = self._make_request("GET", f"orders/{order_id}")
-        if not response:
-            return -1
-        return response.json()
-
-
-def _process_membership_invoice(param, row, indices):
-    """
-    Processes a membership invoice for the Arts Croisés association. The function validates the provided
-    information, creates a client if necessary, generates a membership invoice, and composes a message
-    for the member conveying payment details.
-
-    It ensures the client meets the criteria for membership renewal, attempts to handle the creation of
-    a client and order, and formats the final message detailing how to proceed with the payment.
-
-    :param param: An object that contains properties and behaviors necessary for invoice processing.
-    :param row: A dictionary-like object containing the details of a single member or transaction.
-    :param indices: A dictionary mapping field names to their corresponding indices within the row object.
-    :return: A boolean indicating whether the membership invoice was successfully processed. Returns
-        None if any mandatory step in processing fails.
-    """
-    if param.profile != 'artscroises':
-        return None
-    if not (row[indices["member"]] == "yes" and
-            not row[indices["membershippaid"]] and
-            row[indices["email"]]):
-        return None
-
-    client_id = param.invoice.create_client(row, indices)
-    if client_id == -1:
-        log.error(f"Failed to create client for {row[indices['id']]}.")
-        return None
-
-    client = param.invoice.get_client(client_id)
-    if not client:
-        return None
-
-    order = param.invoice.create_order(
-        client=client,
-        product_name=f"Cotisation Arts Croisés {param.cotisation_year}",
-        price=param.cotisation_amount,
-        qty=1,
-    )
-    if order["OrderID"] == -1:
-        log.error(f"Failed to create invoice for {row[indices['id']]}.")
-        return None
-
-    bank = order["Supplier"]["BankAccounts"][0]
-    acc_name = bank.get("Name", order["Supplier"]["Name"])
-
-    param.message = f"""
-        <html>
-        Chère/cher {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
-        Nous vous souhaitons tous nos meilleurs voeux pour {param.cotisation_year}.<br/><br/>
-        Voici le temps de renouveler votre cotisation en tant que membre de notre association Arts Croisés.<br/><br/>
-        Si vous souhaitez rester membre, veuillez payer le montant de {param.cotisation_amount} {bank['Currency']} 
-        par personne sur le compte suivant :<br/><br/>
-        {acc_name}<br/>
-        IBAN : {bank['IBAN']}<br/>
-        Communication: {order["PaymentReference"]}<br/><br/>
-        Cordialement,<br/>
-        L'équipe Arts Croisés<br/>
-        {order["Supplier"]["Email"]}
-        </html>
-    """
-    return True
 
 def _get_subscriber_reader(param):
     """
@@ -832,10 +638,7 @@ def generate_mailing(param):
 
             # filtering
             if param.profile == 'artscroises':
-                if param.cotisation:
-                    if not _process_membership_invoice(param, row, indices):
-                        continue
-                elif _filter_artscroises(param, row, indices):
+                if _filter_artscroises(param, row, indices):
                     continue
             elif param.profile == 'cambristi':
                 if _filter_cambristi(param, row, indices, param.test):
@@ -1030,69 +833,6 @@ def send_mail(param=None,message=None, recipients=None):
         _save_to_sent(param, message)
 
 
-def _sync(param):
-    """
-    Synchronize Arts Croisés members only database with Billit
-    :param param:
-    :return:
-    """
-    if param.profile != 'artscroises':
-        return "N/A"
-    reader, csvfile = _get_subscriber_reader(param)
-    header = next(reader, None)
-    if not header:
-        return "Error"
-
-    # mapping des headers
-    indices = {
-        "email": header.index("email"),
-        "id": header.index("id"),
-        "first_name": header.index("first_name"),
-        "last_name": header.index("last_name"),
-        "phone": header.index("phone"),
-        "mobile_phone": header.index("mobile_phone"),
-        "address": header.index("address"),
-        "city": header.index("city"),
-        "zip": header.index("zip"),
-        "member": header.index("member"),
-        "membershippaid": header.index(f"Cotisation {param.cotisation_year}"),
-        "group": header.index("mailing_list"),
-        "selected": header.index("selected"),
-        "status": header.index("status"),
-    }
-    # Sauter les enregistrements initiaux
-    current_row_idx = 1
-    if param.from_index:
-        log.info(f"Reprise à l'index {param.from_index}")
-        for _ in range(2, int(param.from_index)):
-            next(reader, None)
-            current_row_idx += 1
-
-    for row in reader:
-        current_row_idx += 1
-        if param.to_index and current_row_idx > int(param.to_index):
-            break
-
-        # Filtres de sélection
-        has_email = bool(row[indices["email"]])
-        is_member = row[indices["member"]] == "yes"
-
-        if is_member:  # and has_email:
-            # Create or update member as client
-            client_id = param.invoice.create_client(row, indices)
-            if client_id == -1:
-                log.error(f"Failed to create client for {row[indices['id']]}.")
-                continue
-            client = param.invoice.get_client(client_id)
-            if not client:
-                continue
-            log.info(
-                f"Client for {row[indices['first_name']]} {row[indices['last_name']] } sync'ed."
-            )
-
-    return "Done"
-
-
 def process_artscroises(args):
     """
     Processes and configures the Arts Croisés mailing workflow including handling of
@@ -1157,15 +897,7 @@ def process_artscroises(args):
     param = Dict2Class(config)
     param.file = files  # Mise à jour explicite des fichiers filtrés
 
-    if args.cotisation:
-        param.invoice = Billit(prod=not args.test)
-        param.subject = f"Arts Croisés - Cotisation {param.cotisation_year}"
-
-    if args.sync:
-        param.invoice = Billit(prod=not args.test)
-        _sync(param)
-
-    elif generate_mailing(param) == "OK" and not args.test:
+    if generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         for f in glob("input/*.*"):
@@ -1256,14 +988,9 @@ def setup_argparse():
     parser.add_argument("-w", "--wait", help="Wait x minutes before restarting sending mail", type=int)
     parser.add_argument("--selected", action="store_true", help="Only send selected mail", default=False)
     parser.add_argument("--body")
-    parser.add_argument("--cotisation", help="Generate cotisation reminder mail", action="store_true", default=False)
-    parser.add_argument("-y", "--cotisation_year", help="Cotisation year", default="2026")
-    parser.add_argument("-amt", "--cotisation_amount", help="Cotisation amount", default="15.00")
     parser.add_argument("-mh", "--max-mails-per-hour", default=1000, type=int)
     parser.add_argument("-na", "--max_addr_per_mail", default=50, type=int)
     parser.add_argument("-p", "--pause", default=3, type=int)
-    parser.add_argument("--sync", action="store_true")
-    parser.add_argument("--check_spam", action="store_true")
     parser.add_argument("--profile", help="mail profile")
     return parser.parse_args()
 
