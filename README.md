@@ -17,8 +17,6 @@ A comprehensive email campaign management system for organizations managing mail
 * **Google Sheets integration** for subscriber management
 * **Google Drive integration** for attachment handling
 * **HTML email templates** with inline image support
-* **Invoice generation** via Billit.be API
-* **Membership management** and cotisation reminders
 * **SMTP and Gmail API** support for sending emails
 * **Flexible filtering** based on subscriber attributes
 
@@ -28,7 +26,6 @@ A comprehensive email campaign management system for organizations managing mail
 - 📊 **Google Sheets integration** for dynamic subscriber lists
 - 📁 **Google Drive integration** for automatic attachment downloads
 - 🎨 **HTML email support** with automatic inline image processing
-- 🧾 **Invoice generation** using Billit.be API
 - ⏱️ **Rate limiting** to comply with email provider restrictions
 - 🔄 **Batch processing** with pause and resume capabilities
 - 🧪 **Test mode** for safe campaign testing
@@ -139,15 +136,6 @@ python sendMail.py --profile <profile_name> [options] [files...]
 | `-p, --pause`               | integer | Pause duration in seconds between operations (default: 3) |
 | `-w, --wait`                | integer | Wait x minutes before starting to send mail               |
 
-#### Membership & Invoice Options
-
-| Argument                    | Type   | Description                              |
-|-----------------------------|--------|------------------------------------------|
-| `--cotisation`              | flag   | Generate cotisation reminder mail        |
-| `-y, --cotisation_year`     | string | Cotisation year (default: "2026")        |
-| `-amt, --cotisation_amount` | string | Cotisation amount (default: "15.00")     |
-| `--sync`                    | flag   | Synchronize members database with Billit |
-
 ## Usage Examples
 
 ### Example 1: Basic Newsletter with Attachments
@@ -186,18 +174,7 @@ python sendMail.py --profile cambristi \
     email_template.html
 ```
 
-### Example 4: Membership Cotisation Reminder
-
-Generate and send cotisation invoices for 2026:
-
-```bash
-python sendMail.py --profile artscroises \
-    --cotisation \
-    -y 2026 \
-    -amt 15.00
-```
-
-### Example 5: Partial Database Processing
+### Example 4: Partial Database Processing
 
 Process only records 100 to 200 from the database:
 
@@ -209,7 +186,7 @@ python sendMail.py --profile artscroises \
     newsletter.pdf
 ```
 
-### Example 6: Dry Run (No Sending)
+### Example 5: Dry Run (No Sending)
 
 Preview what would be sent without actually sending emails:
 
@@ -221,7 +198,7 @@ python sendMail.py --profile artscroises \
     newsletter.pdf
 ```
 
-### Example 7: Selected Recipients Only
+### Example 6: Selected Recipients Only
 
 Send only to recipients marked as "selected" in the database:
 
@@ -232,7 +209,7 @@ python sendMail.py --profile artscroises \
     announcement.pdf
 ```
 
-### Example 8: Using CSV Database
+### Example 7: Using CSV Database
 
 Use a local CSV file instead of Google Sheets:
 
@@ -243,7 +220,7 @@ python sendMail.py --profile artscroises \
     newsletter.pdf
 ```
 
-### Example 9: Delayed Send with Wait Time
+### Example 8: Delayed Send with Wait Time
 
 Wait 30 minutes before starting the mail campaign:
 
@@ -252,15 +229,6 @@ python sendMail.py --profile artscroises \
     -s "Scheduled Newsletter" \
     -w 30 \
     newsletter.pdf
-```
-
-### Example 10: Sync Members with Billit
-
-Synchronize member database with Billit invoicing system:
-
-```bash
-python sendMail.py --profile artscroises \
-    --sync
 ```
 
 ## Database Structure
@@ -332,15 +300,6 @@ The system can automatically download attachments from Google Drive:
 2. Upload files to the specified folder
 3. Run without specifying files - they'll be downloaded automatically
 4. After successful sending, files are renamed with `published_` prefix
-
-## Invoice Generation (Arts Croisés Profile)
-
-The Billit.be integration allows:
-
-- Creating/updating client records
-- Generating invoices for membership fees
-- Automatic payment reference generation
-- Email templates with payment instructions
 
 ## Best Practices
 
@@ -416,7 +375,6 @@ The test suite covers:
 - ✅ **Dictionary to Class conversion** utilities
 - ✅ **File utilities** (MIME type detection, Base64 encoding)
 - ✅ **Message formatting** with variable substitution
-- ✅ **Billit invoice** class initialization and methods
 - ✅ **Filtering functions** for both profiles
 - ✅ **Email building** with various configurations
 - ✅ **Google Drive** connection, file listing, download, upload, and rename
