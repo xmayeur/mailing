@@ -156,39 +156,6 @@ class TestFormatMessage:
         result = sendMail._format_message(template, row, header)
         assert result == template
 
-
-class TestBillit:
-    """Tests for Billit invoice class"""
-
-    @patch('sendMail.get_secret')
-    def test_billit_init_prod(self, mock_secret):
-        """Test Billit initialization in production mode"""
-        mock_secret.return_value = {
-            "token": "prod_token",
-            "baseUrl": "https://prod.api.com",
-            "devToken": "dev_token",
-            "devBaseUrl": "https://dev.api.com"
-        }
-
-        invoice = sendMail.Billit(prod=True)
-        assert invoice.token == "prod_token"
-        assert invoice.base == "https://prod.api.com"
-
-    @patch('sendMail.get_secret')
-    def test_billit_init_dev(self, mock_secret):
-        """Test Billit initialization in development mode"""
-        mock_secret.return_value = {
-            "token": "prod_token",
-            "baseUrl": "https://prod.api.com",
-            "devToken": "dev_token",
-            "devBaseUrl": "https://dev.api.com"
-        }
-
-        invoice = sendMail.Billit(prod=False)
-        assert invoice.token == "dev_token"
-        assert invoice.base == "https://dev.api.com"
-
-
 class TestFilterFunctions:
     """Tests for filtering functions"""
 
@@ -535,34 +502,6 @@ class TestGmailFunctions:
         assert result is not None
         assert result["id"] == "12345"
 
-
-class TestProcessMembershipInvoice:
-    """Tests for membership invoice processing"""
-
-    @patch('sendMail.get_secret')
-    def test_process_membership_invoice_wrong_profile(self, mock_secret):
-        """Test invoice processing with wrong profile"""
-        param = Mock()
-        param.profile = "cambristi"
-
-        result = sendMail._process_membership_invoice(param, [], {})
-
-        assert result is None
-
-    @patch('sendMail.get_secret')
-    def test_process_membership_invoice_not_member(self, mock_secret):
-        """Test invoice processing for non-member"""
-        param = Mock()
-        param.profile = "artscroises"
-
-        row = ["no", "", "test@example.com"]
-        indices = {"member": 0, "membershippaid": 1, "email": 2}
-
-        result = sendMail._process_membership_invoice(param, row, indices)
-
-        assert result is None
-
-
 class TestGetSubscriberReader:
     """Tests for subscriber reader function"""
 
@@ -599,7 +538,6 @@ class TestGetSubscriberReader:
 def test_module_imports():
     """Test that the module imports successfully"""
     assert hasattr(sendMail, 'Dict2Class')
-    assert hasattr(sendMail, 'Billit')
     assert hasattr(sendMail, 'build_email')
     assert hasattr(sendMail, 'send_mail')
     assert hasattr(sendMail, 'generate_mailing')

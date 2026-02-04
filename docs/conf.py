@@ -44,11 +44,11 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'sendMail'
-copyright = '2026, Xavier'
-author = 'Xavier'
+copyright = '2025-2026, Xavier Mayeur'
+author = 'Xavier Mayeur'
 
-version = '1.0'
-release = '1.0'
+version = '1.1'
+release = '1.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
