@@ -11,7 +11,6 @@ The **sendMail** module is a comprehensive email campaign management system that
 * **Google Sheets integration** for subscriber management
 * **Google Drive integration** for attachment handling
 * **HTML email templates** with inline image support
-* **Invoice generation** via Billit.be API
 * **Membership management** and cotisation reminders
 * **SMTP and Gmail API** support for sending emails
 * **Flexible filtering** based on subscriber attributes
@@ -34,15 +33,7 @@ Dict2Class
    :members:
    :undoc-members:
    :show-inheritance:
-
-Billit
-^^^^^^
-
-.. autoclass:: sendMail.Billit
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :special-members: __init__
+   :noindex:
 
 Functions
 ---------
@@ -51,38 +42,51 @@ Logging & Initialization
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.init_log
+   :noindex:
 
 Google Sheets Functions
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.openGoogleDBMembersSheet
+   :noindex:
 .. autofunction:: sendMail.readAllSheet
+   :noindex:
 
 File Utilities
 ^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.guess_type
+   :noindex:
 .. autofunction:: sendMail.file_to_base64
+   :noindex:
 
 HTML Processing
 ^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.prepare_html_for_cid
+   :noindex:
 .. autofunction:: sendMail.prepare_html_and_get_images
+   :noindex:
 
 Email Building & Sending
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.build_email
+   :noindex:
 .. autofunction:: sendMail.send_mail
+   :noindex:
 .. autofunction:: sendMail.send_gmail
+   :noindex:
 .. autofunction:: sendMail.get_gmail_service
+   :noindex:
 
 Message Processing
 ^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.generate_mailing
+   :noindex:
 .. autofunction:: sendMail.process_attachments
+   :noindex:
 
 SMTP & IMAP
 ^^^^^^^^^^^
@@ -98,24 +102,22 @@ Filtering & Data Processing
 .. autofunction:: sendMail._format_message
 .. autofunction:: sendMail._filter_artscroises
 .. autofunction:: sendMail._filter_cambristi
-.. autofunction:: sendMail._process_membership_invoice
 
 Profile Processing
 ^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.process_artscroises
+   :noindex:
 .. autofunction:: sendMail.process_cambristi
-
-Synchronization
-^^^^^^^^^^^^^^^
-
-.. autofunction:: sendMail._sync
+   :noindex:
 
 Command-line Interface
 ^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.setup_argparse
+   :noindex:
 .. autofunction:: sendMail.main
+   :noindex:
 
 Command-Line Arguments
 ----------------------
@@ -211,29 +213,6 @@ Rate Limiting & Batch Options
      - integer
      - Wait x minutes before starting to send mail
 
-Membership & Invoice Options
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 60
-
-   * - Argument
-     - Type
-     - Description
-   * - ``--cotisation``
-     - flag
-     - Generate cotisation reminder mail
-   * - ``-y, --cotisation_year``
-     - string
-     - Cotisation year (default: "2026")
-   * - ``-amt, --cotisation_amount``
-     - string
-     - Cotisation amount (default: "15.00")
-   * - ``--sync``
-     - flag
-     - Synchronize members database with Billit
-
 Other Options
 ^^^^^^^^^^^^^
 
@@ -293,19 +272,8 @@ Send HTML email with controlled rate limiting:
         -p 5 \
         email_template.html
 
-Example 4: Membership Cotisation Reminder
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Generate and send cotisation invoices for 2026:
-
-.. code-block:: bash
-
-    python sendMail.py --profile artscroises \
-        --cotisation \
-        -y 2026 \
-        -amt 15.00
-
-Example 5: Partial Database Processing
+Example 4: Partial Database Processing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Process only records 100 to 200 from the database:
@@ -318,7 +286,7 @@ Process only records 100 to 200 from the database:
         -to 200 \
         newsletter.pdf
 
-Example 6: Dry Run (No Sending)
+Example 5: Dry Run (No Sending)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Preview what would be sent without actually sending emails:
@@ -331,7 +299,7 @@ Preview what would be sent without actually sending emails:
         -v \
         newsletter.pdf
 
-Example 7: Selected Recipients Only
+Example 6: Selected Recipients Only
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Send only to recipients marked as "selected" in the database:
@@ -343,7 +311,7 @@ Send only to recipients marked as "selected" in the database:
         --selected \
         announcement.pdf
 
-Example 8: Using CSV Database
+Example 7: Using CSV Database
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Use a local CSV file instead of Google Sheets:
@@ -355,7 +323,7 @@ Use a local CSV file instead of Google Sheets:
         -db subscribers.csv \
         newsletter.pdf
 
-Example 9: Delayed Send with Wait Time
+Example 8: Delayed Send with Wait Time
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Wait 30 minutes before starting the mail campaign:
@@ -366,16 +334,6 @@ Wait 30 minutes before starting the mail campaign:
         -s "Scheduled Newsletter" \
         -w 30 \
         newsletter.pdf
-
-Example 10: Sync Members with Billit
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Synchronize member database with Billit invoicing system:
-
-.. code-block:: bash
-
-    python sendMail.py --profile artscroises \
-        --sync
 
 Configuration
 -------------
