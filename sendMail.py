@@ -315,7 +315,8 @@ def _save_to_sent(param, msg):
     :param msg:
     :return:
     """
-    for attempt in range(2):
+    n = 3
+    for attempt in range(n):
         try:
             imap = imaplib.IMAP4_SSL(param.imap_host, param.imap_port)
             imap.login(param.username, param.password)
@@ -330,7 +331,7 @@ def _save_to_sent(param, msg):
                 log.info("stored in sent folder")
             return
         except Exception as e:
-            if attempt == 0:
+            if attempt < n-1 :
                 log.warning(f"Retrying IMAP storage: {e}")
                 sleep(10)
             else:
