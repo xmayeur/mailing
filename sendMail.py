@@ -291,8 +291,10 @@ def get_gmail_service(param):
     if os.path.exists(param.token_file):
         creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
     else:
-        token = get_secret(param.token_id)
-        creds = Credentials.from_authorized_user_info(token, param.scopes)
+        creds = None
+    # else:
+    #     token = get_secret(param.token_id)
+    #     creds = Credentials.from_authorized_user_info(token, param.scopes)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -300,7 +302,7 @@ def get_gmail_service(param):
         else:
             credentials = get_secret(param.credentials_id)
             # flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_ID, SCOPES)
-            flow = InstalledAppFlow.from_client_config(credentials, param.SCOPES)
+            flow = InstalledAppFlow.from_client_config(credentials, param.scopes)
             creds = flow.run_local_server(port=0)
         with open(param.token_file, 'w') as token:
             token.write(creds.to_json())
@@ -363,10 +365,32 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
 
     for img in soup.find_all("img"):
         src = img.attrs.get("src", "")
-        if not src or src.startswith(('http', 'data:')):
+        if not src or src.startswith('http'):
             continue
 
-        img_path = urllib.parse.unquote(os.path.join(basepath, src))
+        if src.startswith('data:'):
+            # Traitement des images intégrées en base64
+            try:
+                # Format attendu : data:image/[type];base64,[data]
+                header, encoded = src.split(",", 1)
+                img_data = base64.b64decode(encoded)
+                # On essaie de deviner l'extension à partir du header
+                ext = "png" # par défaut
+                if "image/" in header:
+                    ext = header.split("image/")[1].split(";")[0]
+                
+                cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+                temp_img_path = os.path.join(temp_dir, f"embedded_{cid}.{ext}")
+                with open(temp_img_path, "wb") as f:
+                    f.write(img_data)
+                
+                img_path = temp_img_path
+            except Exception as e:
+                log.error(f"Impossible de traiter l'image en base64 : {e}")
+                continue
+        else:
+            img_path = urllib.parse.unquote(os.path.join(basepath, src))
+
         if os.path.exists(img_path):
             cid = email.utils.make_msgid(domain="inline.img")[1:-1]
 
