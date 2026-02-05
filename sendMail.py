@@ -501,7 +501,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"  # , <{unsubscribe_url}>"
     msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click" # Recommandé par les nouveaux standards Gmail/Yahoo 2024
 
-    if param.cotisation or param.max_addr_per_mail == 1:
+    if param.max_addr_per_mail == 1:
         to = bcc
         bcc = None
         msg["To"] = to
@@ -602,8 +602,8 @@ def generate_mailing(param):
                             `param` object.
     """
     try:
-        max_add = 1 if param.cotisation else param.max_addr_per_mail
-        pause = 0 if param.cotisation else param.pause
+        max_add = param.max_addr_per_mail
+        pause =  param.pause
         max_mail_per_hour = param.max_mails_per_hour
     except AttributeError as e:
         log.critical(f"Clé de configuration manquante : {e}")
@@ -962,17 +962,12 @@ def setup_argparse():
           (default: None).
         - --selected: Flag to send only selected mail (default: False).
         - --body: Specifies the email body (default: None).
-        - --cotisation: Generates a cotisation reminder mail (default: False).
-        - -y, --cotisation_year: Year for cotisation reminders (default: '2026').
-        - -amt, --cotisation_amount: Amount for cotisation reminders (default:
-          '15.00').
         - -mh, --max-mails-per-hour: Maximum emails to send per hour (default:
           1000).
         - -na, --max_addr_per_mail: Maximum number of addresses per mail (default:
           50).
         - -p, --pause: Pause duration in seconds between operations (default: 3).
         - --sync: Flag to enable synchronization mode (default: False).
-        - --check_spam: Flag to perform spam detection checks (default: False).
         - --profile: Specifies the mail profile to use (default: None).
     """
     parser = argparse.ArgumentParser()
@@ -1010,6 +1005,8 @@ def main():
         process_artscroises(args)
     elif args.profile == "cambristi":
         process_cambristi(args)
+    else:
+        log.critical("No profile specified")
 
 if __name__ == "__main__":
     main()
