@@ -419,6 +419,25 @@ class TestSMTPConnection:
 class TestEmailSending:
     """Tests for email sending functions"""
 
+    @patch('sendMail.imaplib.IMAP4_SSL', side_effect=Exception('fail'))
+    @patch('sendMail.sleep')
+    def test_save_to_sent_failure_retries_and_logs(self, mock_sleep, mock_imap):
+        param = Mock()
+        param.imap_host = "imap.example.com"
+        param.imap_port = 993
+        param.username = "user@example.com"
+        param.password = "password123"
+        param.sent_folder = "Sent"
+        param.verbose = False
+
+        msg = Mock()
+        msg.as_string.return_value = "email content"
+
+        # Should not raise; it logs error after retries
+        sendMail._save_to_sent(param, msg)
+        # sleep should have been called twice (between 3 attempts)
+        assert mock_sleep.call_count == 2
+
     @patch('sendMail._get_smtp_connection')
     @patch('sendMail._save_to_sent')
     def test_send_mail_success(self, mock_save, mock_conn_func):
@@ -533,6 +552,249 @@ class TestGetSubscriberReader:
 
         assert reader is not None
         assert csvfile is not None
+
+
+class TestMailingGeneration:
+    """Tests for generate_mailing function"""
+
+    @patch('sendMail._get_subscriber_reader')
+    @patch('sendMail._get_indices')
+    @patch('sendMail._format_message')
+    @patch('sendMail.build_email')
+    @patch('sendMail.send_mail')
+    @patch('sendMail.send_gmail')
+    @patch('sendMail.get_gmail_service')
+    @patch('sendMail.sleep')
+    @patch('sendMail._filter_artscroises')
+    def test_generate_mailing_artscroises_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail, mock_send_mail,
+                                                 mock_build, mock_format, mock_indices, mock_reader_func):
+        """Test successful mailing generation for ArtsCroises profile"""
+        param = Mock()
+        param.max_addr_per_mail = 2
+        param.pause = 0
+        param.max_mails_per_hour = 100
+        param.from_index = None
+        param.to_index = None
+        param.profile = 'artscroises'
+        param.verbose = False
+        param.donotsend = False
+        param.message = "Template"
+        param.subject = "Subject"
+        param.file = None
+
+        # Mock reader to return header and three rows
+        header = ["email", "status", "group", "selected"]
+        rows = [
+            ["user1@example.com", "active", "Group", "x"],
+            ["user2@example.com", "active", "Group", "x"],
+            ["user3@example.com", "active", "Group", "x"]
+        ]
+        
+        # We need to return an iterator that yields header then rows
+        # The code does: header = next(reader, None); for row in reader:
+        class Reader:
+            def __init__(self, data):
+                self.data = iter(data)
+            def __next__(self):
+                return next(self.data)
+            def __iter__(self):
+                return self
+        
+        mock_reader = Reader([header] + rows)
+        mock_reader_func.return_value = (mock_reader, None)
+        
+        mock_indices.return_value = {"email": 0, "status": 1, "group": 2, "selected": 3}
+        mock_format.return_value = "Formatted Message"
+        mock_filter.return_value = False # Do not filter out anyone
+        
+        mock_msg = MagicMock()
+        mock_msg._temp_dirs = []
+        mock_build.return_value = (mock_msg, ["user1@example.com", "user2@example.com"])
+
+        result = sendMail.generate_mailing(param)
+
+        assert result == "OK"
+        # Should be called twice: once for the first 2 users (in the loop), once for the remaining 1 user (after the loop)
+        assert mock_send_mail.call_count == 2
+        assert mock_build.call_count == 2
+
+    @patch('sendMail._get_subscriber_reader')
+    def test_generate_mailing_missing_config(self, mock_reader_func):
+        """Test generate_mailing with missing configuration"""
+        param = Mock(spec=[]) # No attributes
+        
+        result = sendMail.generate_mailing(param)
+        assert result == "Error"
+
+    @patch('sendMail._get_subscriber_reader')
+    def test_generate_mailing_no_reader(self, mock_reader_func):
+        """Test generate_mailing when reader fails to initialize"""
+        param = Mock()
+        param.max_addr_per_mail = 10
+        param.pause = 0
+        param.max_mails_per_hour = 100
+        
+        mock_reader_func.return_value = (None, None)
+        
+        result = sendMail.generate_mailing(param)
+        assert result == "Error"
+
+class TestGoogleSheetHelpers:
+    """Tests for Google Sheets helper functions"""
+
+    @patch('sendMail.ServiceAccountCredentials')
+    @patch('sendMail.gspread')
+    @patch('sendMail.get_secret')
+    def test_open_google_db_members_sheet(self, mock_get_secret, mock_gspread, mock_sac):
+        sa_key = 'sa_key'
+        id_key = 'id_key'
+        # Mock secrets
+        def secret_side_effect(arg):
+            if arg == sa_key:
+                return {"type": "service_account", "client_email": "x@y"}
+            if arg == id_key:
+                return {"ID": "SHEET_ID"}
+            return {}
+        mock_get_secret.side_effect = secret_side_effect
+
+        creds = Mock()
+        mock_sac.from_json_keyfile_dict.return_value = creds
+
+        wb = Mock()
+        mock_gc = Mock()
+        mock_gc.open_by_key.return_value = wb
+        mock_gspread.authorize.return_value = mock_gc
+
+        result = sendMail.openGoogleDBMembersSheet(sa_key, id_key)
+        assert result == wb
+        mock_gspread.authorize.assert_called_once_with(creds)
+        mock_gc.open_by_key.assert_called_once_with('SHEET_ID')
+
+    def test_read_all_sheet_default(self):
+        ws = Mock()
+        ws.get_all_values.return_value = [["h1", "h2"], ["a", "b"]]
+        wb = Mock()
+        wb.sheet1 = ws
+        result = sendMail.readAllSheet(wb)
+        assert result == [["h1", "h2"], ["a", "b"]]
+        ws.get_all_values.assert_called_once()
+
+    def test_read_all_sheet_named(self):
+        ws = Mock()
+        ws.get_all_values.return_value = [["x"]]
+        wb = Mock()
+        wb.worksheet.return_value = ws
+        result = sendMail.readAllSheet(wb, sheet_name='Sheet2')
+        assert result == [["x"]]
+        wb.worksheet.assert_called_once_with('Sheet2')
+
+class TestGetGmailService:
+    """Tests for get_gmail_service function"""
+
+    @patch('sendMail.os.path.exists', return_value=True)
+    @patch('sendMail.Credentials')
+    @patch('sendMail.build')
+    def test_get_gmail_service_with_token_file(self, mock_build, mock_credentials, mock_exists):
+        param = Mock()
+        param.token_file = 'token.json'
+        param.scopes = ['scope1']
+
+        creds = Mock()
+        creds.valid = True
+        mock_credentials.from_authorized_user_file.return_value = creds
+
+        service = sendMail.get_gmail_service(param)
+        assert service == mock_build.return_value
+        mock_credentials.from_authorized_user_file.assert_called_once_with('token.json', ['scope1'])
+        mock_build.assert_called_once()
+
+    @patch('sendMail.os.path.exists', return_value=False)
+    @patch('sendMail.get_secret')
+    @patch('sendMail.Credentials')
+    @patch('sendMail.InstalledAppFlow')
+    @patch('sendMail.build')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_get_gmail_service_oauth_flow(self, mock_file, mock_build, mock_flow_cls, mock_credentials, mock_get_secret, mock_exists):
+        param = Mock()
+        param.token_file = 'token.json'
+        param.scopes = ['scope1']
+        param.token_id = 'token_id'
+        param.credentials_id = 'creds_id'
+        param.SCOPES = ['scope1']
+
+        # First get creds from secret (no token file)
+        token_info = {'token': 'abc'}
+        mock_get_secret.side_effect = [token_info, {'client_id': 'x'}]
+        creds = Mock()
+        creds.valid = False
+        creds.expired = False
+        creds.refresh_token = None
+        creds.to_json.return_value = '{}'
+        mock_credentials.from_authorized_user_info.return_value = creds
+
+        flow = Mock()
+        flow.run_local_server.return_value = creds
+        mock_flow_cls.from_client_config.return_value = flow
+
+        service = sendMail.get_gmail_service(param)
+        assert service == mock_build.return_value
+        # Should have written token file
+        mock_file.assert_called_once_with('token.json', 'w')
+
+class TestProcessFunctions:
+    """Tests for process_artscroises and process_cambristi"""
+
+    @patch('sendMail.get_secret')
+    @patch('sendMail.process_attachments')
+    @patch('sendMail.generate_mailing')
+    @patch('sendMail.getpass')
+    @patch('builtins.open', new_callable=mock_open, read_data="key: value")
+    def test_process_artscroises_success(self, mock_file, mock_getpass, mock_generate, mock_proc_attach, mock_get_secret):
+        """Test process_artscroises success path"""
+        args = Mock()
+        args.config = "config.yml"
+        args.profile = "artscroises"
+        args.conf = {
+            "artscroises": {
+                "MAILCONFIG": "secret_id",
+                "max_mails_per_hour": 100,
+                "max_addr_per_mail": 10,
+                "pause": 1
+            }
+        }
+        args.body = None
+        args.subject = None
+        args.wait = None
+        args.test = False
+        
+        mock_get_secret.return_value = {"password": "secret_password"}
+        mock_proc_attach.return_value = (["test.pdf"], None, [])
+        mock_generate.return_value = "OK"
+        
+        result = sendMail.process_artscroises(args)
+        assert result is None # returns None
+        mock_generate.assert_called_once()
+
+    @patch('sendMail.get_secret')
+    @patch('sendMail.process_attachments')
+    @patch('sendMail.generate_mailing')
+    def test_process_cambristi_success(self, mock_generate, mock_proc_attach, mock_get_secret):
+        """Test process_cambristi success path"""
+        args = Mock()
+        args.profile = "cambristi"
+        args.conf = {
+            "cambristi": {
+                "MAILCONFIG": "secret_id"
+            }
+        }
+        
+        mock_get_secret.return_value = {"some": "config"}
+        mock_proc_attach.return_value = (["test.html"], None, [])
+        mock_generate.return_value = "OK"
+        
+        result = sendMail.process_cambristi(args)
+        assert result is None
+        mock_generate.assert_called_once()
 
 
 def test_module_imports():
