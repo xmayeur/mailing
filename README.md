@@ -393,8 +393,8 @@ Tests run automatically on every push and pull request via GitHub Actions:
 
 | Component         | Status                                                               | Coverage                                                                 |
 |-------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------|
-| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg) |
-| googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg) |
+| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-87%25-yellow.svg)      |
+| googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg) |
 
 ### Writing New Tests
 
