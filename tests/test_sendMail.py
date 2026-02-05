@@ -342,6 +342,84 @@ class TestHTMLProcessing:
         assert len(images) > 0
         assert temp_dir == "/tmp/test_dir"
 
+    @patch('sendMail.open', new_callable=mock_open, read_data='<html><body><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="/></body></html>')
+    @patch('os.path.exists')
+    @patch('tempfile.mkdtemp')
+    @patch('sendMail.Image')
+    @patch('sendMail.BeautifulSoup')
+    @patch('email.utils.make_msgid')
+    def test_prepare_html_and_get_images_base64(self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open):
+        """Test HTML processing with base64 image"""
+        mock_exists.return_value = True
+        mock_temp.return_value = "/tmp/test_dir"
+        # make_msgid returns with brackets, [1:-1] removes them.
+        mock_msgid.side_effect = ["<cid1@inline.img>", "<cid2@inline.img>"]
+
+        # Mock PIL Image
+        mock_img = Mock()
+        mock_img.width = 100
+        mock_img.height = 100
+        mock_img.resize.return_value = mock_img
+        mock_img.convert.return_value = mock_img
+        mock_image.open.return_value.__enter__.return_value = mock_img
+
+        # Create a mock img tag
+        mock_img_tag = Mock()
+        mock_img_tag.attrs = {"src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}
+
+        # Create a mock soup object
+        mock_soup = Mock()
+        mock_soup.find_all.return_value = [mock_img_tag]
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:cid2@inline.img"/></body></html>')
+
+        mock_bs.return_value = mock_soup
+
+        # We need PIL.Image.save to NOT call open if possible, or we just ignore its calls.
+        # Let's mock the save method to avoid it calling open.
+        mock_img.save = Mock()
+
+        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
+
+        assert "cid:" in html
+        assert len(images) > 0
+        assert temp_dir == "/tmp/test_dir"
+        
+        # The base64 image is first saved to embedded_<cid1>.<ext>
+        m_open.assert_any_call(os.path.join(temp_dir, "embedded_cid1@inline.img.png"), "wb")
+        
+        # The optimized image is saved by PIL.Image.save
+        mock_img.save.assert_called()
+        # Verify the path passed to save()
+        args, kwargs = mock_img.save.call_args
+        assert args[0] == os.path.join(temp_dir, "cid2@inline.img.jpg")
+
+    @patch('builtins.open', mock_open(read_data='<html><body><img src="data:image/png;base64,INVALID"/></body></html>'))
+    @patch('os.path.exists')
+    @patch('tempfile.mkdtemp')
+    @patch('sendMail.BeautifulSoup')
+    @patch('sendMail.log')
+    def test_prepare_html_and_get_images_base64_error(self, mock_log, mock_bs, mock_temp, mock_exists):
+        """Test HTML processing with invalid base64 image"""
+        mock_exists.return_value = True
+        mock_temp.return_value = "/tmp/test_dir"
+
+        # Create a mock img tag
+        mock_img_tag = Mock()
+        mock_img_tag.attrs = {"src": "data:image/png;base64,INVALID"}
+
+        # Create a mock soup object
+        mock_soup = Mock()
+        mock_soup.find_all.return_value = [mock_img_tag]
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="data:image/png;base64,INVALID"/></body></html>')
+
+        mock_bs.return_value = mock_soup
+
+        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
+
+        # Should skip the image and log error
+        assert len(images) == 0
+        mock_log.error.assert_called()
+
 
 class TestAttachmentProcessing:
     """Tests for attachment processing"""
