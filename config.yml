@@ -23,3 +23,4 @@ cambristi:
   sender: "icambristi@gmail.com"   # "x@gmailapi.google.com"
   members: https://www.cambristi.com/_functions/members/
   SHEETID: 'cambristiMemberSheetID'
+  filter: ['member', 'participant', 'inactive']

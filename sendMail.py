@@ -783,9 +783,10 @@ def _filter_cambristi(param, row, indices, test):
             return True
     else:
         try:
-            is_active = row[indices["title"]] == "member"
+            is_active = row[indices["title"]] in param.filter
             has_mail = bool(row[indices["email"]])
-            return not (is_active and has_mail)
+            bounced = bool(row[indices["bounced"]])
+            return not (is_active and has_mail and not bounced)
         except IndexError:
             return True
 
