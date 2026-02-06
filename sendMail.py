@@ -709,7 +709,7 @@ def generate_mailing(param):
             if not param.donotsend:
                 msg, recipients = build_email(param=param, subject=param.subject, message=msg_body,
                                   bcc=",".join(addressees), attachments=param.file)
-                if param.profile == 'artscroises':
+                if hasattr(param, 'smtp_host'):    # param.profile == 'artscroises':
                     send_mail(param=param, message=msg, recipients=recipients)
                 elif param.profile == 'cambristi':
                     send_gmail(get_gmail_service(param), message=msg)
@@ -783,9 +783,10 @@ def _filter_cambristi(param, row, indices, test):
             return True
     else:
         try:
-            is_active = row[indices["title"]] == "member"
+            is_active = row[indices["title"]] in param.filter
             has_mail = bool(row[indices["email"]])
-            return not (is_active and has_mail)
+            bounced = bool(row[indices["bounced"]])
+            return not (is_active and has_mail and not bounced)
         except IndexError:
             return True
 

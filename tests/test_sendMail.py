@@ -173,9 +173,10 @@ class TestFilterFunctions:
 
     def test_filter_artscroises_inactive(self):
         """Test Arts Croisés filter with inactive member"""
-        param = Mock()
+        param = MagicMock()
         param.test = False
         param.selected = False
+
 
         row = ["inactive", "Group", "", "test@example.com"]
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
@@ -185,10 +186,12 @@ class TestFilterFunctions:
 
     def test_filter_cambristi_member(self):
         """Test Cambristi filter with member"""
-        param = Mock()
+        param = MagicMock()
+        param.filter = ["inactive", "member"]
 
-        row = ["member", "John", "Doe", "test@example.com"]
-        indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
+        row = ["member", "John", "Doe", "test@example.com", ""]
+        indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3, "bounced":4}
+
 
         result = sendMail._filter_cambristi(param, row, indices, test=False)
         assert result == False  # Should NOT be filtered
