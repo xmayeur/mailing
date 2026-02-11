@@ -394,7 +394,7 @@ Tests run automatically on every push and pull request via GitHub Actions:
 
 | Component         | Status                                                               | Coverage                                                                 |
 |-------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------|
-| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-87%25-yellow.svg)      |
+| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg) |
 | googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg) |
 
 ### Writing New Tests
@@ -459,3 +459,10 @@ For issues and questions, please contact the maintainer or file an issue in the 
 
 Contributions are welcome! Please follow the existing code style and include tests for new features.
 
+
+## Changelog
+
+All notable changes to this project will be documented here.
+
+### 2026-02-11
+- Added initial changelog section to README.
