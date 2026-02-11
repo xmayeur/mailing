@@ -3,6 +3,7 @@ artscroises:
   database: data/Subscribers.csv
   SHEETID: "artscroisesDBmembreID"
   SA: "artscroisesServiceAccount"
+  styles: "/data/styles.css"
 
 cambristi:
   SCOPES:
@@ -24,3 +25,4 @@ cambristi:
   members: https://www.cambristi.com/_functions/members/
   SHEETID: 'cambristiMemberSheetID'
   filter: ['member', 'participant', 'inactive']
+  styles: "/data/styles.css"

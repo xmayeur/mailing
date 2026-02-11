@@ -489,6 +489,56 @@ def process_attachments(args, config, folder="input"):
 
     return files, service, google_drive_files
 
+def md2html(file_path, styles=None) :
+    """
+    Converts a Markdown file into an HTML file and saves it to the same directory.
+
+    This function reads the content of a Markdown file, processes it using the
+    Markdown library with specified extensions, and embeds it into a basic HTML
+    template. The resulting HTML file is then saved in the directory of the
+    provided Markdown file, with the same name but an `.html` extension.
+
+    :param file_path: The path to the Markdown file to be converted.
+    :type file_path: str
+
+    :return: The file path of the newly created HTML file.
+    :rtype: str
+    """
+
+    default_styles = """
+    body {background-color: PapayaWhip;}
+    h1  {color: darkred; text-align: center}
+    h2,h3, h4, h5  {padding-left: 20px;}
+    h6  {color: skyblue;}
+    p,li   {color: DarkSlateGray;padding-left: 20px;}
+    img {
+        max-width: 1000px;
+        height: auto;   display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    table {width: 100%;}
+    """
+    if styles is None:
+        styles = os.path.join(os.path.dirname(__file__), "styles.css")
+        with open(styles, "w") as f:
+            f.write(default_styles)
+    with open(file_path, "r") as f:
+        data = f.read()
+    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])  # <-- here
+    head = f"""
+    <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href={styles}>
+    </head>
+
+    """
+    html = "<html>\n" + head + converter.convert(data) + "\n</html>"
+    file_path = file_path.split(".")[0] + ".html"
+    with open(file_path, "w") as f:
+        f.write(html)
+    return file_path
 
 def build_email(param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None):
     """
@@ -556,26 +606,19 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
         if os.path.exists(img_path):
             cid = email.utils.make_msgid(domain="inline.img")[1:-1]
             all_inline_images.append({'path': img_path, 'cid': cid})
-            # Note: Si vous utilisez cette option, vous devrez manuellement
-            # mettre cid:id dans votre message texte.
 
     for att in [attachments] if isinstance(attachments, str) else (attachments or []):
         if att.endswith(("htm", "html", "md")):
-            if att.endswith("md"):
-                # convert to html
-                with open(att, "r") as f:
-                    data = f.read()
-                converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])  # <-- here
-                html = "<html>\n" + converter.convert(data) + "\n</html>"
-                att = att.split(".")[0] + ".html"
-                with open(att, "w") as f:
-                    f.write(html)
+            is_md = att.endswith("md")
+            if is_md:
+                att = md2html(att, param.styles if hasattr(param, "styles") else None)
             # C'est ici que la magie opère pour le HTML
             html_content, found_images, t_dir = prepare_html_and_get_images(att)
             message = html_content
             all_inline_images.extend(found_images)
             temp_dirs.append(t_dir)
-            os.remove(att)
+            if is_md:
+                os.remove(att)
         else:
             with open(att, "rb") as f:
                 content = f.read()
