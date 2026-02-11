@@ -961,10 +961,11 @@ def process_artscroises(args):
     """
     config = args.conf[args.profile]
     # config overrides secret data
-    config = {**get_secret(config["MAILCONFIG"]), **config }
-    if config is None:
+    secret = get_secret(config["MAILCONFIG"])
+    if secret is None:
         log.critical("No secret configuration found")
         sys.exit(1)
+    config = {**secret, **config }
 
     # and args overrides config data
     if config["max_mails_per_hour"]:
