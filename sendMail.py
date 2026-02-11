@@ -43,6 +43,8 @@ import yaml
 from PIL import Image
 from bs4 import BeautifulSoup
 
+import markdown2 as md
+
 from getSecrets import get_secret
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -558,12 +560,22 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
             # mettre cid:id dans votre message texte.
 
     for att in [attachments] if isinstance(attachments, str) else (attachments or []):
-        if att.endswith(("htm", "html")):
+        if att.endswith(("htm", "html", "md")):
+            if att.endswith("md"):
+                # convert to html
+                with open(att, "r") as f:
+                    data = f.read()
+                converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])  # <-- here
+                html = "<html>\n" + converter.convert(data) + "\n</html>"
+                att = att.split(".")[0] + ".html"
+                with open(att, "w") as f:
+                    f.write(html)
             # C'est ici que la magie opère pour le HTML
             html_content, found_images, t_dir = prepare_html_and_get_images(att)
             message = html_content
             all_inline_images.extend(found_images)
             temp_dirs.append(t_dir)
+            os.remove(att)
         else:
             with open(att, "rb") as f:
                 content = f.read()
@@ -859,6 +871,27 @@ def send_mail(param=None,message=None, recipients=None):
         _save_to_sent(param, message)
 
 
+def _get_newsletter_name(files, args):
+    # Analyse des fichiers pour le sujet et le corps
+    for f in files:
+        basename = os.path.basename(f)
+        ext = basename.split(".")[-1].lower()
+        name_part = basename.split(".")[0]
+
+        if ext in ["pdf", "html", "md"]:
+            if not args.subject:
+                args.subject = name_part
+            if "letter" in name_part.lower() or "lettre" in name_part.lower():
+                args.newsletter_name = basename
+            if ext == "html":
+                args.message = "html"
+        elif "body.txt" in basename:
+            body_txt = open(f, encoding="utf-8").read()
+            args.message = body_txt
+            files.remove(f)
+    return args
+
+
 def process_artscroises(args):
     """
     Processes and configures the Arts Croisés mailing workflow including handling of
@@ -889,23 +922,7 @@ def process_artscroises(args):
     body_txt = args.body if args.body else ""
     args.newsletter_name = ""
 
-    # Analyse des fichiers pour le sujet et le corps
-    for f in files:
-        basename = os.path.basename(f)
-        ext = basename.split(".")[-1].lower()
-        name_part = basename.split(".")[0]
-
-        if ext in ["pdf", "html"]:
-            if not args.subject:
-                args.subject = name_part
-            if "letter" in name_part.lower() or "lettre" in name_part.lower():
-                args.newsletter_name = basename
-            if ext == "html":
-                args.message = "html"
-        elif "body.txt" in basename:
-            body_txt = open(f, encoding="utf-8").read()
-            args.message = body_txt
-            files.remove(f)
+    args = _get_newsletter_name(files, args)
 
     if not args.message:
         args.message = f"\nChers amies et amis des Arts Croisés,\n{body_txt}\nVeuillez trouver en pièce jointe notre newsletter {args.newsletter_name}.\nBonne lecture!\n\nL'équipe Arts Croisés, asbl.\n"
@@ -952,13 +969,12 @@ def process_cambristi(args):
         log.critical("No secret configuration found")
         sys.exit(1)
     files, service, google_drive_files = process_attachments(args, config)
+    args = _get_newsletter_name(files, args)
 
     config.update(vars(args))
     param = Dict2Class(config)
     param.file = files
-    # if 'html' in files[0]:
-    #     param.message = open(files[0], encoding="utf-8").read()
-    #     param.file=files[1:]
+
     generate_mailing(param)
 
 

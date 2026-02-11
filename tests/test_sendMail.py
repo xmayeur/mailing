@@ -250,6 +250,47 @@ class TestEmailBuilding:
         assert "bcc@example.com" in recipients
         assert "to@example.com" in recipients
 
+    def test_build_email_with_markdown_attachment(self, tmp_path, monkeypatch):
+        """Ensure .md attachments are converted to HTML, processed, and temp HTML is removed"""
+        # Create a temporary markdown file
+        md_file = tmp_path / "newsletter.md"
+        md_file.write_text("# Title\n\nSome body text")
+
+        # Patch HTML preparation to avoid heavy processing and ensure HTML body path
+        monkeypatch.setattr(
+            sendMail,
+            "prepare_html_and_get_images",
+            lambda p: ("<html><body>Converted</body></html>", [], str(tmp_path / "t"))
+        )
+
+        # Track removal of the generated HTML file
+        removed = {}
+        monkeypatch.setattr(sendMail.os, "remove", lambda p: removed.setdefault("p", p))
+
+        # Minimal param
+        param = Mock()
+        param.sendername = "Test Sender"
+        param.sender = "sender@example.com"
+        param.cotisation = False
+        param.max_addr_per_mail = 50
+        param.profile = "test"
+
+        msg, _ = sendMail.build_email(
+            param=param,
+            subject="S",
+            to="to@example.com",
+            attachments=[str(md_file)]
+        )
+
+        # The temporary HTML (derived from the .md) must be removed
+        assert removed.get("p") == str(md_file).replace(".md", ".html")
+
+        # HTML body is attached inside a multipart/related part
+        related_parts = [p for p in msg.get_payload() if p.get_content_subtype() == "related"]
+        assert related_parts, "Expected a multipart/related part with HTML body"
+        html_parts = [p for p in related_parts[0].get_payload() if p.get_content_subtype() == "html"]
+        assert html_parts, "Expected an HTML part in the related container"
+
 
 class TestArgumentParser:
     """Tests for argument parser setup"""
@@ -821,6 +862,32 @@ class TestGetGmailService:
         assert service == mock_build.return_value
         # Should have written token file
         mock_file.assert_called_once_with('token.json', 'w')
+
+class TestGetNewsletterName:
+    """Tests for helper that infers subject/newsletter/message from file list"""
+
+    def test_get_newsletter_name_md_and_body(self, tmp_path):
+        # Create files
+        md_path = tmp_path / "MyNewsletter.md"
+        md_path.write_text("content")
+        body_path = tmp_path / "body.txt"
+        body_path.write_text("Hello body")
+
+        # Prepare args mock with necessary attributes
+        args = Mock()
+        args.subject = None
+        args.message = None
+        args.newsletter_name = ""
+
+        files = [str(md_path), str(body_path)]
+        updated = sendMail._get_newsletter_name(files, args)
+
+        assert updated.subject == "MyNewsletter"
+        assert updated.newsletter_name == "MyNewsletter.md"  # contains "letter"
+        assert updated.message == "Hello body"
+        # body.txt should be removed from files list
+        assert str(body_path) not in files
+
 
 class TestProcessFunctions:
     """Tests for process_artscroises and process_cambristi"""
