@@ -90,7 +90,6 @@ Credentials and API keys should be stored securely using the `getSecrets` module
 - **MAILCONFIG**: SMTP/IMAP credentials
 - **Service Account**: Google API credentials
 - **Sheet ID**: Google Sheets identifier
-- **Billit API Token**: For invoice generation (Arts Croisés profile)
 
 ## Command-Line Usage
 
