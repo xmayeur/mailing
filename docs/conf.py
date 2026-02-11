@@ -36,6 +36,7 @@ MOCK_MODULES = [
     'oauth2client.service_account',
     'googleDriveLib',
     'PIL',
+    'markdown2'
 ]
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
