@@ -872,6 +872,20 @@ def send_mail(param=None,message=None, recipients=None):
 
 
 def _get_newsletter_name(files, args):
+    """
+    Parses given files and updates newsletter-related attributes in the provided arguments.
+
+    The function analyses filenames and their extensions to infer newsletter-related details such as
+    subject, newsletter name, and message body. It modifies the attributes of the provided `args`
+    object accordingly.
+
+    :param files: List of file paths to analyze
+    :type files: list[str]
+    :param args: Arguments object that holds properties like `subject`, `newsletter_name`, and `message`
+    :type args: Any
+    :return: Updated arguments object with inferred newsletter details
+    :rtype: Any
+    """
     # Analyse des fichiers pour le sujet et le corps
     for f in files:
         basename = os.path.basename(f)
