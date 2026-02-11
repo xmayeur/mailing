@@ -1,6 +1,6 @@
 [project]
 name = "sendmail"
-version = "0.1.0"
+version = "0.1.1"
 description = "Add your description here"
 requires-python = ">=3.14"
 dependencies = [
@@ -11,4 +11,5 @@ dependencies = [
     "get_hc_secrets",
     "oauth2client",
     "pillow>=12.1.0",
+    "markdown2",
 ]
