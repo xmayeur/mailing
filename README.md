@@ -56,6 +56,7 @@ pip install -r requirements.txt
 - Pillow
 - requests
 - certifi
+- markdown2
 
 ## Configuration
 

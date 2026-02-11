@@ -10,7 +10,7 @@ oauth2client
 pillow>=12.1.0
 PyYAML
 requests
-
+markdown2
 # Custom/local dependencies
 get_hc_secrets
 
