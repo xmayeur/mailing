@@ -8,7 +8,7 @@ dependencies = [
     "google-api-python-client>=2.187.0",
     "gspread>=6.2.1",
     "spamcheck>=1.0.4",
-    "get-hc-secrets>=1.5.26",
+    "get-hc-secrets>=1.5.27",
     "oauth2client",
     "pillow>=12.1.0",
     "markdown2",

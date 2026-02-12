@@ -11,7 +11,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
 
     runs-on: ${{ matrix.os }}
 
@@ -66,14 +66,14 @@ jobs:
       - name: Make files executable (Linux/Mac)
         run: chmod +x sendMail-* || true
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.version }}
-          name: Release ${{ github.event.inputs.version }}
-          draft: false
-          prerelease: false
-          files: |
-            sendMail-linux
-            sendMail-windows.exe
-            sendMail-macos
+#      - name: Create GitHub Release
+#        uses: softprops/action-gh-release@v2
+#        with:
+#          tag_name: ${{ github.event.inputs.version }}
+#          name: Release ${{ github.event.inputs.version }}
+#          draft: false
+#          prerelease: false
+#          files: |
+#            sendMail-linux
+#            sendMail-windows.exe
+#            sendMail-macos
