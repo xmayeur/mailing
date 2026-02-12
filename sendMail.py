@@ -491,20 +491,15 @@ def process_attachments(args, config, folder="input"):
 
 def md2html(file_path, styles=None) :
     """
-    Converts a Markdown file into an HTML file and saves it to the same directory.
+    Converts a Markdown file to an HTML file, applying default or custom styles, and generates
+    a well-structured HTML document.
 
-    This function reads the content of a Markdown file, processes it using the
-    Markdown library with specified extensions, and embeds it into a basic HTML
-    template. The resulting HTML file is then saved in the directory of the
-    provided Markdown file, with the same name but an `.html` extension.
-
-    :param file_path: The path to the Markdown file to be converted.
-    :type file_path: str
-
-    :return: The file path of the newly created HTML file.
+    :param file_path: Path to the input Markdown file to be converted.
+    :param styles: Optional. Path to the CSS file defining HTML styles. If not provided,
+        a default stylesheet will be created and applied.
+    :return: Path to the generated HTML file.
     :rtype: str
     """
-
     default_styles = """
     body {background-color: PapayaWhip;}
     h1  {color: darkred; text-align: center}
@@ -661,25 +656,21 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
 
 def generate_mailing(param):
     """
-    Generates and sends email batches based on the specified parameters and subscription data.
+    Generates and sends emails to a list of subscribers based on provided parameters and subscriber information.
 
-    The function processes subscriber data, filters the recipients based on given conditions,
-    formats the message body, and sends emails in batches while adhering to specified constraints
-    such as maximum recipients per mail and maximum emails per hour. Handles special cases like
-    membership-specific invoicing, restricts email sending to specific recipient indices,
-    and optionally resumes at a specified index.
+    This function reads a list of recipients from a CSV file and sends them emails in batched groups. The
+    function supports various profiles for filtering recipients, skipping initial records, and processing
+    up to a certain index. It respects constraints like maximum recipients per email, maximum emails
+    sent per hour, and pauses between batches. The email messages can include custom formatting, attachments,
+    and can be sent using different email delivery methods based on the profile.
 
-    :param param: Object containing configurations and parameters for the email generation
-                  and sending process (e.g., max address per mail, pause duration, verbose
-                  mode, subscription filters, etc.).
-    :type param: object
+    If an error occurs during execution, the function logs the error and attempts to finish gracefully.
 
-    :return: A string indicating the result of the operation. Returns "OK" if successful, or
-             "Error" in case of a failure.
+    :param param: An object containing configuration attributes required to generate, filter, and send emails.
+                  The attributes include limits, filters, email parameters, and operational flags.
+    :type param: Any
+    :return: A string "OK" if email generation and sending complete successfully, or "Error" if an error occurs.
     :rtype: str
-
-    :raises AttributeError: Raised if a required configuration key is missing in the
-                            `param` object.
     """
     try:
         max_add = param.max_addr_per_mail
