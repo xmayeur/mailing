@@ -28,11 +28,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --onefile  --noconfirm \
-          --icon images/mail.png \
-          --collect-submodules  './googleDriveLib.py' \
-          --add-data  './config.yml:.' \
-          sendMail.py
+        run: pyinstaller --onefile  --noconfirm  --collect-submodules  './googleDriveLib.py' --add-data  './config.yml:.' sendMail.py
 
       - name: Rename executable
         run: |
