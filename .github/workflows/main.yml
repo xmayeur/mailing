@@ -33,18 +33,18 @@ jobs:
       - name: Rename executable
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            mv dist/app.exe dist/app-windows.exe
+            mv dist/sendMail.exe dist/sendMail-windows.exe
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
-            mv dist/app dist/app-linux
+            mv dist/sendMail dist/sendMail-linux
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            mv dist/app dist/app-macos
+            mv dist/sendMail dist/sendMail-macos
           fi
         shell: bash
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-${{ matrix.os }}
+          name: sendMail-${{ matrix.os }}
           path: dist/*
 
   release:
@@ -64,7 +64,7 @@ jobs:
         run: ls -R
 
       - name: Make files executable (Linux/Mac)
-        run: chmod +x app-* || true
+        run: chmod +x sendMail-* || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -74,6 +74,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            app-linux
-            app-windows.exe
-            app-macos
+            sendMail-linux
+            sendMail-windows.exe
+            sendMail-macos
