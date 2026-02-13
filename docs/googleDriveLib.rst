@@ -1,11 +1,6 @@
 googleDriveLib module
 =====================
 
-.. automodule:: googleDriveLib
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Overview
 --------
 
@@ -38,6 +33,12 @@ File Operations
 
 Module Details
 --------------
+
+.. automodule:: googleDriveLib
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
 
 The module provides the following capabilities:
 
