@@ -5,6 +5,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Build and Release Executables](https://github.com/xmayeur/mailing/actions/workflows/main.yml/badge.svg)](https://github.com/xmayeur/mailing/actions/workflows/main.yml)
 
 A comprehensive email campaign management system for organizations managing mailing lists, newsletters, and membership communications.
 
