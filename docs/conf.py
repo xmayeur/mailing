@@ -32,9 +32,9 @@ MOCK_MODULES = [
     'googleapiclient',
     'googleapiclient.discovery',
     'googleapiclient.errors',
+    'googleapiclient.http',
     'oauth2client',
     'oauth2client.service_account',
-    'googleDriveLib',
     'PIL',
     'markdown2'
 ]
