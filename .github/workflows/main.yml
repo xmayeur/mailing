@@ -1,6 +1,9 @@
 name: Build and Release Executables
 
 on:
+  # push:
+  #   tag:
+  #     - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -66,14 +69,16 @@ jobs:
       - name: Make files executable (Linux/Mac)
         run: chmod +x sendMail-* || true
 
-#      - name: Create GitHub Release
-#        uses: softprops/action-gh-release@v2
-#        with:
-#          tag_name: ${{ github.event.inputs.version }}
-#          name: Release ${{ github.event.inputs.version }}
-#          draft: false
-#          prerelease: false
-#          files: |
-#            sendMail-linux
-#            sendMail-windows.exe
-#            sendMail-macos
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            sendMail-linux
+            sendMail-windows.exe
+            sendMail-macos
