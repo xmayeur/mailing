@@ -14,7 +14,6 @@ HTML content and converting data structures.
 import argparse
 import base64
 import csv
-
 import email.mime.application
 import email.utils
 import imaplib
@@ -38,13 +37,11 @@ from time import time, sleep
 from uuid import uuid4
 
 import gspread
+import markdown2 as md
 import requests
 import yaml
 from PIL import Image
 from bs4 import BeautifulSoup
-
-import markdown2 as md
-
 from getSecrets import get_secret
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -501,34 +498,47 @@ def md2html(file_path, styles=None) :
     :rtype: str
     """
     default_styles = """
-    body {background-color: PapayaWhip;}
-    h1  {color: darkred; text-align: center}
-    h2,h3, h4, h5  {padding-left: 20px;}
-    h6  {color: skyblue;}
-    p,li   {color: DarkSlateGray;padding-left: 20px;}
-    img {
-        max-width: 1000px;
-        height: auto;   display: block;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    table {width: 100%;}
+        body {background-color: PapayaWhip;}
+        h1  {color: red; text-align: center}
+        h2  {color: darkred; padding-left: 20px;}
+        h3, h4, h5  { padding-left: 20px;}
+        h6  {color: skyblue;}
+        p, b {color: DarkSlateGray;padding-left: 50px;}
+        ul  {color: DarkSlateGray;padding-left: 80px;}
+        li  {
+            color: DarkSlateGray;
+            padding-left: 10px;
+            }
+        img {
+            max-width: 1000px;
+            height: auto;   display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        table {width: 100%;}
     """
-    if styles is None:
-        styles = os.path.join(os.path.dirname(__file__), "styles.css")
-        with open(styles, "w") as f:
-            f.write(default_styles)
+
     with open(file_path, "r") as f:
         data = f.read()
-    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])  # <-- here
-    head = f"""
-    <!-- Add locale and title header -->
-    <head>
-        <meta charset="UTF-8">
-        <link rel="stylesheet" href={styles}>
-    </head>
+    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
+    if styles is None:
+        head = f"""
+                <!-- Add locale and title header -->
+                <head>
+                    <meta charset="UTF-8">
+                    <style>{default_styles}</style>
+                </head>
 
-    """
+                """
+    else:
+        head = f"""
+        <!-- Add locale and title header -->
+        <head>
+            <meta charset="UTF-8">
+            <link rel="stylesheet" href=../css/styles.css>
+        </head>
+    
+        """
     html = "<html>\n" + head + converter.convert(data) + "\n</html>"
     file_path = file_path.split(".")[0] + ".html"
     with open(file_path, "w") as f:
@@ -1078,6 +1088,7 @@ def setup_argparse():
     parser.add_argument("-na", "--max_addr_per_mail", default=50, type=int)
     parser.add_argument("-p", "--pause", default=3, type=int)
     parser.add_argument("--profile", help="mail profile")
+    parser.add_argument("--md2html", action="store_true", help="convert md file to html & exit")
     return parser.parse_args()
 
 
@@ -1091,7 +1102,15 @@ def main():
     """
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     args = setup_argparse()
+    if not args.profile:
+        args.profile = "default"
     args.conf = yaml.safe_load(open("config.yml"))
+
+    if args.md2html and args.file[0].endswith(".md"):
+        md2html(args.file[0], "./css/styles.css")
+        print(args.file[0] + " converted to html")
+        return
+
     if args.profile == "artscroises":
         process_artscroises(args)
     elif args.profile == "cambristi":
