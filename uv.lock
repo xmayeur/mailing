@@ -51,15 +51,15 @@ wheels = [
 
 [[package]]
 name = "get-hc-secrets"
-version = "1.5.25"
+version = "1.5.28"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/12/7d27008c9abdd9c7bfe14e22975b4034827683aebc2e25da9624d225aeb8/get_hc_secrets-1.5.25.tar.gz", hash = "sha256:ded9b440a9e96d4ed3e04479198d419e1c2ffc7d72902d403822a4a0ed081959", size = 10821, upload-time = "2026-02-12T17:22:06.839Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/13/61d4a9998e609a1f972e7e090624d6bf4ad5474b21bdbc9e337597f53fe0/get_hc_secrets-1.5.28.tar.gz", hash = "sha256:ade3bd51cb331d3057b2adb8d38b684251bba56b6a28de13713d776e190bb244", size = 14696, upload-time = "2026-02-13T08:44:50.196Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/d5/5f2fabf37c0f028deca73ad3640a2c5a556d9db48ce63ffe094fce27d7dd/get_hc_secrets-1.5.25-py3-none-any.whl", hash = "sha256:6f0ae09f36d52922a64d8a2622e43d269f82aa93cbbb7ce8b8c0d003df4a2596", size = 7534, upload-time = "2026-02-12T17:22:05.483Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/24/c848383a0fe38e0618f331766b78f706b1d75b36e8cbd664ba477cbc14f9/get_hc_secrets-1.5.28-py3-none-any.whl", hash = "sha256:0620314fe12b8f37999235ba16b9511bae903f43dd467b37bed89ac7289c9fdc", size = 8679, upload-time = "2026-02-13T08:44:49.041Z" },
 ]
 
 [[package]]
@@ -389,7 +389,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
-    { name = "get-hc-secrets", specifier = ">=1.5.25" },
+    { name = "get-hc-secrets", specifier = ">=1.5.27" },
     { name = "google-api-python-client", specifier = ">=2.187.0" },
     { name = "google-auth", specifier = ">=2.47.0" },
     { name = "google-auth-oauthlib", specifier = ">=1.2.2" },
