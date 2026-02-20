@@ -25,7 +25,7 @@ cambristi:
   members: https://www.cambristi.com/_functions/members/
   SHEETID: 'cambristiMemberSheetID'
   filter: ['member', 'participant', 'inactive']
-  styles: "./css/styles.css"
+  # styles: "./css/styles.css"
 
 default:
   styles: "./css/styles.css"
