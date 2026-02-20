@@ -209,7 +209,7 @@ class TestFilterFunctions:
         param.filter = ["inactive", "member"]
 
         row = ["member", "John", "Doe", "test@example.com", ""]
-        indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3, "bounced":4}
+        indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3, "emailBounced": 4}
 
 
         result = sendMail._filter_cambristi(param, row, indices, test=False)
