@@ -521,28 +521,33 @@ def md2html(file_path, styles=None) :
     if not os.path.exists(file_path):
         log.error(f"Le fichier Markdown {file_path} n'existe pas.")
         return None
+    else:
+        with open(file_path, "r") as f:
+            data = f.read()
 
-    if styles and not os.path.exists(styles):
-        log.warning(f"Le fichier CSS {styles} n'existe pas. Default styles used instead.")
-        styles = None
-
-    with open(file_path, "r") as f:
-        data = f.read()
+    # if not styles is None and not os.path.exists(styles):
+    #     log.warning(f"Le fichier CSS {styles} n'existe pas. Default styles used instead.")
+    #     styles = None
 
     converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
 
-    if styles and os.path.exists(styles):
-        with open(styles, "r") as f:
-            default_styles = f.read()
-
-    head = f"""
-            <!-- Add locale and title header -->
-            <head>
-                <meta charset="UTF-8">
-                <style>{default_styles}</style>
-            </head>
-
-            """
+    if not styles is None:
+        head = f"""
+   <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="{styles}">
+    </head>
+"""
+    else:
+        head = f"""
+    <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <style>{default_styles}</style>
+    </head>
+    
+"""
 
     html = "<html>\n" + head + converter.convert(data) + "\n</html>"
     file_path = file_path.split(".")[0] + ".html"
@@ -1114,7 +1119,7 @@ def main():
     args.conf = yaml.safe_load(open("config.yml"))
 
     if args.md2html and args.file[0].endswith(".md"):
-        md2html(args.file[0], "./css/styles.css")
+        md2html(args.file[0], "../css/styles.css")
         print(args.file[0] + " converted to html")
         return
 
