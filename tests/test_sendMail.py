@@ -293,6 +293,9 @@ class TestEmailBuilding:
         param.cotisation = False
         param.max_addr_per_mail = 50
         param.profile = "test"
+        param.styles = None
+        delattr(param, "keep-html")
+
 
         msg, _ = sendMail.build_email(
             param=param,

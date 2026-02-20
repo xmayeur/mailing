@@ -104,12 +104,13 @@ python sendMail.py --profile <profile_name> [options] [files...]
 
 #### Basic Options
 
-| Argument        | Type   | Description                                                      |
-|-----------------|--------|------------------------------------------------------------------|
-| `--profile`     | string | **Required**. Mail profile to use (`artscroises` or `cambristi`) |
-| `-s, --subject` | string | Subject of the email                                             |
-| `-m, --message` | string | Text message body of the email                                   |
-| `file`          | list   | Files to attach to the email (positional argument)               |
+| Argument        | Type   | Description                                                                              |
+|-----------------|--------|------------------------------------------------------------------------------------------|
+| `--profile`     | string | **Required**. Mail profile to use (`artscroises` or `cambristi`)                         |
+| `-s, --subject` | string | Subject of the email                                                                     |
+| `-m, --message` | string | Text message body of the email - optional if files argument given                        |
+| `file`          | list   | Files `(.html, .txt, .pdf, .md, .png, .jpg)`to attach to the email (positional argument) |
+| `--keep-html`   | flag   | Keep HTML files after conversion of `.md` Markdown files                                 | 
 
 #### Test & Debug Options
 
@@ -136,6 +137,12 @@ python sendMail.py --profile <profile_name> [options] [files...]
 | `-na, --max_addr_per_mail`  | integer | Maximum number of addresses per mail (default: 50)        |
 | `-p, --pause`               | integer | Pause duration in seconds between operations (default: 3) |
 | `-w, --wait`                | integer | Wait x minutes before starting to send mail               |
+
+#### Other Options
+
+| Argument    | Type | Description                              |
+|-------------|------|------------------------------------------|
+| `--md2html` | flag | Convert a Markdown file to HTML and exit |
 
 ## Usage Examples
 
@@ -164,7 +171,7 @@ python sendMail.py --profile artscroises \
 
 ### Example 3: HTML Email with Rate Limiting
 
-Send HTML email with controlled rate limiting:
+Send HTML email from converted mardonx file with controlled rate limiting:
 
 ```bash
 python sendMail.py --profile cambristi \
@@ -172,8 +179,11 @@ python sendMail.py --profile cambristi \
     -mh 500 \
     -na 25 \
     -p 5 \
-    email_template.html
+    -keephtml \
+    email_template.md
 ```
+
+email_template.html will be created in the same directory and can be published to a web site
 
 ### Example 4: Partial Database Processing
 

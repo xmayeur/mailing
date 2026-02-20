@@ -627,7 +627,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
             message = html_content
             all_inline_images.extend(found_images)
             temp_dirs.append(t_dir)
-            if is_md:
+            if is_md and not hasattr(param, "keep-html"):
                 os.remove(att)
         else:
             with open(att, "rb") as f:
@@ -1073,7 +1073,8 @@ def setup_argparse():
         - -na, --max_addr_per_mail: Maximum number of addresses per mail (default:
           50).
         - -p, --pause: Pause duration in seconds between operations (default: 3).
-        - --sync: Flag to enable synchronization mode (default: False).
+        - --md2html: Flag to convert input Markdown file to embedded HTML (default: False).
+        - --keep-html: Flag to keep the generated HTML file (default: False).
         - --profile: Specifies the mail profile to use (default: None).
     """
     parser = argparse.ArgumentParser()
@@ -1094,6 +1095,7 @@ def setup_argparse():
     parser.add_argument("-p", "--pause", default=3, type=int)
     parser.add_argument("--profile", help="mail profile")
     parser.add_argument("--md2html", action="store_true", help="convert md file to html & exit")
+    parser.add_argument("--keep-html", action="store_true", help="keep the generated html file")
     return parser.parse_args()
 
 
