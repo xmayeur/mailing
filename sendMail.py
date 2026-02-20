@@ -518,27 +518,32 @@ def md2html(file_path, styles=None) :
         table {width: 100%;}
     """
 
+    if not os.path.exists(file_path):
+        log.error(f"Le fichier Markdown {file_path} n'existe pas.")
+        return None
+
+    if styles and not os.path.exists(styles):
+        log.warning(f"Le fichier CSS {styles} n'existe pas. Default styles used instead.")
+        styles = None
+
     with open(file_path, "r") as f:
         data = f.read()
-    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
-    if styles is None:
-        head = f"""
-                <!-- Add locale and title header -->
-                <head>
-                    <meta charset="UTF-8">
-                    <style>{default_styles}</style>
-                </head>
 
-                """
-    else:
-        head = f"""
-        <!-- Add locale and title header -->
-        <head>
-            <meta charset="UTF-8">
-            <link rel="stylesheet" href=../css/styles.css>
-        </head>
-    
-        """
+    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
+
+    if styles and os.path.exists(styles):
+        with open(styles, "r") as f:
+            default_styles = f.read()
+
+    head = f"""
+            <!-- Add locale and title header -->
+            <head>
+                <meta charset="UTF-8">
+                <style>{default_styles}</style>
+            </head>
+
+            """
+
     html = "<html>\n" + head + converter.convert(data) + "\n</html>"
     file_path = file_path.split(".")[0] + ".html"
     with open(file_path, "w") as f:
@@ -1110,6 +1115,9 @@ def main():
         md2html(args.file[0], "./css/styles.css")
         print(args.file[0] + " converted to html")
         return
+
+    if not (args.message or args.body or args.file) and not args.subject:
+        print("Missing subject and message text or file")
 
     if args.profile == "artscroises":
         process_artscroises(args)
