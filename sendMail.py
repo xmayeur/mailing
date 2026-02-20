@@ -518,27 +518,37 @@ def md2html(file_path, styles=None) :
         table {width: 100%;}
     """
 
-    with open(file_path, "r") as f:
-        data = f.read()
-    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
-    if styles is None:
-        head = f"""
-                <!-- Add locale and title header -->
-                <head>
-                    <meta charset="UTF-8">
-                    <style>{default_styles}</style>
-                </head>
+    if not os.path.exists(file_path):
+        log.error(f"Le fichier Markdown {file_path} n'existe pas.")
+        return None
+    else:
+        with open(file_path, "r") as f:
+            data = f.read()
 
-                """
+    # if not styles is None and not os.path.exists(styles):
+    #     log.warning(f"Le fichier CSS {styles} n'existe pas. Default styles used instead.")
+    #     styles = None
+
+    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
+
+    if not styles is None:
+        head = f"""
+   <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="{styles}">
+    </head>
+"""
     else:
         head = f"""
-        <!-- Add locale and title header -->
-        <head>
-            <meta charset="UTF-8">
-            <link rel="stylesheet" href=../css/styles.css>
-        </head>
+    <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <style>{default_styles}</style>
+    </head>
     
-        """
+"""
+
     html = "<html>\n" + head + converter.convert(data) + "\n</html>"
     file_path = file_path.split(".")[0] + ".html"
     with open(file_path, "w") as f:
@@ -622,7 +632,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
             message = html_content
             all_inline_images.extend(found_images)
             temp_dirs.append(t_dir)
-            if is_md:
+            if is_md and not hasattr(param, "keep-html"):
                 os.remove(att)
         else:
             with open(att, "rb") as f:
@@ -841,7 +851,7 @@ def _filter_cambristi(param, row, indices, test):
         try:
             is_active = row[indices["title"]] in param.filter
             has_mail = bool(row[indices["email"]])
-            bounced = bool(row[indices["bounced"]])
+            bounced = bool(row[indices["emailBounced"]])
             return not (is_active and has_mail and not bounced)
         except IndexError:
             return True
@@ -1068,7 +1078,8 @@ def setup_argparse():
         - -na, --max_addr_per_mail: Maximum number of addresses per mail (default:
           50).
         - -p, --pause: Pause duration in seconds between operations (default: 3).
-        - --sync: Flag to enable synchronization mode (default: False).
+        - --md2html: Flag to convert input Markdown file to embedded HTML (default: False).
+        - --keep-html: Flag to keep the generated HTML file (default: False).
         - --profile: Specifies the mail profile to use (default: None).
     """
     parser = argparse.ArgumentParser()
@@ -1089,6 +1100,7 @@ def setup_argparse():
     parser.add_argument("-p", "--pause", default=3, type=int)
     parser.add_argument("--profile", help="mail profile")
     parser.add_argument("--md2html", action="store_true", help="convert md file to html & exit")
+    parser.add_argument("--keep-html", action="store_true", help="keep the generated html file")
     return parser.parse_args()
 
 
@@ -1107,9 +1119,12 @@ def main():
     args.conf = yaml.safe_load(open("config.yml"))
 
     if args.md2html and args.file[0].endswith(".md"):
-        md2html(args.file[0], "./css/styles.css")
+        md2html(args.file[0], "../css/styles.css")
         print(args.file[0] + " converted to html")
         return
+
+    if not (args.message or args.body or args.file) and not args.subject:
+        print("Missing subject and message text or file")
 
     if args.profile == "artscroises":
         process_artscroises(args)
