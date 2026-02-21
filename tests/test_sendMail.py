@@ -1397,8 +1397,8 @@ def test_process_artscroises():
                             with pytest.raises(SystemExit) as pytest_wrapped_e:
                                 sendMail.main()
                                 # print(pytest_wrapped_e)
-                                assert pytest_wrapped_e.type == SystemExit
-                                assert pytest_wrapped_e.value.code == 42
+                                # assert pytest_wrapped_e.type == SystemExit
+                                # assert pytest_wrapped_e.value.code == 42
 
 
 def test_process_cambristi():
@@ -1433,8 +1433,8 @@ def test_process_cambristi():
                             with pytest.raises(SystemExit) as pytest_wrapped_e:
                                 sendMail.main()
                                 # print(pytest_wrapped_e)
-                                assert pytest_wrapped_e.type == SystemExit
-                                assert pytest_wrapped_e.value.code == 42
+                                # assert pytest_wrapped_e.type == SystemExit
+                                # assert pytest_wrapped_e.value.code == 42
 
 
 
@@ -1515,8 +1515,8 @@ def test_main_missing_args():
         mock_args.return_value.subject = None
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             sendMail.main()
-            assert pytest_wrapped_e.type == SystemExit
-            assert pytest_wrapped_e.value.code == 2
+            # assert pytest_wrapped_e.type == SystemExit
+            # assert pytest_wrapped_e.value.code == 2
 
 
 def test_main_missing_profile():
@@ -1526,8 +1526,8 @@ def test_main_missing_profile():
         mock_args.return_value.md2html = None
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             sendMail.main()
-            assert pytest_wrapped_e.type == SystemExit
-            assert pytest_wrapped_e.value.code == 42
+            # assert pytest_wrapped_e.type == SystemExit
+            # assert pytest_wrapped_e.value.code == 42
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
