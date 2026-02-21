@@ -1014,6 +1014,9 @@ def process_artscroises(args):
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         for f in glob("input/*.*"):
             os.remove(f)
+        return "OK"
+    else:
+        return "Error"
 
 
 def process_cambristi(args):
@@ -1044,7 +1047,7 @@ def process_cambristi(args):
     param = Dict2Class(config)
     param.file = files
 
-    generate_mailing(param)
+    return generate_mailing(param)
 
 
 def setup_argparse():
@@ -1121,17 +1124,19 @@ def main():
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
         print(args.file[0] + " converted to html")
-        return
+        sys.exit(-1)
 
     if not (args.message or args.body or args.file) and not args.subject:
         print("Missing subject and message text or file")
+        sys.exit(-1)
 
     if args.profile == "artscroises":
-        process_artscroises(args)
+        sys.exit(0 if process_artscroises(args) == "OK" else -1)
     elif args.profile == "cambristi":
-        process_cambristi(args)
+        sys.exit(0 if process_cambristi(args) == "OK" else -1)
     else:
         log.critical("No profile specified")
+        sys.exit(-1)
 
 if __name__ == "__main__":
     main()

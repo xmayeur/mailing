@@ -697,7 +697,6 @@ class TestGetSubscriberReader:
         assert reader is not None
         assert csvfile is not None
 
-
 class TestMailingGeneration:
     """Tests for generate_mailing function"""
 
@@ -910,7 +909,6 @@ class TestGetNewsletterName:
         # body.txt should be removed from files list
         assert str(body_path) not in files
 
-
 class TestProcessFunctions:
     """Tests for process_artscroises and process_cambristi"""
 
@@ -942,7 +940,7 @@ class TestProcessFunctions:
         mock_generate.return_value = "OK"
         
         result = sendMail.process_artscroises(args)
-        assert result is None # returns None
+        assert result == "OK"  # returns None
         mock_generate.assert_called_once()
 
     @patch('sendMail.get_secret')
@@ -963,7 +961,7 @@ class TestProcessFunctions:
         mock_generate.return_value = "OK"
         
         result = sendMail.process_cambristi(args)
-        assert result is None
+        assert result == 'OK'
         mock_generate.assert_called_once()
 
 
@@ -1102,6 +1100,9 @@ def test_md2html_default_styles():
             assert os.path.exists(html_file)
             # assert os.path.exists(os.path.join(tmp_dir, "styles.css"))
 
+def test_md2html_file_not_found():
+    html_file = sendMail.md2html("non_existent.md")
+    assert html_file is None
 
 def test_build_email_max_addr_1():
     """Test build_email when max_addr_per_mail is 1"""
@@ -1248,8 +1249,11 @@ def test_main_no_profile():
         mock_args.return_value.profile = None
         with patch("builtins.open", mock_open(read_data="{}")):
             with patch("yaml.safe_load", return_value={}):
-                sendMail.main()
                 # Should log "No profile specified"
+                with pytest.raises(SystemExit) as pytest_wrapped_e:
+                    sendMail.main()
+                    assert pytest_wrapped_e.type == SystemExit
+                    assert pytest_wrapped_e.value.code == 42
 
 
 def test_send_gmail_error():
