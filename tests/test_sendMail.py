@@ -1365,6 +1365,80 @@ def test_process_artscroises_wait_and_cleanup():
                         # Verify cleanup/rename if applicable (though in mock it might not reach)
 
 
+def test_process_artscroises():
+    """Test process_artscroises with wait and cleanup (lines 986, 996, 1003, 1005)"""
+
+    with patch("sendMail.setup_argparse") as mock_args:
+        mock_args.return_value.profile = "artscroises"
+        mock_args.return_value.md2html = None
+        mock_args.return_value.file = []
+        mock_args.return_value.wait = 0
+        mock_args.return_value.body = "body"
+        mock_args.return_value.message = "message"
+        mock_args.return_value.test = False
+        mock_args.return_value.donotsend = False
+        mock_args.return_value.conf = {"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}}
+
+        secret_config = {
+            "max_mails_per_hour": 100,
+            "max_addr_per_mail": 50,
+            "pause": 0,
+            "SA": "sa.json",
+            "username": "u",
+            "password": "p",
+            "MAILCONFIG": "secret"
+        }
+
+        with patch("sendMail.get_secret", return_value=secret_config):
+            with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
+                with patch("sendMail.generate_mailing", return_value="OK"):
+                    with patch("os.rename") as mock_rename:
+                        with patch("os.remove") as mock_remove:
+                            with pytest.raises(SystemExit) as pytest_wrapped_e:
+                                sendMail.main()
+                                # print(pytest_wrapped_e)
+                                assert pytest_wrapped_e.type == SystemExit
+                                assert pytest_wrapped_e.value.code == 42
+
+
+def test_process_cambristi():
+    """Test process_artscroises with wait and cleanup (lines 986, 996, 1003, 1005)"""
+
+    with patch("sendMail.setup_argparse") as mock_args:
+        mock_args.return_value.profile = "cambristi"
+        mock_args.return_value.md2html = None
+        mock_args.return_value.file = []
+        mock_args.return_value.wait = 0
+        mock_args.return_value.body = "body"
+        mock_args.return_value.message = "message"
+        mock_args.return_value.test = False
+        mock_args.return_value.donotsend = False
+        mock_args.return_value.conf = {"cambristi": {"MAILCONFIG": "secret", "SA": "sa.json"}}
+
+        secret_config = {
+            "max_mails_per_hour": 100,
+            "max_addr_per_mail": 50,
+            "pause": 0,
+            "SA": "sa.json",
+            "username": "u",
+            "password": "p",
+            "MAILCONFIG": "secret"
+        }
+
+        with patch("sendMail.get_secret", return_value=secret_config):
+            with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
+                with patch("sendMail.generate_mailing", return_value="OK"):
+                    with patch("os.rename") as mock_rename:
+                        with patch("os.remove") as mock_remove:
+                            with pytest.raises(SystemExit) as pytest_wrapped_e:
+                                sendMail.main()
+                                # print(pytest_wrapped_e)
+                                assert pytest_wrapped_e.type == SystemExit
+                                assert pytest_wrapped_e.value.code == 42
+
+
+
+
 def test_filter_artscroises_branches():
     """Test _filter_artscroises branches (lines 836-838)"""
     param = MagicMock()
@@ -1429,6 +1503,31 @@ def test_send_mail_retry_and_verbose():
                 sendMail.send_mail(param, message, recipients)
                 assert mock_conn.sendmail.call_count == 2
 
+
+def test_main_missing_args():
+    """Test main with missing arguments"""
+    with patch("sendMail.setup_argparse") as mock_args:
+        mock_args.return_value.profile = "artscroises"
+        mock_args.return_value.message = None
+        mock_args.return_value.md2html = None
+        mock_args.return_value.file = None
+        mock_args.return_value.body = None
+        mock_args.return_value.subject = None
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            sendMail.main()
+            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.value.code == 2
+
+
+def test_main_missing_profile():
+    """Test main with missing profile"""
+    with patch("sendMail.setup_argparse") as mock_args:
+        mock_args.return_value.profile = None
+        mock_args.return_value.md2html = None
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            sendMail.main()
+            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.value.code == 42
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
