@@ -1,8 +1,8 @@
-import pytest
 import os
 import sys
 from unittest.mock import Mock, MagicMock, patch, mock_open
-import email.utils
+
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 mock_get_secret = MagicMock(return_value={"key": "value"})
 sys.modules['gspread'] = MagicMock()
 sys.modules['yaml'] = MagicMock()
-sys.modules['bs4'] = MagicMock()
+# sys.modules['bs4'] = MagicMock()
 sys.modules['certifi'] = MagicMock()
 sys.modules['getSecrets'] = MagicMock()
 sys.modules['getSecrets'].get_secret = mock_get_secret
@@ -30,7 +30,6 @@ sys.modules['googleapiclient.http'] = MagicMock()
 sys.modules['oauth2client'] = MagicMock()
 sys.modules['oauth2client.service_account'] = MagicMock()
 sys.modules['PIL'] = MagicMock()
-from PIL import Image
 
 import sendMail
 

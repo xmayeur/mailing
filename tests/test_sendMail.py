@@ -23,7 +23,7 @@ mock_get_secret = MagicMock(return_value={"key": "value"})
 
 sys.modules['gspread'] = MagicMock()
 sys.modules['yaml'] = MagicMock()
-sys.modules['bs4'] = MagicMock()
+# sys.modules['bs4'] = MagicMock()
 sys.modules['certifi'] = MagicMock()
 sys.modules['getSecrets'] = MagicMock()
 sys.modules['getSecrets'].get_secret = mock_get_secret
@@ -990,7 +990,6 @@ def mock_config():
         }
     }
 
-
 def test_prepare_html_for_cid_with_invalid_src():
     """Test prepare_html_for_cid with invalid src (should continue)"""
     html_content = '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
@@ -1012,6 +1011,7 @@ def test_prepare_html_for_cid_with_invalid_src():
                 # Let's just check images length and hope for the best, or use a more robust way.
                 assert len(images) == 0
                 # assert 'src="http://example.com/img.png"' in str(html)
+            mock_bs.stop()
 
 
 def test_get_subscriber_reader_file_not_found():
