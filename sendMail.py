@@ -169,6 +169,35 @@ def file_to_base64(filepath):
     return encoded_str.decode("utf-8")
 
 
+def make_html_images_inline(in_filepath, out_filepath=None) -> str:
+    """
+    Takes an HTML file and writes a new version with inline Base64 encoded
+    images.
+    :param in_filepath: Input file path (HTML)
+    :type in_filepath: str
+    :param out_filepath: Output file path (HTML) - if None, return the data
+    :type out_filepath: str
+    :returns the html data with inline images
+    """
+    basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
+    with open(in_filepath, "r") as file:
+        soup = BeautifulSoup(file, "html.parser")
+    for img in soup.find_all("img"):
+        img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
+        mimetype = guess_type(img_path)
+        if ";base64," not in img_path:
+            img.attrs["src"] = f"data:{mimetype};base64,{file_to_base64(img_path)}"
+
+        else:
+            # TODO Change by a regex to ensure the string start with data:.*?;base64...
+            img.attrs["src"] = img_path[6:]
+
+    if out_filepath:
+        with open(out_filepath, "w") as of:
+            of.write(str(soup))
+    return str(soup)
+
+
 def prepare_html_for_cid(in_filepath):
     """
     Prepare HTML content for embedding inline images as Content-ID (CID) references.
@@ -1123,11 +1152,9 @@ def main():
 
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
-        html_content, img, t_dir = prepare_html_and_get_images(args.file[0])
-        with open(args.file[0], 'w') as f:
-            f.write(html_content)
-        print(args.file[0] + " converted to html", t_dir)
-        sys.exit(-1)
+        file = args.file[0].replace(".md", ".html")
+        make_html_images_inline(file, file)
+        sys.exit(0)
 
     if not (args.message or args.body or args.file) and not args.subject:
         print("Missing subject and message text or file")
