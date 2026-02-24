@@ -183,7 +183,10 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
     with open(in_filepath, "r") as file:
         soup = BeautifulSoup(file, "html.parser")
     for img in soup.find_all("img"):
-        img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
+        if 'http' in img.attrs["src"]:
+            img_path = urllib.parse.unquote(img.attrs["src"])
+        else:
+            img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
         mimetype = guess_type(img_path)
         if ";base64," not in img_path:
             img.attrs["src"] = f"data:{mimetype};base64,{file_to_base64(img_path)}"
