@@ -23,6 +23,7 @@ Based on : https://medium.com/@matheodaly.md/using-google-drive-api-with-python-
 
 import io
 import logging
+import sys
 from os.path import join, basename
 
 from getSecrets import get_secret
@@ -31,7 +32,6 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.http import MediaIoBaseDownload
 from oauth2client.service_account import ServiceAccountCredentials
-import sys
 
 
 def _init_log():
@@ -195,10 +195,3 @@ def upload_file(service, file, mimetype="text/csv"):
         .execute()
     )
 
-
-if __name__ == "__main__":
-
-    conn = connect_google_driver()
-    id = get_secret("artscroisesmailing")["mailing_folder"]
-    items = get_files(conn, folder_id=id)
-    download_file(conn, items)
