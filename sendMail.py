@@ -1123,7 +1123,10 @@ def main():
 
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
-        print(args.file[0] + " converted to html")
+        html_content, img, t_dir = prepare_html_and_get_images(args.file[0])
+        with open(args.file[0], 'w') as f:
+            f.write(html_content)
+        print(args.file[0] + " converted to html", t_dir)
         sys.exit(-1)
 
     if not (args.message or args.body or args.file) and not args.subject:
