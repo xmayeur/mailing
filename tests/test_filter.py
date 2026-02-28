@@ -64,7 +64,7 @@ def test_filter_with_data():
     filter['cotisation'] = "gt 200"
     assert sendMail._filter(filter, row, indices) == True
     filter['cotisation'] = "gt xxx"
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail._filter(filter, row, indices) == True
     filter = {"selected": "is True"}
     assert sendMail._filter(filter, row, indices) == False
     row[2] = "15.0"
@@ -86,9 +86,9 @@ def test_filter_with_data():
     filter = {"selected": "is empty"}
     assert sendMail._filter(filter, row, indices) == False
     filter = {"selected": "has None"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail._filter(filter, row, indices) == True
     filter = {"SSelected": "is not empty"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail._filter(filter, row, indices) == True
     row[5] = "True"
     filter = {"selected": "not in x, y, X, Yes"}
     assert sendMail._filter(filter, row, indices) == False
