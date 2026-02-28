@@ -2,9 +2,11 @@
 # Filtering options
 # if all of the conditions are met, the subscriber is added to the mailing list
 # - syntax:
-#   - <field_name>: <operation> <value>
+#   filter:
+#     <field_name>: <operation> <value>
 #
-#   <field_name>: is a field from the subscriber database (email, first_name...)
+#   where:
+# <field_name>: is a field from the subscriber database (email, first_name...)
 #   <operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
 #                           "is empty", "is not empty", "greater than", "less than"
 #                           ,"greater or equal to", "less or equal to", "one of", "none of",
@@ -49,8 +51,6 @@ cambristi:
 
 default:
   styles: "./css/styles.css"
-
-
   filter:
     email: is not empty
     bounced: is not bounced
