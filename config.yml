@@ -1,3 +1,17 @@
+#
+# Filtering options
+# if all of the conditions are met, the subscriber is added to the mailing list
+# - syntax:
+#   - <field_name>: <operation> <value>
+#
+#   <field_name>: is a field from the subscriber database (email, first_name...)
+#   <operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
+#                           "is empty", "is not empty", "greater than", "less than"
+#                           ,"greater or equal to", "less or equal to", "one of", "none of",
+#                           "is equal to", "is not equal to"
+#   <value>: is the value to compare with
+#
+
 artscroises:
   MAILCONFIG: 'artscroisesmailing'
   database: data/Subscribers.csv
@@ -30,25 +44,13 @@ cambristi:
   filter:
     title: in member, participant, inactive
     email: is not empty
-    emailBounced: is False
+    emailBounced: is not True
   # styles: "./css/styles.css"
 
 default:
   styles: "./css/styles.css"
 
-  #
-  # Filtering options
-  # if all of the conditions are met, the subscriber is added to the mailing list
-  # - syntax:
-  #   - <field_name>: <operation> <value>
-  #
-  #   <field_name>: is a field from the subscriber database (email, first_name...)
-  #   <operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
-  #                           "is empty", "is not empty", "greater than", "less than"
-  #                           ,"greater or equal to", "less or equal to", "one of", "none of",
-  #                           "is equal to", "is not equal to"
-  #   <value>: is the value to compare with
-  #
+
   filter:
     email: is not empty
     bounced: is not bounced
