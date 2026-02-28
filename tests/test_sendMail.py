@@ -724,6 +724,10 @@ class TestMailingGeneration:
         param.message = "Template"
         param.subject = "Subject"
         param.file = None
+        param.filter = {
+            "email": "is not empty",
+            "status": "is active"
+        }
 
         # Mock reader to return header and three rows
         header = ["email", "status", "group", "selected"]
@@ -1181,6 +1185,7 @@ def test_generate_mailing_hourly_limit():
     param.donotsend = True
     param.file = []
     param.message = "Hello ${email}"
+    param.filter = {}
 
     rows = [
         ["email"],
@@ -1314,6 +1319,10 @@ def test_generate_mailing_batching_and_filtering():
     param.donotsend = True
     param.message = "Hi ${email}"
     param.selected = False
+    param.filter = {
+        "email": "is not empty",
+        "status": "is active"
+    }
 
     rows = [
         ["status", "nom", "prenom", "email", "bounced", "group", "selected"],
@@ -1528,6 +1537,23 @@ def test_main_missing_profile():
             sendMail.main()
             # assert pytest_wrapped_e.type == SystemExit
             # assert pytest_wrapped_e.value.code == 42
+
+def test_make_html_images_inline():
+    html_content = '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
+    # Use a real file instead of mock_open to avoid BeautifulSoup issues if it uses other file methods
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        html_file = os.path.join(tmp_dir, "test.html")
+        with open(html_file, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        """Test make_html_images_inline with a real HTML file"""
+
+        sendMail.make_html_images_inline(html_file, html_file)
+        with open(html_file, "r", encoding="utf-8") as f:
+            html_content = f.read()
+            assert "data:image/png;base64," in html_content
+            assert "src=\"data:image/png;base64," in html_content
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
