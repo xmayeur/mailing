@@ -67,10 +67,14 @@ Create a `config.yml` file with profile-specific settings:
 
 ```yaml
 artscroises:
-  MAILCONFIG: "ArtsCroisesMailConfig"
-  SA: "artscroisesServiceAccount"
-  sheetid: "artscroisesmembersdb"
+  MAILCONFIG: "ArtsCroisesMailConfig"               # key name of all the below parameters in a secure vault
+  SA: "artscroisesServiceAccount"                   # key name of Service Account credentials in the secure vault
+  sheetid: "artscroisesmembersdb"                   # key name of the Google Sheets identifier in vault 
+  sender: "sender@example.com"
+  sendername: "John Doe"
+  password: "password"
   mailing_folder: "folder_id_from_google_drive"
+  sent_folder: "SENT"
   smtp_host: "smtp.example.com"
   smtp_port: 587
   imap_host: "imap.example.com"
@@ -78,11 +82,32 @@ artscroises:
   max_mails_per_hour: 1000
   max_addr_per_mail: 50
   pause: 3
+  filter: # see below for details
+    email: is not empty
+    status: is active
 
 cambristi:
   MAILCONFIG: "CambristiMailConfig"
   # Similar configuration...
 ```
+
+The filter section is optional and can be used to filter subscribers based on specific attributes.
+
+if all the conditions are met, the subscriber is added to the mailing list
+
+The syntax is:
+
+    filter:
+        <field_name>: <operation> <value>
+        <field_name>: <operation> <value>
+
+    where:
+    <field_name>: is a field from the subscriber database (email, first_name...)
+    <operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
+                            "is empty", "is not empty", "greater than", "less than",
+                            "greater or equal to", "less or equal to", "one of", "none of",
+                            "is equal to", "is not equal to"
+    <value>: is the value to compare with
 
 ### Secrets Management
 
