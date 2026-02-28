@@ -963,8 +963,8 @@ class TestProcessFunctions:
         mock_get_secret.return_value = {"some": "config"}
         mock_proc_attach.return_value = (["test.html"], None, [])
         mock_generate.return_value = "OK"
-        
-        result = sendMail.process_cambristi(args)
+
+        result = sendMail.process_other_profile(args)
         assert result == 'OK'
         mock_generate.assert_called_once()
 

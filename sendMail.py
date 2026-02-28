@@ -781,13 +781,14 @@ def generate_mailing(param):
                 log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
                 msg_body = _format_message(param.message, row, header)
                 if not param.donotsend:
-                    msg, recipents = build_email(param=param,subject=param.subject, message=msg_body,
+                    msg, recipients = build_email(param=param, subject=param.subject, message=msg_body,
                               bcc=",".join(addressees), attachments=param.file)
                     try:
-                        if param.profile == 'artscroises':
-                            send_mail(param=param, message=msg, recipients=recipents)
-                        elif param.profile == 'cambristi':
-                            send_gmail(get_gmail_service(param), message= msg)
+                        if hasattr(param, 'smtp_host'):
+                            send_mail(param=param, message=msg, recipients=recipients)
+                        else:
+                            send_gmail(get_gmail_service(param), message=msg)
+
                     finally:
                         # Nettoyage des dossiers temporaires créés pour ce mail
                         if hasattr(msg, '_temp_dirs'):
@@ -813,7 +814,7 @@ def generate_mailing(param):
                                   bcc=",".join(addressees), attachments=param.file)
                 if hasattr(param, 'smtp_host'):    # param.profile == 'artscroises':
                     send_mail(param=param, message=msg, recipients=recipients)
-                elif param.profile == 'cambristi':
+                else:
                     send_gmail(get_gmail_service(param), message=msg)
             mail_batch_count += 1
 
@@ -923,73 +924,73 @@ def _filter(filter, row, indices):
 
     return not result
 
-def _filter_artscroises(param, row, indices):
-    """
-    Filters rows based on specific conditions such as status, group, selection,
-    and email presence. The function evaluates multiple constraints using the
-    provided parameters, data row, and column indices to determine the
-    exclusion or inclusion of the row.
-
-    :param param: An object containing filtering options such as test mode
-        and selection criteria.
-    :type param: Any
-    :param row: A list or array representing a single row of data to be
-        evaluated by the filter.
-    :type row: list
-    :param indices: A dictionary mapping column names to their respective
-        indices in the row for easy access to specific data points.
-    :type indices: dict
-    :return: A boolean value. True if the row should NOT pass the filter
-        (i.e., be excluded), False if it should pass.
-    :rtype: bool
-    """
-    is_active = row[indices["status"]] == "active"
-    is_test_match = not param.test or "Test" in row[indices["group"]]
-    is_selected = (
-            not param.selected or row[indices["selected"]].lower() == "x"
-    )
-    has_email = bool(row[indices["email"]])
-    return not (is_active and is_test_match and is_selected and has_email)
-
-
-def _filter_cambristi(param, row, indices, test):
-    """
-    Filters data based on specific conditions related to membership status and test mode.
-
-    This function implements a filtering mechanism to process a given row of data based on
-    conditions defined by the input parameters. It differentiates behaviors depending on
-    whether the test mode is enabled or not.
-
-    :param param: Context-specific parameter used for processing. Implementation details
-                  of this parameter are not specified in the function body.
-    :type param: Any
-    :param row: The current row of data to process.
-    :type row: List[Any]
-    :param indices: A dictionary mapping relevant column names to their respective indices
-                    in the row.
-    :type indices: Dict[str, int]
-    :param test: A flag indicating whether the function operates in test mode (`True`) or
-                 normal mode (`False`).
-    :type test: bool
-    :return: Indicates whether the row passes the filtering conditions.
-             Returns `True` if the row does not satisfy the filtering criteria and should
-             be excluded; `False` otherwise.
-    :rtype: bool
-    """
-    if test:
-        try:
-            return not ('test' in row[indices["title"]] )
-        except IndexError:
-            log.warning(f"No title in row {row[indices['nom']]}, {row[indices['prenom']]}")
-            return True
-    else:
-        try:
-            is_active = row[indices["title"]] in param.filter
-            has_mail = bool(row[indices["email"]])
-            bounced = bool(row[indices["emailBounced"]])
-            return not (is_active and has_mail and not bounced)
-        except IndexError:
-            return True
+# def _filter_artscroises(param, row, indices):
+#     """
+#     Filters rows based on specific conditions such as status, group, selection,
+#     and email presence. The function evaluates multiple constraints using the
+#     provided parameters, data row, and column indices to determine the
+#     exclusion or inclusion of the row.
+#
+#     :param param: An object containing filtering options such as test mode
+#         and selection criteria.
+#     :type param: Any
+#     :param row: A list or array representing a single row of data to be
+#         evaluated by the filter.
+#     :type row: list
+#     :param indices: A dictionary mapping column names to their respective
+#         indices in the row for easy access to specific data points.
+#     :type indices: dict
+#     :return: A boolean value. True if the row should NOT pass the filter
+#         (i.e., be excluded), False if it should pass.
+#     :rtype: bool
+#     """
+#     is_active = row[indices["status"]] == "active"
+#     is_test_match = not param.test or "Test" in row[indices["group"]]
+#     is_selected = (
+#             not param.selected or row[indices["selected"]].lower() == "x"
+#     )
+#     has_email = bool(row[indices["email"]])
+#     return not (is_active and is_test_match and is_selected and has_email)
+#
+#
+# def _filter_cambristi(param, row, indices, test):
+#     """
+#     Filters data based on specific conditions related to membership status and test mode.
+#
+#     This function implements a filtering mechanism to process a given row of data based on
+#     conditions defined by the input parameters. It differentiates behaviors depending on
+#     whether the test mode is enabled or not.
+#
+#     :param param: Context-specific parameter used for processing. Implementation details
+#                   of this parameter are not specified in the function body.
+#     :type param: Any
+#     :param row: The current row of data to process.
+#     :type row: List[Any]
+#     :param indices: A dictionary mapping relevant column names to their respective indices
+#                     in the row.
+#     :type indices: Dict[str, int]
+#     :param test: A flag indicating whether the function operates in test mode (`True`) or
+#                  normal mode (`False`).
+#     :type test: bool
+#     :return: Indicates whether the row passes the filtering conditions.
+#              Returns `True` if the row does not satisfy the filtering criteria and should
+#              be excluded; `False` otherwise.
+#     :rtype: bool
+#     """
+#     if test:
+#         try:
+#             return not ('test' in row[indices["title"]] )
+#         except IndexError:
+#             log.warning(f"No title in row {row[indices['nom']]}, {row[indices['prenom']]}")
+#             return True
+#     else:
+#         try:
+#             is_active = row[indices["title"]] in param.filter
+#             has_mail = bool(row[indices["email"]])
+#             bounced = bool(row[indices["emailBounced"]])
+#             return not (is_active and has_mail and not bounced)
+#         except IndexError:
+#             return True
 
 
 def send_gmail(service,message=None):
@@ -1154,7 +1155,7 @@ def process_artscroises(args):
         return "Error"
 
 
-def process_cambristi(args):
+def process_other_profile(args):
     """
     Processes and sends emails with optional attachment handling and message body
     generation based on the provided profile configuration.
@@ -1181,6 +1182,9 @@ def process_cambristi(args):
     config.update(vars(args))
     param = Dict2Class(config)
     param.file = files
+
+    if param.test:
+        param.filter["title"] = "in Test, test"
 
     return generate_mailing(param)
 
@@ -1267,9 +1271,10 @@ def main():
         sys.exit(-1)
 
     if args.profile == "artscroises":
+
         sys.exit(0 if process_artscroises(args) == "OK" else -1)
-    elif args.profile == "cambristi":
-        sys.exit(0 if process_cambristi(args) == "OK" else -1)
+    elif args.profile:
+        sys.exit(0 if process_other_profile(args) == "OK" else -1)
     else:
         log.critical("No profile specified")
         sys.exit(-1)
