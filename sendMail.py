@@ -867,14 +867,14 @@ def _filter(filter, row, indices):
             return True
         # get the operator
         try:
-            op = ops[[v.find(x) for x in ops].index(0)]
+            op = ops[[v.find(x + ' ') for x in ops].index(0)]
         except ValueError:
             log.warning(f"Invalid filter operation for field '{k}': {v}")
             return True
         # get the value to compare with
         test_value = v.split(op)[1].strip()
         # correct the operator if needed
-        if 'not' in test_value:
+        if 'not ' in test_value:
             op += ' not'
             test_value = test_value.split('not')[1].strip()
         if 'empty' in test_value:
@@ -920,6 +920,8 @@ def _filter(filter, row, indices):
             elif op == "is empty":
                 res = (field_value == "" or field_value is None)
 
+        if not res:
+            return True
         result = result and res
 
     return not result
@@ -1144,6 +1146,9 @@ def process_artscroises(args):
 
     param = Dict2Class(config)
     param.file = files  # Mise à jour explicite des fichiers filtrés
+
+    if param.test:
+        param.filter['group'] = 'is Test'
 
     if generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:
