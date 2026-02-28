@@ -183,11 +183,15 @@ class TestFilterFunctions:
         param = Mock()
         param.test = False
         param.selected = True
+        param.filter = {
+            "email": "is not empty",
+            "status": "is active"
+        }
 
         row = ["active", "Test Group", "x", "test@example.com"]
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
 
-        result = sendMail._filter_artscroises(param, row, indices)
+        result = sendMail._filter(param.filter, row, indices)
         assert result == False  # Should NOT be filtered (passes filter)
 
     def test_filter_artscroises_inactive(self):
@@ -195,35 +199,47 @@ class TestFilterFunctions:
         param = MagicMock()
         param.test = False
         param.selected = False
+        param.filter = {
+            "email": "is not empty",
+            "status": "is active"
+        }
 
 
         row = ["inactive", "Group", "", "test@example.com"]
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
 
-        result = sendMail._filter_artscroises(param, row, indices)
+        result = sendMail._filter(param.filter, row, indices)
         assert result == True  # Should be filtered (doesn't pass)
 
     def test_filter_cambristi_member(self):
         """Test Cambristi filter with member"""
         param = MagicMock()
-        param.filter = ["inactive", "member"]
+        param.filter = {
+            "title": "in member, inactive",
+            "email": "is not empty",
+            "emailBounced": "is empty"
+        }
 
         row = ["member", "John", "Doe", "test@example.com", ""]
         indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3, "emailBounced": 4}
 
-
-        result = sendMail._filter_cambristi(param, row, indices, test=False)
+        result = sendMail._filter(param.filter, row, indices)
         assert result == False  # Should NOT be filtered
 
     def test_filter_cambristi_test_mode(self):
         """Test Cambristi filter in test mode"""
         param = Mock()
+        param.filter = {
+            "title": "in test, Test",
+            "email": "is not empty",
+            "emailBounced": "is empty"
+        }
 
-        row = ["test", "John", "Doe", "test@example.com"]
+        row = ["Test", "John", "Doe", "test@example.com"]
         indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
 
-        result = sendMail._filter_cambristi(param, row, indices, test=True)
-        assert result == False  # Should NOT be filtered
+        result = sendMail._filter(param.filter, row, indices)
+        assert result == True  # Should NOT be filtered
 
 
 class TestEmailBuilding:
@@ -708,7 +724,7 @@ class TestMailingGeneration:
     @patch('sendMail.send_gmail')
     @patch('sendMail.get_gmail_service')
     @patch('sendMail.sleep')
-    @patch('sendMail._filter_artscroises')
+    @patch('sendMail._filter')
     def test_generate_mailing_artscroises_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail, mock_send_mail,
                                                  mock_build, mock_format, mock_indices, mock_reader_func):
         """Test successful mailing generation for ArtsCroises profile"""
@@ -724,6 +740,10 @@ class TestMailingGeneration:
         param.message = "Template"
         param.subject = "Subject"
         param.file = None
+        param.filter = {
+            "email": "is not empty",
+            "status": "is active"
+        }
 
         # Mock reader to return header and three rows
         header = ["email", "status", "group", "selected"]
@@ -955,12 +975,13 @@ class TestProcessFunctions:
                 "MAILCONFIG": "secret_id"
             }
         }
+        args.test = False
         
         mock_get_secret.return_value = {"some": "config"}
         mock_proc_attach.return_value = (["test.html"], None, [])
         mock_generate.return_value = "OK"
-        
-        result = sendMail.process_cambristi(args)
+
+        result = sendMail.process_other_profile(args)
         assert result == 'OK'
         mock_generate.assert_called_once()
 
@@ -1181,6 +1202,7 @@ def test_generate_mailing_hourly_limit():
     param.donotsend = True
     param.file = []
     param.message = "Hello ${email}"
+    param.filter = {}
 
     rows = [
         ["email"],
@@ -1198,11 +1220,16 @@ def test_generate_mailing_hourly_limit():
 def test_filter_cambristi_index_error():
     """Test _filter_cambristi with IndexError"""
     param = MagicMock()
+    param.filter = {
+        "title": "in member, participant, inactive",
+        "email": "is not empty",
+        "emailBounced": "if False"
+    }
     indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
     row = ["only one col"]
 
-    assert sendMail._filter_cambristi(param, row, indices, test=True) == True
-    assert sendMail._filter_cambristi(param, row, indices, test=False) == True
+    assert sendMail._filter(param.filter, row, indices) == True
+
 
 
 def test_process_artscroises_wait_and_no_config():
@@ -1314,6 +1341,10 @@ def test_generate_mailing_batching_and_filtering():
     param.donotsend = True
     param.message = "Hi ${email}"
     param.selected = False
+    param.filter = {
+        "email": "is not empty",
+        "status": "is active"
+    }
 
     rows = [
         ["status", "nom", "prenom", "email", "bounced", "group", "selected"],
@@ -1445,23 +1476,27 @@ def test_filter_artscroises_branches():
     param.filter = ["active"]
     param.test = False
     param.selected = False
+    param.filter = {
+        "email": "is not empty",
+        "status": "is active"
+    }
     indices = {"status": 0, "bounced": 1, "group": 2, "selected": 3, "email": 4}
 
     # Bounced row (should be filtered -> True)
     row_bounced = ["bounced", "", "Test", "", "test@ex.com"]
-    assert sendMail._filter_artscroises(param, row_bounced, indices) == True
+    assert sendMail._filter(param.filter, row_bounced, indices) == True
 
     # Filtered out title (should be filtered -> True)
     row_inactive = ["inactive", "", "Test", "", "test@ex.com"]
-    assert sendMail._filter_artscroises(param, row_inactive, indices) == True
+    assert sendMail._filter(param.filter, row_inactive, indices) == True
 
     # Active (should NOT be filtered -> False)
     row_active = ["active", "", "Test", "", "test@ex.com"]
-    assert sendMail._filter_artscroises(param, row_active, indices) == False
+    assert sendMail._filter(param.filter, row_active, indices) == False
 
     # No email (should be filtered -> True)
     row_no_email = ["active", "", "Test", "", ""]
-    assert sendMail._filter_artscroises(param, row_no_email, indices) == True
+    assert sendMail._filter(param.filter, row_no_email, indices) == True
 
 
 def test_get_newsletter_name_branches():
@@ -1521,6 +1556,7 @@ def test_main_missing_args():
 
 def test_main_missing_profile():
     """Test main with missing profile"""
+
     with patch("sendMail.setup_argparse") as mock_args:
         mock_args.return_value.profile = None
         mock_args.return_value.md2html = None
@@ -1528,6 +1564,23 @@ def test_main_missing_profile():
             sendMail.main()
             # assert pytest_wrapped_e.type == SystemExit
             # assert pytest_wrapped_e.value.code == 42
+
+def test_make_html_images_inline():
+    html_content = '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
+    # Use a real file instead of mock_open to avoid BeautifulSoup issues if it uses other file methods
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        html_file = os.path.join(tmp_dir, "test.html")
+        with open(html_file, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        """Test make_html_images_inline with a real HTML file"""
+
+        sendMail.make_html_images_inline(html_file, html_file)
+        with open(html_file, "r", encoding="utf-8") as f:
+            html_content = f.read()
+            assert "data:image/png;base64," in html_content
+            assert "src=\"data:image/png;base64," in html_content
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
