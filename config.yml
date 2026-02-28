@@ -30,7 +30,7 @@ cambristi:
   filter:
     title: in member, participant, inactive
     email: is not empty
-    emailBounced: if False
+    emailBounced: is False
   # styles: "./css/styles.css"
 
 default:

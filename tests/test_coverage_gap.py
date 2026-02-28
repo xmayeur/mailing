@@ -286,13 +286,18 @@ class TestCoverageGap:
     def test_filter_cambristi_errors(self):
         """Cover lines 757-759 and 765-766: IndexError in _filter_cambristi"""
         # Test mode with missing title index but valid nom/prenom indices to avoid secondary errors
+        filter = {
+            "title": "in member, participant, inactive",
+            "email": "is not empty",
+            "emailBounced": "if False"
+        }
         with patch('sendMail.log') as mock_log:
-            res = sendMail._filter_cambristi(Mock(), ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2}, True)
+            res = sendMail._filter(filter, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2})
             assert res is True
             mock_log.warning.assert_called_once()
             
         # Normal mode with missing title index
-        res = sendMail._filter_cambristi(Mock(), ["member"], {"title": 50}, False)
+        res = sendMail._filter(filter, ["member"], {"title": 50})
         assert res is True
 
     def test_send_gmail_error(self):

@@ -861,16 +861,16 @@ def _filter(filter, row, indices):
 
     for k, v in filter.items():
         res = True
-        field_value = row[indices[k]] if k in indices else None
+        field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
-            log.warning(f"Ignored and invalid field '{k}")
-            continue
+            log.warning(f"Invalid field '{k}")
+            return True
         # get the operator
         try:
             op = ops[[v.find(x) for x in ops].index(0)]
         except ValueError:
-            log.warning(f"Ignored and invalid filter operation for field '{k}': {v}")
-            continue
+            log.warning(f"Invalid filter operation for field '{k}': {v}")
+            return True
         # get the value to compare with
         test_value = v.split(op)[1].strip()
         # correct the operator if needed
@@ -889,8 +889,8 @@ def _filter(filter, row, indices):
             try:
                 test_value = float(test_value)
             except ValueError:
-                log.warning(f"Ignored and invalid filter value for field '{k}': {test_value}")
-                continue
+                log.warning(f"Invalid filter value for field '{k}': {test_value}")
+                return True
             # numeric comparison
             if op == "ge" or op == "greater than or equal to":
                 res = (field_value >= test_value)
@@ -1183,7 +1183,7 @@ def process_other_profile(args):
     param = Dict2Class(config)
     param.file = files
 
-    if param.test:
+    if args.test:
         param.filter["title"] = "in Test, test"
 
     return generate_mailing(param)
@@ -1256,8 +1256,6 @@ def main():
     """
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     args = setup_argparse()
-    if not args.profile:
-        args.profile = "default"
     args.conf = yaml.safe_load(open("config.yml"))
 
     if args.md2html and args.file[0].endswith(".md"):
@@ -1271,7 +1269,6 @@ def main():
         sys.exit(-1)
 
     if args.profile == "artscroises":
-
         sys.exit(0 if process_artscroises(args) == "OK" else -1)
     elif args.profile:
         sys.exit(0 if process_other_profile(args) == "OK" else -1)
