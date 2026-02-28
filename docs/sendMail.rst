@@ -42,51 +42,40 @@ Logging & Initialization
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.init_log
-   :noindex:
 
 Google Sheets Functions
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.openGoogleDBMembersSheet
-   :noindex:
 .. autofunction:: sendMail.readAllSheet
-   :noindex:
 
 File Utilities
 ^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.guess_type
-   :noindex:
 .. autofunction:: sendMail.file_to_base64
-   :noindex:
 
 HTML Processing
 ^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.prepare_html_for_cid
-   :noindex:
 .. autofunction:: sendMail.prepare_html_and_get_images
-   :noindex:
+.. autofunction:: sendMail.md2html
+
 
 Email Building & Sending
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.build_email
-   :noindex:
 .. autofunction:: sendMail.send_mail
-   :noindex:
 .. autofunction:: sendMail.send_gmail
-   :noindex:
 .. autofunction:: sendMail.get_gmail_service
-   :noindex:
 
 Message Processing
 ^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.generate_mailing
-   :noindex:
-.. autofunction:: sendMail.process_attachments
-   :noindex:
+.. autofunction:: sendMail.process_attachments:
 
 SMTP & IMAP
 ^^^^^^^^^^^
@@ -100,24 +89,21 @@ Filtering & Data Processing
 .. autofunction:: sendMail._get_subscriber_reader
 .. autofunction:: sendMail._get_indices
 .. autofunction:: sendMail._format_message
-.. autofunction:: sendMail._filter_artscroises
-.. autofunction:: sendMail._filter_cambristi
+.. autofunction:: sendMail._filter
+
 
 Profile Processing
 ^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.process_artscroises
-   :noindex:
-.. autofunction:: sendMail.process_cambristi
-   :noindex:
+.. autofunction:: sendMail.process_other_profile
+
 
 Command-line Interface
 ^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.setup_argparse
-   :noindex:
 .. autofunction:: sendMail.main
-   :noindex:
 
 Command-Line Arguments
 ----------------------
