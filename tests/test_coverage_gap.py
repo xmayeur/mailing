@@ -245,6 +245,10 @@ class TestCoverageGap:
         param.file = []
         param.test = False
         param.selected = False
+        param.filter = {
+            "email": "is not empty",
+            "status": "is active"
+        }
         
         # Header + 3 rows
         reader = iter([

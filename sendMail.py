@@ -760,12 +760,16 @@ def generate_mailing(param):
                 break
 
             # filtering
-            if param.profile == 'artscroises':
-                if _filter_artscroises(param, row, indices):
+            # if param.profile == 'artscroises':
+            #     if _filter_artscroises(param, row, indices):
+            #         continue
+            # elif param.profile == 'cambristi':
+            #     if _filter_cambristi(param, row, indices, param.test):
+            #         continue
+            # else:
+            if _filter(param.filter, row, indices):
                     continue
-            elif param.profile == 'cambristi':
-                if _filter_cambristi(param, row, indices, param.test):
-                    continue
+
 
             if param.verbose:
                 print(row[indices["email"]])
@@ -819,6 +823,105 @@ def generate_mailing(param):
     finally:
         if csvfile: csvfile.close()
 
+
+def _filter(filter, row, indices):
+    """
+    Filters rows based on specific conditions such as status, group, selection,
+    and email presence. The function evaluates multiple constraints using the
+    provided parameters, data row, and column indices to determine the
+    exclusion or inclusion of the row.
+
+    :param filter: An object containing filtering options such as test mode
+        and selection criteria.
+    :type param: list of dict
+    :param row: A list or array representing a single row of data to be
+        evaluated by the filter.
+    :type row: list
+    :param indices: A dictionary mapping column names to their respective
+        indices in the row for easy access to specific data points.
+    :type indices: dict
+    :return: A boolean value. True if the row should NOT pass the filter
+        (i.e., be excluded), False if it should pass.
+    :rtype: bool
+    """
+
+    if filter == {}:
+        return False
+
+    result = True
+
+    # Allowed operations
+    ops = [
+        "is", "is not", "gt", "lt", "ge", "le", "in", "not in",
+        "is empty", "is not empty", "greater than", "less than",
+        "greater or equal to", "less or equal to", "one of", "none of",
+        "is equal to", "is not equal to", "eq", "ne"
+    ]
+
+    for k, v in filter.items():
+        res = True
+        field_value = row[indices[k]] if k in indices else None
+        if field_value is None:
+            log.warning(f"Ignored and invalid field '{k}")
+            continue
+        # get the operator
+        try:
+            op = ops[[v.find(x) for x in ops].index(0)]
+        except ValueError:
+            log.warning(f"Ignored and invalid filter operation for field '{k}': {v}")
+            continue
+        # get the value to compare with
+        test_value = v.split(op)[1].strip()
+        # correct the operator if needed
+        if 'not' in test_value:
+            op += ' not'
+            test_value = test_value.split('not')[1].strip()
+        if 'empty' in test_value:
+            op += ' empty'
+            test_value = None
+        # find if test_value should be a list
+        if test_value and ',' in test_value:
+            test_value = test_value.replace(' ', '').split(',')
+
+        try:
+            field_value = float(field_value)
+            try:
+                test_value = float(test_value)
+            except ValueError:
+                log.warning(f"Ignored and invalid filter value for field '{k}': {test_value}")
+                continue
+            # numeric comparison
+            if op == "ge" or op == "greater than or equal to":
+                res = (field_value >= test_value)
+            elif op == "gt" or op == "greater than":
+                res = (field_value > test_value)
+            elif op == "le" or op == "less than or equal to":
+                res = (field_value <= test_value)
+            elif op == "lt" or op == "less than":
+                res = (field_value < test_value)
+            elif op == "eq" or op == "is equal to":
+                res = (field_value == test_value)
+            elif op == "ne" or op == "is not equal to":
+                res = (field_value != test_value)
+
+        except ValueError:
+            # string comparison
+            if op == "in" or op == 'one of':
+                res = (field_value in test_value)
+            elif op == "not in" or op == 'none of':
+                res = (field_value not in test_value)
+            elif op == "is" or op == 'is equal to':
+                res = (field_value == test_value)
+            elif op == "is not" or op == 'is not equal to':
+                res = (field_value != test_value)
+            elif op == "is not empty":
+                res = (field_value != "" and field_value is not None)
+            elif op == "is empty":
+                res = (field_value == "" or field_value is None)
+
+        result = result and res
+
+    return not result
 
 def _filter_artscroises(param, row, indices):
     """
