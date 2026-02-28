@@ -518,7 +518,7 @@ def process_attachments(args, config, folder="input"):
 
     return files, service, google_drive_files
 
-def md2html(file_path, styles=None) :
+def md2html(file_path, styles=None, embed_styles=False):
     """
     Converts a Markdown file to an HTML file, applying default or custom styles, and generates
     a well-structured HTML document.
@@ -563,15 +563,7 @@ def md2html(file_path, styles=None) :
 
     converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
 
-    if not styles is None:
-        head = f"""
-   <!-- Add locale and title header -->
-    <head>
-        <meta charset="UTF-8">
-        <link rel="stylesheet" href="{styles}">
-    </head>
-"""
-    else:
+    if styles is None:
         head = f"""
     <!-- Add locale and title header -->
     <head>
@@ -579,6 +571,25 @@ def md2html(file_path, styles=None) :
         <style>{default_styles}</style>
     </head>
     
+"""
+    elif embed_styles and os.path.exists(styles):
+        with open(styles, "r") as f:
+            default_styles = f.read()
+            head = f"""
+                <!-- Add locale and title header -->
+                <head>
+                    <meta charset="UTF-8">
+                    <style>{default_styles}</style>
+                </head>
+
+            """
+    else:
+        head = f"""
+   <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="{styles}">
+    </head>
 """
 
     html = "<html>\n" + head + converter.convert(data) + "\n</html>"
@@ -658,7 +669,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
         if att.endswith(("htm", "html", "md")):
             is_md = att.endswith("md")
             if is_md:
-                att = md2html(att, param.styles if hasattr(param, "styles") else None)
+                att = md2html(att, styles=param.styles if hasattr(param, "styles") else None, embed_styles=True)
             # C'est ici que la magie opère pour le HTML
             html_content, found_images, t_dir = prepare_html_and_get_images(att)
             message = html_content
