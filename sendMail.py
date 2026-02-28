@@ -518,16 +518,28 @@ def process_attachments(args, config, folder="input"):
 
     return files, service, google_drive_files
 
-def md2html(file_path, styles=None) :
+def md2html(file_path, styles=None, embed_styles=False):
     """
-    Converts a Markdown file to an HTML file, applying default or custom styles, and generates
-    a well-structured HTML document.
+    Converts a Markdown file to an HTML file with optional styling.
 
-    :param file_path: Path to the input Markdown file to be converted.
-    :param styles: Optional. Path to the CSS file defining HTML styles. If not provided,
-        a default stylesheet will be created and applied.
-    :return: Path to the generated HTML file.
-    :rtype: str
+    The function reads a Markdown file, converts its content to an HTML
+    document using the `Markdown` library, and writes the resulting HTML
+    to a new file. Default and optional CSS styles can be embedded in or
+    linked from the resulting HTML document.
+
+    :param file_path: The file path of the Markdown file to be converted.
+    :type file_path: str
+    :param styles: Optional path to a CSS file for custom styling.
+                   Defaults to None.
+    :type styles: str, optional
+    :param embed_styles: Specifies whether to embed styles directly into
+                         the HTML. If True and a valid `styles` path is
+                         provided, the CSS content will be embedded as
+                         inline styles. Defaults to False.
+    :type embed_styles: bool
+    :return: The file path of the created HTML file, or None if the process
+             fails (e.g., if the Markdown file does not exist).
+    :rtype: str or None
     """
     default_styles = """
         body {background-color: PapayaWhip;}
@@ -563,15 +575,7 @@ def md2html(file_path, styles=None) :
 
     converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
 
-    if not styles is None:
-        head = f"""
-   <!-- Add locale and title header -->
-    <head>
-        <meta charset="UTF-8">
-        <link rel="stylesheet" href="{styles}">
-    </head>
-"""
-    else:
+    if styles is None:
         head = f"""
     <!-- Add locale and title header -->
     <head>
@@ -579,6 +583,25 @@ def md2html(file_path, styles=None) :
         <style>{default_styles}</style>
     </head>
     
+"""
+    elif embed_styles and os.path.exists(styles):
+        with open(styles, "r") as f:
+            default_styles = f.read()
+            head = f"""
+                <!-- Add locale and title header -->
+                <head>
+                    <meta charset="UTF-8">
+                    <style>{default_styles}</style>
+                </head>
+
+            """
+    else:
+        head = f"""
+   <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="{styles}">
+    </head>
 """
 
     html = "<html>\n" + head + converter.convert(data) + "\n</html>"
@@ -658,7 +681,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
         if att.endswith(("htm", "html", "md")):
             is_md = att.endswith("md")
             if is_md:
-                att = md2html(att, param.styles if hasattr(param, "styles") else None)
+                att = md2html(att, styles=param.styles if hasattr(param, "styles") else None, embed_styles=True)
             # C'est ici que la magie opère pour le HTML
             html_content, found_images, t_dir = prepare_html_and_get_images(att)
             message = html_content
@@ -827,25 +850,56 @@ def generate_mailing(param):
 
 def _filter(filter, row, indices):
     """
-    Filters rows based on specific conditions such as status, group, selection,
-    and email presence. The function evaluates multiple constraints using the
-    provided parameters, data row, and column indices to determine the
-    exclusion or inclusion of the row.
+    Evaluates a set of filtering conditions on a given row of data using field indices.
 
-    :param filter: An object containing filtering options such as test mode
-        and selection criteria.
-    :type param: list of dict
-    :param row: A list or array representing a single row of data to be
-        evaluated by the filter.
+    This function checks each field-value pair in a filter dictionary against a row of
+    data by performing the specified operations. Only rows that do not match the filter
+    criteria will pass (return `False`). The function supports a variety of comparison
+    operations, such as equality, inequality, greater-than, less-than, and membership.
+
+    Supported operations:
+    - "is"
+    - "is not"
+    - "gt" (greater than)
+    - "lt" (less than)
+    - "ge" (greater than or equal)
+    - "le" (less than or equal)
+    - "in"
+    - "not in"
+    - "is empty"
+    - "is not empty"
+    - "greater than" (alias for "gt")
+    - "less than" (alias for "lt")
+    - "greater or equal to" (alias for "ge")
+    - "less or equal to" (alias for "le")
+    - "one of" (alias for "in")
+    - "none of" (alias for "not in")
+    - "is equal to" (alias for "is")
+    - "is not equal to" (alias for "is not")
+    - "eq" (alias for "is equal to")
+    - "ne" (alias for "is not equal to")
+
+    Filter values can specify further conditions through implicit parsing. For example:
+    - Comma-separated values for membership tests (e.g., "in").
+    - Empty string values to test for emptiness.
+
+    The function logs warnings for invalid operations or values encountered in the filter.
+
+    :param filter: Dictionary containing filter conditions, where each key represents
+                   a field name, and the value is a string describing the operation
+                   and target value (e.g., "gt 10").
+    :type filter: dict
+    :param row: A list of field values representing a single data row that will be
+                checked against the filtering criteria.
     :type row: list
-    :param indices: A dictionary mapping column names to their respective
-        indices in the row for easy access to specific data points.
+    :param indices: Dictionary mapping filter field names to their respective column
+                    index positions in the `row` list. Used to retrieve field values
+                    for comparison.
     :type indices: dict
-    :return: A boolean value. True if the row should NOT pass the filter
-        (i.e., be excluded), False if it should pass.
+    :return: `True` if the given row does not satisfy the filter criteria, `False`
+             otherwise.
     :rtype: bool
     """
-
     if filter == {}:
         return False
 
@@ -867,14 +921,14 @@ def _filter(filter, row, indices):
             return True
         # get the operator
         try:
-            op = ops[[v.find(x) for x in ops].index(0)]
+            op = ops[[v.find(x + ' ') for x in ops].index(0)]
         except ValueError:
             log.warning(f"Invalid filter operation for field '{k}': {v}")
             return True
         # get the value to compare with
         test_value = v.split(op)[1].strip()
         # correct the operator if needed
-        if 'not' in test_value:
+        if 'not ' in test_value:
             op += ' not'
             test_value = test_value.split('not')[1].strip()
         if 'empty' in test_value:
@@ -920,6 +974,8 @@ def _filter(filter, row, indices):
             elif op == "is empty":
                 res = (field_value == "" or field_value is None)
 
+        if not res:
+            return True
         result = result and res
 
     return not result
@@ -1144,6 +1200,9 @@ def process_artscroises(args):
 
     param = Dict2Class(config)
     param.file = files  # Mise à jour explicite des fichiers filtrés
+
+    if param.test:
+        param.filter['group'] = 'is Test'
 
     if generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:

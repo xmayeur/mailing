@@ -1121,6 +1121,23 @@ def test_md2html_default_styles():
             assert os.path.exists(html_file)
             # assert os.path.exists(os.path.join(tmp_dir, "styles.css"))
 
+def test_md2html_custom_styles():
+    """Test md2html creates custom styles.css if styles is provided"""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        md_file = os.path.join(tmp_dir, "test.md")
+        with open(md_file, "w") as f:
+            f.write("# Hello")
+        styles_file = os.path.join(tmp_dir, "styles.css")
+        with open(styles_file, "w") as f:
+            f.write("body { color: red; }")
+        html_file = sendMail.md2html(md_file, styles=styles_file, embed_styles=True)
+        assert os.path.exists(html_file)
+        assert os.path.exists(styles_file)
+        with open(html_file, "r") as f:
+            html_content = f.read()
+            assert "color: red" in html_content
+
+
 def test_md2html_file_not_found():
     html_file = sendMail.md2html("non_existent.md")
     assert html_file is None
