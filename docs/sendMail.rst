@@ -42,68 +42,91 @@ Logging & Initialization
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.init_log
+   :no-index:
 
 Google Sheets Functions
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.openGoogleDBMembersSheet
+   :no-index:
+
 .. autofunction:: sendMail.readAllSheet
+   :no-index:
 
 File Utilities
 ^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.guess_type
+   :no-index:
 .. autofunction:: sendMail.file_to_base64
+   :no-index:
 
 HTML Processing
 ^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.prepare_html_for_cid
+   :no-index:
 .. autofunction:: sendMail.prepare_html_and_get_images
+   :no-index:
 .. autofunction:: sendMail.md2html
+   :no-index:
 
 
 Email Building & Sending
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.build_email
+   :no-index:
 .. autofunction:: sendMail.send_mail
+   :no-index:
 .. autofunction:: sendMail.send_gmail
+   :no-index:
 .. autofunction:: sendMail.get_gmail_service
+   :no-index:
 
 Message Processing
 ^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.generate_mailing
+   :no-index:
 .. autofunction:: sendMail.process_attachments:
+   :no-index:
 
 SMTP & IMAP
 ^^^^^^^^^^^
 
-.. autofunction:: sendMail._get_smtp_connection
-.. autofunction:: sendMail._save_to_sent
+.. autofunction:: sendMail.get_smtp_connection
+   :no-index:
+.. autofunction:: sendMail.save_to_sent
+   :no-index:
 
 Filtering & Data Processing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: sendMail._get_subscriber_reader
-.. autofunction:: sendMail._get_indices
-.. autofunction:: sendMail._format_message
-.. autofunction:: sendMail._filter
+.. autofunction:: sendMail.get_subscriber_reader
+   :no-index:
+.. autofunction:: sendMail.get_indices
+   :no-index:
+.. autofunction:: sendMail.format_message
+   :no-index:
+.. autofunction:: sendMail.filter
+   :no-index:
 
 
 Profile Processing
 ^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: sendMail.process_artscroises
-.. autofunction:: sendMail.process_other_profile
+.. autofunction:: sendMail.process_profile
+   :no-index:
 
 
 Command-line Interface
 ^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: sendMail.setup_argparse
+   :no-index:
 .. autofunction:: sendMail.main
+   :no-index:
 
 Command-Line Arguments
 ----------------------
