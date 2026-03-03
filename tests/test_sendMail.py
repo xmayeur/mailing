@@ -598,8 +598,8 @@ class TestEmailSending:
         # sleep should have been called twice (between 3 attempts)
         assert mock_sleep.call_count == 2
 
-    @patch('sendMail._get_smtp_connection')
-    @patch('sendMail._save_to_sent')
+    @patch('sendMail.get_smtp_connection')
+    @patch('sendMail.save_to_sent')
     def test_send_mail_success(self, mock_save, mock_conn_func):
         """Test successful email sending"""
         param = Mock()
@@ -620,7 +620,7 @@ class TestEmailSending:
         mock_conn.quit.assert_called_once()
         mock_save.assert_called_once()
 
-    @patch('sendMail._get_smtp_connection')
+    @patch('sendMail.get_smtp_connection')
     def test_send_mail_connection_failure(self, mock_conn_func):
         """Test email sending with connection failure"""
         param = Mock()
@@ -716,15 +716,15 @@ class TestGetSubscriberReader:
 class TestMailingGeneration:
     """Tests for generate_mailing function"""
 
-    @patch('sendMail._get_subscriber_reader')
-    @patch('sendMail._get_indices')
-    @patch('sendMail._format_message')
+    @patch('sendMail.get_subscriber_reader')
+    @patch('sendMail.get_indices')
+    @patch('sendMail.format_message')
     @patch('sendMail.build_email')
     @patch('sendMail.send_mail')
     @patch('sendMail.send_gmail')
     @patch('sendMail.get_gmail_service')
     @patch('sendMail.sleep')
-    @patch('sendMail._filter')
+    @patch('sendMail.filter')
     def test_generate_mailing_artscroises_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail, mock_send_mail,
                                                  mock_build, mock_format, mock_indices, mock_reader_func):
         """Test successful mailing generation for ArtsCroises profile"""
@@ -781,7 +781,7 @@ class TestMailingGeneration:
         assert mock_send_mail.call_count == 2
         assert mock_build.call_count == 2
 
-    @patch('sendMail._get_subscriber_reader')
+    @patch('sendMail.get_subscriber_reader')
     def test_generate_mailing_missing_config(self, mock_reader_func):
         """Test generate_mailing with missing configuration"""
         param = Mock(spec=[]) # No attributes
@@ -789,7 +789,7 @@ class TestMailingGeneration:
         result = sendMail.generate_mailing(param)
         assert result == "Error"
 
-    @patch('sendMail._get_subscriber_reader')
+    @patch('sendMail.get_subscriber_reader')
     def test_generate_mailing_no_reader(self, mock_reader_func):
         """Test generate_mailing when reader fails to initialize"""
         param = Mock()
@@ -1182,7 +1182,7 @@ def test_generate_mailing_from_to_index():
         ["5@ex.com"]
     ]
 
-    with patch("sendMail._get_subscriber_reader", return_value=(iter(rows), None)):
+    with patch("sendMail.get_subscriber_reader", return_value=(iter(rows), None)):
         result = sendMail.generate_mailing(param)
         assert result == "OK"
 
@@ -1207,7 +1207,7 @@ def test_generate_mailing_hourly_limit():
         ["2@ex.com"]
     ]
 
-    with patch("sendMail._get_subscriber_reader", return_value=(iter(rows), None)):
+    with patch("sendMail.get_subscriber_reader", return_value=(iter(rows), None)):
         with patch("sendMail.sleep") as mock_sleep:
             sendMail.generate_mailing(param)
             # Should have called sleep(3600) once
@@ -1351,13 +1351,13 @@ def test_generate_mailing_batching_and_filtering():
         ["active", "White", "Alice", "4@ex.com", "", "Test", ""],
     ]
 
-    with patch("sendMail._get_subscriber_reader", return_value=(iter(rows), None)):
+    with patch("sendMail.get_subscriber_reader", return_value=(iter(rows), None)):
         # Important: when profile is artscroises, it calls send_gmail if service is not None
         # OR it calls send_mail if service IS None.
         # Let's ensure send_mail is called by keeping service as None.
         with patch("sendMail.get_gmail_service", return_value=None):
             # Patch send_mail in sendMail module
-            with patch("sendMail._format_message") as mock_sm:
+            with patch("sendMail.format_message") as mock_sm:
                 sendMail.generate_mailing(param)
                 # Should have sent 2 batches (total 3 active recipients, max 2 per mail)
                 assert mock_sm.call_count == 2
@@ -1523,13 +1523,13 @@ def test_send_mail_retry_and_verbose():
     message.as_string.return_value = "msg_string"
     recipients = ["to@example.com"]
 
-    with patch("sendMail._get_smtp_connection") as mock_conn_func:
+    with patch("sendMail.get_smtp_connection") as mock_conn_func:
         mock_conn = MagicMock()
         mock_conn_func.return_value = mock_conn
         # Fail first, succeed second
         mock_conn.sendmail.side_effect = [sendMail.SMTPException("Error"), None]
         with patch("sendMail.sleep"):
-            with patch("sendMail._save_to_sent"):
+            with patch("sendMail.save_to_sent"):
                 sendMail.send_mail(param, message, recipients)
                 assert mock_conn.sendmail.call_count == 2
 
@@ -1595,7 +1595,7 @@ def test_process_profile_message_replacement_and_password_prompt():
 
     with patch("sendMail.get_secret", return_value=secret_config), \
             patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
-            patch("sendMail._get_newsletter_name") as mock_get_news, \
+            patch("sendMail.get_newsletter_name") as mock_get_news, \
             patch("sendMail.getpass", return_value="secret_pass") as mock_getpass, \
             patch("sendMail.generate_mailing", return_value="OK"):
         # Mock _get_newsletter_name to set a specific name
@@ -1634,7 +1634,7 @@ def test_process_profile_test_filter():
 
     with patch("sendMail.get_secret", return_value=secret_config), \
             patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
-            patch("sendMail._get_newsletter_name", side_effect=lambda f, a: a), \
+            patch("sendMail.get_newsletter_name", side_effect=lambda f, a: a), \
             patch("sendMail.generate_mailing", return_value="OK") as mock_generate:
         result = sendMail.process_profile(args)
 

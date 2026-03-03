@@ -213,8 +213,8 @@ class TestCoverageGap:
         # 1 image + 1 html part + 1 pdf + 1 txt = 4 parts expected in some structure
         # Mixed -> [Related -> [HTML, Image], PDF, TXT]
         assert len(msg.get_payload()) >= 2 # Mixed contains Related and others
-        
-    @patch('sendMail._get_subscriber_reader')
+
+    @patch('sendMail.get_subscriber_reader')
     def test_generate_mailing_missing_config(self, mock_reader):
         """Cover lines 610-611: AttributeError in generate_mailing"""
         param = Mock()
@@ -225,7 +225,7 @@ class TestCoverageGap:
             assert res == "Error"
             mock_log.critical.assert_called_once()
 
-    @patch('sendMail._get_subscriber_reader')
+    @patch('sendMail.get_subscriber_reader')
     @patch('sendMail.sleep')
     @patch('sendMail.send_mail')
     @patch('sendMail.build_email')
@@ -325,7 +325,7 @@ class TestCoverageGap:
                 assert res is None
                 mock_log.error.assert_called_once()
 
-    @patch('sendMail._get_smtp_connection')
+    @patch('sendMail.get_smtp_connection')
     def test_send_mail_error(self, mock_get_conn):
         """Cover lines 828-831: SMTPException in send_mail"""
         param = Mock()
