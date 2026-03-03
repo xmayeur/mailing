@@ -239,7 +239,7 @@ def prepare_html_for_cid(in_filepath):
     return str(soup), image_paths
 
 
-def _get_subscriber_reader(param):
+def get_subscriber_reader(param):
     """
     Returns a reader object and file handle for retrieving subscriber
     data based on the given parameter. The function retrieves the data
@@ -268,7 +268,7 @@ def _get_subscriber_reader(param):
         return None, None
 
 
-def _get_indices(header):
+def get_indices(header):
     """
     Create a dictionary that maps each header element to its corresponding
     index in the list of headers.
@@ -282,7 +282,7 @@ def _get_indices(header):
     return {h: i for i, h in enumerate(header)}
 
 
-def _get_smtp_connection(param):
+def get_smtp_connection(param):
     """
     Open a connection to the SMTP server.
     :param param:
@@ -341,7 +341,7 @@ def get_gmail_service(param):
     return build('gmail', 'v1', credentials=creds)
 
 
-def _save_to_sent(param, msg):
+def save_to_sent(param, msg):
     """
     Store the message in the Sent folder using IMAP.
     :param param:
@@ -450,7 +450,7 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
     return str(soup), inline_images, temp_dir
 
 
-def _format_message(template, row, header):
+def format_message(template, row, header):
     """
     Formats a message template by replacing placeholders with corresponding values
     from the `row` list, based on the column names provided in the `header`.
@@ -659,8 +659,9 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     if bcc:
         msg["Bcc"] = bcc
     msg["Date"] = email.utils.formatdate(localtime=True)
-    if param.profile == 'artscroises':
-        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="artscroises.be")
+
+    if param.domain:
+        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain=param.domain)
     # elif param.profile == 'cambristi':
     #    msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
 
@@ -755,14 +756,14 @@ def generate_mailing(param):
         log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
 
-    reader, csvfile = _get_subscriber_reader(param)
+    reader, csvfile = get_subscriber_reader(param)
     if not reader:
         return "Error"
 
     try:
         header = next(reader, None)
         if not header: return "Error"
-        indices = _get_indices(header)
+        indices = get_indices(header)
 
         # Skip initial records if requested
         current_row_idx = 1
@@ -790,9 +791,8 @@ def generate_mailing(param):
             #     if _filter_cambristi(param, row, indices, param.test):
             #         continue
             # else:
-            if _filter(param.filter, row, indices):
+            if filter(param.filter, row, indices):
                     continue
-
 
             if param.verbose:
                 print(row[indices["email"]])
@@ -802,7 +802,7 @@ def generate_mailing(param):
 
             if len(addressees) >= max_add:
                 log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
-                msg_body = _format_message(param.message, row, header)
+                msg_body = format_message(param.message, row, header)
                 if not param.donotsend:
                     msg, recipients = build_email(param=param, subject=param.subject, message=msg_body,
                               bcc=",".join(addressees), attachments=param.file)
@@ -831,7 +831,7 @@ def generate_mailing(param):
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
-            msg_body = _format_message(param.message, row, header)
+            msg_body = format_message(param.message, row, header)
             if not param.donotsend:
                 msg, recipients = build_email(param=param, subject=param.subject, message=msg_body,
                                   bcc=",".join(addressees), attachments=param.file)
@@ -848,7 +848,7 @@ def generate_mailing(param):
         if csvfile: csvfile.close()
 
 
-def _filter(filter, row, indices):
+def filter(filter, row, indices):
     """
     Evaluates a set of filtering conditions on a given row of data using field indices.
 
@@ -1031,7 +1031,7 @@ def send_mail(param=None,message=None, recipients=None):
         log.info(f"Sending email to {recipients}")
     success = False
     for attempt in range(2):
-        conn = _get_smtp_connection(param)
+        conn = get_smtp_connection(param)
         if conn:
             try:
                 conn.sendmail(message["From"], recipients, message.as_string())
@@ -1046,10 +1046,10 @@ def send_mail(param=None,message=None, recipients=None):
                     sleep(10)
 
     if success:
-        _save_to_sent(param, message)
+        save_to_sent(param, message)
 
 
-def _get_newsletter_name(files, args):
+def get_newsletter_name(files, args):
     """
     Parses given files and updates newsletter-related attributes in the provided arguments.
 
@@ -1101,7 +1101,7 @@ def process_profile(args):
     body_txt = args.body if args.body else ""
     args.newsletter_name = ""
 
-    args = _get_newsletter_name(files, args)
+    args = get_newsletter_name(files, args)
     if not args.message:
         args.message = config["default_message"]
         args.message = args.message.replace("${newsletter_name}", args.newsletter_name)
