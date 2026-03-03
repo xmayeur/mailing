@@ -980,74 +980,6 @@ def _filter(filter, row, indices):
 
     return not result
 
-# def _filter_artscroises(param, row, indices):
-#     """
-#     Filters rows based on specific conditions such as status, group, selection,
-#     and email presence. The function evaluates multiple constraints using the
-#     provided parameters, data row, and column indices to determine the
-#     exclusion or inclusion of the row.
-#
-#     :param param: An object containing filtering options such as test mode
-#         and selection criteria.
-#     :type param: Any
-#     :param row: A list or array representing a single row of data to be
-#         evaluated by the filter.
-#     :type row: list
-#     :param indices: A dictionary mapping column names to their respective
-#         indices in the row for easy access to specific data points.
-#     :type indices: dict
-#     :return: A boolean value. True if the row should NOT pass the filter
-#         (i.e., be excluded), False if it should pass.
-#     :rtype: bool
-#     """
-#     is_active = row[indices["status"]] == "active"
-#     is_test_match = not param.test or "Test" in row[indices["group"]]
-#     is_selected = (
-#             not param.selected or row[indices["selected"]].lower() == "x"
-#     )
-#     has_email = bool(row[indices["email"]])
-#     return not (is_active and is_test_match and is_selected and has_email)
-#
-#
-# def _filter_cambristi(param, row, indices, test):
-#     """
-#     Filters data based on specific conditions related to membership status and test mode.
-#
-#     This function implements a filtering mechanism to process a given row of data based on
-#     conditions defined by the input parameters. It differentiates behaviors depending on
-#     whether the test mode is enabled or not.
-#
-#     :param param: Context-specific parameter used for processing. Implementation details
-#                   of this parameter are not specified in the function body.
-#     :type param: Any
-#     :param row: The current row of data to process.
-#     :type row: List[Any]
-#     :param indices: A dictionary mapping relevant column names to their respective indices
-#                     in the row.
-#     :type indices: Dict[str, int]
-#     :param test: A flag indicating whether the function operates in test mode (`True`) or
-#                  normal mode (`False`).
-#     :type test: bool
-#     :return: Indicates whether the row passes the filtering conditions.
-#              Returns `True` if the row does not satisfy the filtering criteria and should
-#              be excluded; `False` otherwise.
-#     :rtype: bool
-#     """
-#     if test:
-#         try:
-#             return not ('test' in row[indices["title"]] )
-#         except IndexError:
-#             log.warning(f"No title in row {row[indices['nom']]}, {row[indices['prenom']]}")
-#             return True
-#     else:
-#         try:
-#             is_active = row[indices["title"]] in param.filter
-#             has_mail = bool(row[indices["email"]])
-#             bounced = bool(row[indices["emailBounced"]])
-#             return not (is_active and has_mail and not bounced)
-#         except IndexError:
-#             return True
-
 
 def send_gmail(service,message=None):
     """
@@ -1152,15 +1084,9 @@ def _get_newsletter_name(files, args):
     return args
 
 
-def process_artscroises(args):
+def process_profile(args):
     """
-    Processes and configures the Arts Croisés mailing workflow including handling of
-    attachments, configuration settings, and messaging details derived from the provided
-    arguments and configurations.
 
-    :param args: Parsed arguments containing configuration details for mailing options.
-    :type args: argparse.Namespace
-    :return: None
     """
     config = args.conf[args.profile]
     # config overrides secret data
@@ -1170,29 +1096,16 @@ def process_artscroises(args):
         sys.exit(1)
     config = {**secret, **config }
 
-    # and args overrides config data
-    if config["max_mails_per_hour"]:
-        args.max_addr_per_mail = int(config["max_addr_per_mail"])
-    if config["max_addr_per_mail"]:
-        args.max_mails_per_hour = int(config["max_mails_per_hour"])
-    if config["pause"]:
-        args.pause = int(config["pause"])
-
     files, service, google_drive_files = process_attachments(args, config)
 
     body_txt = args.body if args.body else ""
     args.newsletter_name = ""
 
     args = _get_newsletter_name(files, args)
-
     if not args.message:
-        args.message = f"\nChers amies et amis des Arts Croisés,\n{body_txt}\nVeuillez trouver en pièce jointe notre newsletter {args.newsletter_name}.\nBonne lecture!\n\nL'équipe Arts Croisés, asbl.\n"
-
-    if args.wait:
-        log.info(f"Start sending in {args.wait} minutes")
-        for i in range(args.wait):
-            print(f"Sleeping for {args.wait - i} minutes      \r", end="", flush=True)
-            sleep(60)
+        args.message = config["default_message"]
+        args.message = args.message.replace("${newsletter_name}", args.newsletter_name)
+        args.message = args.message.replace("${body}", body_txt)
 
     config.update(vars(args))
     if "password" not in config:
@@ -1202,7 +1115,7 @@ def process_artscroises(args):
     param.file = files  # Mise à jour explicite des fichiers filtrés
 
     if param.test:
-        param.filter['group'] = 'is Test'
+        param.filter = param.filter_test
 
     if generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:
@@ -1212,40 +1125,6 @@ def process_artscroises(args):
         return "OK"
     else:
         return "Error"
-
-
-def process_other_profile(args):
-    """
-    Processes and sends emails with optional attachment handling and message body
-    generation based on the provided profile configuration.
-
-    This function initializes the configuration based on the provided arguments,
-    combines it with secret configuration data, and processes any attachments.
-    It then uses the updated configuration to create and send mailing content
-    through a specified email service.
-
-    :param args: The argparse.Namespace object containing the command-line
-        arguments, including profile and other configurations.
-    :returns: None
-    """
-    config = args.conf[args.profile]
-    # config overrides secret data
-    if "MAILCONFIG" in config:
-        config = {**get_secret(config["MAILCONFIG"]), **config }
-    if config is None:
-        log.critical("No secret configuration found")
-        sys.exit(1)
-    files, service, google_drive_files = process_attachments(args, config)
-    args = _get_newsletter_name(files, args)
-
-    config.update(vars(args))
-    param = Dict2Class(config)
-    param.file = files
-
-    if args.test:
-        param.filter["title"] = "in Test, test"
-
-    return generate_mailing(param)
 
 
 def setup_argparse():
@@ -1327,10 +1206,8 @@ def main():
         print("Missing subject and message text or file")
         sys.exit(-1)
 
-    if args.profile == "artscroises":
-        sys.exit(0 if process_artscroises(args) == "OK" else -1)
-    elif args.profile:
-        sys.exit(0 if process_other_profile(args) == "OK" else -1)
+    if args.profile:
+        sys.exit(0 if process_profile(args) == "OK" else -1)
     else:
         log.critical("No profile specified")
         sys.exit(-1)

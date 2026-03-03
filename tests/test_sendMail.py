@@ -947,44 +947,24 @@ class TestProcessFunctions:
                 "MAILCONFIG": "secret_id",
                 "max_mails_per_hour": 100,
                 "max_addr_per_mail": 10,
-                "pause": 1
+                "pause": 1,
+                "default_message": "hello ${body_txt}, here the file ${news_letter_name}"
             }
         }
-        args.body = None
+        args.body = "Buddy"
         args.subject = None
         args.wait = None
         args.test = False
+        args.message = None
         
         mock_get_secret.return_value = {"password": "secret_password"}
         mock_proc_attach.return_value = (["test.pdf"], None, [])
         mock_generate.return_value = "OK"
-        
-        result = sendMail.process_artscroises(args)
+        mock_getpass.return_value = "secret_password"
+
+        result = sendMail.process_profile(args)
         assert result == "OK"  # returns None
         mock_generate.assert_called_once()
-
-    @patch('sendMail.get_secret')
-    @patch('sendMail.process_attachments')
-    @patch('sendMail.generate_mailing')
-    def test_process_cambristi_success(self, mock_generate, mock_proc_attach, mock_get_secret):
-        """Test process_cambristi success path"""
-        args = Mock()
-        args.profile = "cambristi"
-        args.conf = {
-            "cambristi": {
-                "MAILCONFIG": "secret_id"
-            }
-        }
-        args.test = False
-        
-        mock_get_secret.return_value = {"some": "config"}
-        mock_proc_attach.return_value = (["test.html"], None, [])
-        mock_generate.return_value = "OK"
-
-        result = sendMail.process_other_profile(args)
-        assert result == 'OK'
-        mock_generate.assert_called_once()
-
 
 def test_module_imports():
     """Test that the module imports successfully"""
@@ -1053,7 +1033,6 @@ def test_get_smtp_connection_generic_exception():
     with patch("sendMail.SMTP", side_effect=Exception("Connection failed")):
         conn = sendMail._get_smtp_connection(param)
         assert conn is None
-
 
 def test_save_to_sent_verbose_and_retry_exhaustion():
     """Test _save_to_sent with verbose output and when retries are exhausted"""
@@ -1141,6 +1120,7 @@ def test_md2html_custom_styles():
 def test_md2html_file_not_found():
     html_file = sendMail.md2html("non_existent.md")
     assert html_file is None
+
 
 def test_build_email_max_addr_1():
     """Test build_email when max_addr_per_mail is 1"""
@@ -1259,7 +1239,7 @@ def test_process_artscroises_wait_and_no_config():
     with patch("sendMail.get_secret") as mock_gs:
         mock_gs.return_value = None
         with pytest.raises(SystemExit):
-            sendMail.process_artscroises(args)
+            sendMail.process_profile(args)
 
     # Test with wait
     args.wait = 1
@@ -1284,7 +1264,7 @@ def test_process_artscroises_wait_and_no_config():
                 with patch("sendMail.generate_mailing", return_value="OK"):
                     # Mock getpass to avoid interactive prompt
                     with patch("sendMail.getpass", return_value="pass"):
-                        sendMail.process_artscroises(args)
+                        sendMail.process_profile(args)
 
 
 def test_main_no_profile():
@@ -1409,7 +1389,7 @@ def test_process_artscroises_wait_and_cleanup():
             with patch("sendMail.generate_mailing", return_value="OK"):
                 with patch("os.rename") as mock_rename:
                     with patch("os.remove") as mock_remove:
-                        sendMail.process_artscroises(args)
+                        sendMail.process_profile(args)
                         # Verify cleanup/rename if applicable (though in mock it might not reach)
 
 
@@ -1483,8 +1463,6 @@ def test_process_cambristi():
                                 # print(pytest_wrapped_e)
                                 # assert pytest_wrapped_e.type == SystemExit
                                 # assert pytest_wrapped_e.value.code == 42
-
-
 
 
 def test_filter_artscroises_branches():
@@ -1597,6 +1575,79 @@ def test_make_html_images_inline():
             html_content = f.read()
             assert "data:image/png;base64," in html_content
             assert "src=\"data:image/png;base64," in html_content
+
+
+def test_process_profile_message_replacement_and_password_prompt():
+    """Tests lines 1186-1190 and 1194 of sendMail.py"""
+    args = MagicMock()
+    args.profile = "test_profile"
+    args.conf = {
+        "test_profile": {
+            "MAILCONFIG": "dummy_config",
+            "default_message": "Newsletter: ${newsletter_name}, Body: ${body}"
+        }
+    }
+    args.body = "Test Body Content"
+    args.message = None  # To trigger lines 1187-1190
+    args.test = False
+
+    secret_config = {"MAILCONFIG": "dummy_config"}  # No password here to trigger line 1194
+
+    with patch("sendMail.get_secret", return_value=secret_config), \
+            patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
+            patch("sendMail._get_newsletter_name") as mock_get_news, \
+            patch("sendMail.getpass", return_value="secret_pass") as mock_getpass, \
+            patch("sendMail.generate_mailing", return_value="OK"):
+        # Mock _get_newsletter_name to set a specific name
+        def side_effect(files, a):
+            a.newsletter_name = "MyNewsletter"
+            return a
+
+        mock_get_news.side_effect = side_effect
+
+        result = sendMail.process_profile(args)
+
+        # Verify lines 1187-1190: message was replaced
+        assert args.message == "Newsletter: MyNewsletter, Body: Test Body Content"
+
+        # Verify line 1194: getpass was called
+        mock_getpass.assert_called_once_with("Enter mail user's password")
+
+        assert result == "OK"
+
+
+def test_process_profile_test_filter():
+    """Tests line 1200 of sendMail.py"""
+    args = MagicMock()
+    args.profile = "test_profile"
+    args.conf = {
+        "test_profile": {
+            "MAILCONFIG": "dummy_config",
+            "filter_test": {"title": "Test Filter"}
+        }
+    }
+    args.body = ""
+    args.message = "Direct message"
+    args.test = True  # To trigger line 1200
+
+    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
+
+    with patch("sendMail.get_secret", return_value=secret_config), \
+            patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
+            patch("sendMail._get_newsletter_name", side_effect=lambda f, a: a), \
+            patch("sendMail.generate_mailing", return_value="OK") as mock_generate:
+        result = sendMail.process_profile(args)
+
+        # Verify line 1200: param.filter was set to param.filter_test
+        # We check the call to generate_mailing to see what 'param' looked like
+        # param is a Dict2Class instance
+        called_param = mock_generate.call_args[0][0]
+        assert called_param.test is True
+        assert called_param.filter == {"title": "Test Filter"}
+
+        # When args.test is True, process_profile returns "Error"
+        # because of "and not args.test" in "if generate_mailing(param) == "OK" and not args.test:"
+        assert result == "Error"
 
 
 if __name__ == '__main__':
