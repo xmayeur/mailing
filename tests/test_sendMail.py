@@ -133,13 +133,13 @@ class TestIndicesHelper:
     def test_get_indices_basic(self):
         """Test basic index mapping"""
         header = ["name", "email", "status"]
-        result = sendMail._get_indices(header)
+        result = sendMail.get_indices(header)
         assert result == {"name": 0, "email": 1, "status": 2}
 
     def test_get_indices_empty(self):
         """Test with empty header"""
         header = []
-        result = sendMail._get_indices(header)
+        result = sendMail.get_indices(header)
         assert result == {}
 
 
@@ -152,7 +152,7 @@ class TestFormatMessage:
         row = ["John", "john@example.com"]
         header = ["name", "email"]
 
-        result = sendMail._format_message(template, row, header)
+        result = sendMail.format_message(template, row, header)
         assert "John" in result
 
     def test_format_message_multiple_vars(self):
@@ -161,7 +161,7 @@ class TestFormatMessage:
         row = ["John", "Doe", "john@example.com"]
         header = ["first_name", "last_name", "email"]
 
-        result = sendMail._format_message(template, row, header)
+        result = sendMail.format_message(template, row, header)
         assert "John" in result
         assert "Doe" in result
 
@@ -172,7 +172,7 @@ class TestFormatMessage:
         header = ["name"]
 
         # Should return original template on error
-        result = sendMail._format_message(template, row, header)
+        result = sendMail.format_message(template, row, header)
         assert result == template
 
 class TestFilterFunctions:
@@ -191,7 +191,7 @@ class TestFilterFunctions:
         row = ["active", "Test Group", "x", "test@example.com"]
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
 
-        result = sendMail._filter(param.filter, row, indices)
+        result = sendMail.filter(param.filter, row, indices)
         assert result == False  # Should NOT be filtered (passes filter)
 
     def test_filter_artscroises_inactive(self):
@@ -208,7 +208,7 @@ class TestFilterFunctions:
         row = ["inactive", "Group", "", "test@example.com"]
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
 
-        result = sendMail._filter(param.filter, row, indices)
+        result = sendMail.filter(param.filter, row, indices)
         assert result == True  # Should be filtered (doesn't pass)
 
     def test_filter_cambristi_member(self):
@@ -223,7 +223,7 @@ class TestFilterFunctions:
         row = ["member", "John", "Doe", "test@example.com", ""]
         indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3, "emailBounced": 4}
 
-        result = sendMail._filter(param.filter, row, indices)
+        result = sendMail.filter(param.filter, row, indices)
         assert result == False  # Should NOT be filtered
 
     def test_filter_cambristi_test_mode(self):
@@ -238,7 +238,7 @@ class TestFilterFunctions:
         row = ["Test", "John", "Doe", "test@example.com"]
         indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
 
-        result = sendMail._filter(param.filter, row, indices)
+        result = sendMail.filter(param.filter, row, indices)
         assert result == True  # Should NOT be filtered
 
 
@@ -550,7 +550,7 @@ class TestSMTPConnection:
         mock_conn = Mock()
         mock_smtp.return_value = mock_conn
 
-        result = sendMail._get_smtp_connection(param)
+        result = sendMail.get_smtp_connection(param)
 
         assert result == mock_conn
         mock_conn.starttls.assert_called_once()
@@ -573,7 +573,7 @@ class TestSMTPConnection:
         mock_smtp.return_value = mock_conn
 
         with pytest.raises(SystemExit):
-            sendMail._get_smtp_connection(param)
+            sendMail.get_smtp_connection(param)
 
 
 class TestEmailSending:
@@ -594,7 +594,7 @@ class TestEmailSending:
         msg.as_string.return_value = "email content"
 
         # Should not raise; it logs error after retries
-        sendMail._save_to_sent(param, msg)
+        sendMail.save_to_sent(param, msg)
         # sleep should have been called twice (between 3 attempts)
         assert mock_sleep.call_count == 2
 
@@ -654,7 +654,7 @@ class TestEmailSending:
         msg = Mock()
         msg.as_string.return_value = "email content"
 
-        sendMail._save_to_sent(param, msg)
+        sendMail.save_to_sent(param, msg)
 
         mock_conn.login.assert_called_once()
         mock_conn.append.assert_called_once()
@@ -697,7 +697,7 @@ class TestGetSubscriberReader:
         mock_open.return_value = mock_wb
         mock_read.return_value = [["header1", "header2"], ["data1", "data2"]]
 
-        reader, csvfile = sendMail._get_subscriber_reader(param)
+        reader, csvfile = sendMail.get_subscriber_reader(param)
 
         assert csvfile is None
         assert reader is not None
@@ -708,7 +708,7 @@ class TestGetSubscriberReader:
         param = Mock()
         param.database = "test.csv"
 
-        reader, csvfile = sendMail._get_subscriber_reader(param)
+        reader, csvfile = sendMail.get_subscriber_reader(param)
 
         assert reader is not None
         assert csvfile is not None
@@ -921,7 +921,7 @@ class TestGetNewsletterName:
         args.newsletter_name = ""
 
         files = [str(md_path), str(body_path)]
-        updated = sendMail._get_newsletter_name(files, args)
+        updated = sendMail.get_newsletter_name(files, args)
 
         assert updated.subject == "MyNewsletter"
         assert updated.newsletter_name == "MyNewsletter.md"  # contains "letter"
@@ -1020,7 +1020,7 @@ def test_get_subscriber_reader_file_not_found():
     param = MagicMock()
     param.database = "non_existent.csv"
     with patch("builtins.open", side_effect=FileNotFoundError):
-        reader, csvfile = sendMail._get_subscriber_reader(param)
+        reader, csvfile = sendMail.get_subscriber_reader(param)
         assert reader is None
         assert csvfile is None
 
@@ -1031,7 +1031,7 @@ def test_get_smtp_connection_generic_exception():
     param.smtp_host = "smtp.example.com"
     param.smtp_port = 587
     with patch("sendMail.SMTP", side_effect=Exception("Connection failed")):
-        conn = sendMail._get_smtp_connection(param)
+        conn = sendMail.get_smtp_connection(param)
         assert conn is None
 
 def test_save_to_sent_verbose_and_retry_exhaustion():
@@ -1048,7 +1048,7 @@ def test_save_to_sent_verbose_and_retry_exhaustion():
         # Succeed on second attempt
         mock_instance.login.side_effect = [Exception("Fail"), None]
         with patch("sendMail.sleep"):  # Don't actually sleep
-            sendMail._save_to_sent(param, msg)
+            sendMail.save_to_sent(param, msg)
             assert mock_instance.login.call_count == 2
 
     # Test retry exhaustion
@@ -1056,7 +1056,7 @@ def test_save_to_sent_verbose_and_retry_exhaustion():
         mock_instance = mock_imap.return_value
         mock_instance.login.side_effect = Exception("Permanent Fail")
         with patch("sendMail.sleep"):
-            sendMail._save_to_sent(param, msg)
+            sendMail.save_to_sent(param, msg)
             assert mock_instance.login.call_count == 3
 
 
@@ -1225,7 +1225,7 @@ def test_filter_cambristi_index_error():
     indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
     row = ["only one col"]
 
-    assert sendMail._filter(param.filter, row, indices) == True
+    assert sendMail.filter(param.filter, row, indices) == True
 
 
 
@@ -1479,19 +1479,19 @@ def test_filter_artscroises_branches():
 
     # Bounced row (should be filtered -> True)
     row_bounced = ["bounced", "", "Test", "", "test@ex.com"]
-    assert sendMail._filter(param.filter, row_bounced, indices) == True
+    assert sendMail.filter(param.filter, row_bounced, indices) == True
 
     # Filtered out title (should be filtered -> True)
     row_inactive = ["inactive", "", "Test", "", "test@ex.com"]
-    assert sendMail._filter(param.filter, row_inactive, indices) == True
+    assert sendMail.filter(param.filter, row_inactive, indices) == True
 
     # Active (should NOT be filtered -> False)
     row_active = ["active", "", "Test", "", "test@ex.com"]
-    assert sendMail._filter(param.filter, row_active, indices) == False
+    assert sendMail.filter(param.filter, row_active, indices) == False
 
     # No email (should be filtered -> True)
     row_no_email = ["active", "", "Test", "", ""]
-    assert sendMail._filter(param.filter, row_no_email, indices) == True
+    assert sendMail.filter(param.filter, row_no_email, indices) == True
 
 
 def test_get_newsletter_name_branches():
@@ -1505,12 +1505,12 @@ def test_get_newsletter_name_branches():
 
     # _get_newsletter_name modifies files and args. It returns updated args.
     files = ["news.md", "body.html"]
-    updated = sendMail._get_newsletter_name(files, args)
+    updated = sendMail.get_newsletter_name(files, args)
     assert updated.subject == "news"
 
     args.md = None
     args.subject = None
-    updated = sendMail._get_newsletter_name(["body.html"], args)
+    updated = sendMail.get_newsletter_name(["body.html"], args)
     assert updated.subject == "body"
 
 
