@@ -23,6 +23,21 @@ artscroises:
   filter:
     email: is not empty
     status: is active
+  filter_test:
+    email: is not empty
+    status: is active
+    group: is Test
+  default_message: |
+    
+    Chers amies et amis des Arts Croisés,
+    ${body}
+    Veuillez trouver en pièce jointe notre newsletter '${newsletter_name}'.
+    Bonne lecture!
+    
+    L'équipe Arts Croisés, asbl.
+
+
+
 
 cambristi:
   SCOPES:
@@ -47,7 +62,10 @@ cambristi:
     title: in member, participant, inactive
     email: is not empty
     emailBounced: is not True
-  # styles: "./css/styles.css"
+  filter_test:
+    title: in test, Test
+    email: is not empty
+  styles: "./css/styles.css"
 
 default:
   styles: "./css/styles.css"
