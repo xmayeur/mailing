@@ -981,19 +981,19 @@ def filter(filter, row, indices):
     return not result
 
 
-def send_gmail(service,message=None):
+def send_gmail(service, message=None):
     """
-    This function is used to send an email using the Gmail API. The provided `service`
-    object facilitates interaction with the Gmail API. An input `message` object must
-    also be provided, containing the email to be sent. The function encodes the email
-    in a URL-safe format and sends it using the API. In the case of an error during
-    transmission, the error is logged, and `None` is returned.
+    Sends an email message using the Gmail API.
 
-    :param service: A resource object with methods for interacting with the Gmail API.
-    :param message: An email message object containing the data to send. Should
-       implement the `as_bytes` method for conversion to raw bytes format.
-    :return: The API response on successful email sending, or `None` if an error
-       occurs.
+    This function encodes the message in Base64 and uses the provided Gmail service
+    to send the email. It handles errors and logs any failures.
+
+    :param service: An authorized Gmail API service instance.
+    :type service: googleapiclient.discovery.Resource
+    :param message: The email message as a MIME object.
+    :type message: MIMEMultipart or MIMEText
+    :return: The sent message resource if successful, None otherwise.
+    :rtype: dict or None
     """
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
@@ -1047,6 +1047,7 @@ def send_mail(param=None,message=None, recipients=None):
 
     if success:
         save_to_sent(param, message)
+    return success
 
 
 def get_newsletter_name(files, args):
@@ -1140,8 +1141,20 @@ def process_profile(args):
 def check_mandatory_param(param):
     """
     Validates that all mandatory parameters are present and correctly configured.
+
     This function ensures that required parameters for mailing operations are
-    set and valid before proceeding with the mailing process.
+    set and valid before proceeding with the mailing process. It checks for:
+
+    - **Common Parameters**: subject, sender, sendername, message.
+    - **Data Source**: either a CSV database path or (Google Service Account and Sheet ID).
+    - **Mailing Method**:
+        - *SMTP/IMAP mode*: smtp_host, smtp_port, imap_host, imap_port, username, password, sent_folder.
+        - *Gmail mode*: token_file, scopes, credentials_id.
+
+    :param param: An object containing configuration parameters.
+    :type param: Dict2Class
+    :return: True if all mandatory parameters are present, False otherwise.
+    :rtype: bool
     """
     ret = True
 
