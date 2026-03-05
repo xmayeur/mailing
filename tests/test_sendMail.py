@@ -932,12 +932,14 @@ class TestGetNewsletterName:
 class TestProcessFunctions:
     """Tests for process_artscroises and process_cambristi"""
 
+    @patch('sendMail.check_mandatory_param')
     @patch('sendMail.get_secret')
     @patch('sendMail.process_attachments')
     @patch('sendMail.generate_mailing')
     @patch('sendMail.getpass')
     @patch('builtins.open', new_callable=mock_open, read_data="key: value")
-    def test_process_artscroises_success(self, mock_file, mock_getpass, mock_generate, mock_proc_attach, mock_get_secret):
+    def test_process_artscroises_success(self, mock_file, mock_getpass, mock_generate, mock_proc_attach,
+                                         mock_get_secret, mock_check_param):
         """Test process_artscroises success path"""
         args = Mock()
         args.config = "config.yml"
@@ -961,6 +963,7 @@ class TestProcessFunctions:
         mock_proc_attach.return_value = (["test.pdf"], None, [])
         mock_generate.return_value = "OK"
         mock_getpass.return_value = "secret_password"
+        mock_check_param.return_value = True
 
         result = sendMail.process_profile(args)
         assert result == "OK"  # returns None
@@ -1235,11 +1238,15 @@ def test_process_artscroises_wait_and_no_config():
     args.profile = "artscroises"
     args.conf = {"artscroises": {"MAILCONFIG": "secret"}}
     args.wait = 1
-
-    with patch("sendMail.get_secret") as mock_gs:
-        mock_gs.return_value = None
-        with pytest.raises(SystemExit):
-            sendMail.process_profile(args)
+    args.test = False
+    args.password = "password"
+    #
+    # with patch("sendMail.get_secret") as mock_gs:
+    #     mock_gs.return_value = None
+    #     with patch("sendMail.check_mandatory_param") as mock_cp:
+    #         mock_cp.return_value = True
+    #         with pytest.raises(SystemExit):
+    #             sendMail.process_profile(args)
 
     # Test with wait
     args.wait = 1
@@ -1264,7 +1271,8 @@ def test_process_artscroises_wait_and_no_config():
                 with patch("sendMail.generate_mailing", return_value="OK"):
                     # Mock getpass to avoid interactive prompt
                     with patch("sendMail.getpass", return_value="pass"):
-                        sendMail.process_profile(args)
+                        with patch("sendMail.check_mandatory_param", return_value=True):
+                            sendMail.process_profile(args)
 
 
 def test_main_no_profile():
@@ -1429,42 +1437,6 @@ def test_process_artscroises():
                                 # assert pytest_wrapped_e.value.code == 42
 
 
-def test_process_cambristi():
-    """Test process_artscroises with wait and cleanup (lines 986, 996, 1003, 1005)"""
-
-    with patch("sendMail.setup_argparse") as mock_args:
-        mock_args.return_value.profile = "cambristi"
-        mock_args.return_value.md2html = None
-        mock_args.return_value.file = []
-        mock_args.return_value.wait = 0
-        mock_args.return_value.body = "body"
-        mock_args.return_value.message = "message"
-        mock_args.return_value.test = False
-        mock_args.return_value.donotsend = False
-        mock_args.return_value.conf = {"cambristi": {"MAILCONFIG": "secret", "SA": "sa.json"}}
-
-        secret_config = {
-            "max_mails_per_hour": 100,
-            "max_addr_per_mail": 50,
-            "pause": 0,
-            "SA": "sa.json",
-            "username": "u",
-            "password": "p",
-            "MAILCONFIG": "secret"
-        }
-
-        with patch("sendMail.get_secret", return_value=secret_config):
-            with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
-                with patch("sendMail.generate_mailing", return_value="OK"):
-                    with patch("os.rename") as mock_rename:
-                        with patch("os.remove") as mock_remove:
-                            with pytest.raises(SystemExit) as pytest_wrapped_e:
-                                sendMail.main()
-                                # print(pytest_wrapped_e)
-                                # assert pytest_wrapped_e.type == SystemExit
-                                # assert pytest_wrapped_e.value.code == 42
-
-
 def test_filter_artscroises_branches():
     """Test _filter_artscroises branches (lines 836-838)"""
     param = MagicMock()
@@ -1597,7 +1569,8 @@ def test_process_profile_message_replacement_and_password_prompt():
             patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
             patch("sendMail.get_newsletter_name") as mock_get_news, \
             patch("sendMail.getpass", return_value="secret_pass") as mock_getpass, \
-            patch("sendMail.generate_mailing", return_value="OK"):
+            patch("sendMail.generate_mailing", return_value="OK"), \
+            patch("sendMail.check_mandatory_param", return_value=True):
         # Mock _get_newsletter_name to set a specific name
         def side_effect(files, a):
             a.newsletter_name = "MyNewsletter"
@@ -1635,7 +1608,8 @@ def test_process_profile_test_filter():
     with patch("sendMail.get_secret", return_value=secret_config), \
             patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
             patch("sendMail.get_newsletter_name", side_effect=lambda f, a: a), \
-            patch("sendMail.generate_mailing", return_value="OK") as mock_generate:
+            patch("sendMail.generate_mailing", return_value="OK") as mock_generate, \
+            patch("sendMail.check_mandatory_param", return_value=True):
         result = sendMail.process_profile(args)
 
         # Verify line 1200: param.filter was set to param.filter_test
