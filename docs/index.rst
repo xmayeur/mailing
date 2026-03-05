@@ -27,8 +27,7 @@ Table of Contents
    :maxdepth: 2
    :caption: API Reference:
 
-   sendMail
-   googleDriveLib
+   modules
 
 
 Installation
