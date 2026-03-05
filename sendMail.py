@@ -1086,15 +1086,23 @@ def get_newsletter_name(files, args):
 
 def process_profile(args):
     """
+    Processes the user profile to configure and send a mailing task with attachments. The function
+    integrates configurations, manages secrets, processes attachments, and dynamically generates
+    and sends the mailing.
 
+    :param args: The argparse.Namespace object containing the configurations and command-line
+        arguments required for the mailing process.
+    :return: A string indicating the success or failure of the process. Returns "OK" if the
+        mailing was successfully sent; otherwise, returns "Error".
     """
     config = args.conf[args.profile]
     # config overrides secret data
     secret = get_secret(config["MAILCONFIG"])
     if secret is None:
-        log.critical("No secret configuration found")
-        sys.exit(1)
-    config = {**secret, **config }
+        log.warning("No secret configuration found")
+        # sys.exit(1)
+    else:
+        config = {**secret, **config}
 
     files, service, google_drive_files = process_attachments(args, config)
 
@@ -1117,6 +1125,8 @@ def process_profile(args):
     if param.test:
         param.filter = param.filter_test
 
+    if not check_mandatory_param(param):
+        return "Error"
     if generate_mailing(param) == "OK" and not args.test:
         for f in google_drive_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
@@ -1126,6 +1136,47 @@ def process_profile(args):
     else:
         return "Error"
 
+
+def check_mandatory_param(param):
+    """
+    Validates that all mandatory parameters are present and correctly configured.
+    This function ensures that required parameters for mailing operations are
+    set and valid before proceeding with the mailing process.
+    """
+    ret = True
+
+    # Parameters mandatory for ALL modes
+    common_params = ['subject', 'sender', 'sendername', 'message']
+    for p in common_params:
+        if not hasattr(param, p) or getattr(param, p) is None:
+            log.error(f"{p.replace('_', ' ').capitalize()} is mandatory")
+            ret = False
+
+    # Data source check
+    if not hasattr(param, 'database') and not (hasattr(param, 'sa') and hasattr(param, 'sheetid')):
+        log.error("Database path or (Service Account (SA) and SheetID) is mandatory")
+        ret = False
+
+    # Mailing method specific checks
+    if hasattr(param, 'smtp_host'):
+        # SMTP/IMAP mode
+        smtp_imap_params = ['smtp_port', 'imap_host', 'imap_port', 'username', 'password', 'sent_folder']
+        for p in smtp_imap_params:
+            if not hasattr(param, p) or getattr(param, p) is None:
+                log.error(f"{p.replace('_', ' ').upper()} is mandatory for SMTP/IMAP mode")
+                ret = False
+    else:
+        # Gmail mode
+        gmail_params = ['token_file', 'scopes', 'credentials_id']
+        for p in gmail_params:
+            if not hasattr(param, p) or getattr(param, p) is None:
+                log.error(f"{p.replace('_', ' ').capitalize()} is mandatory for Gmail mode")
+                ret = False
+
+    if not ret:
+        log.critical("Please check and update your configuration file")
+
+    return ret
 
 def setup_argparse():
     """
