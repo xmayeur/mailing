@@ -89,7 +89,7 @@ Message Processing
 
 .. autofunction:: sendMail.generate_mailing
    :no-index:
-.. autofunction:: sendMail.process_attachments:
+.. autofunction:: sendMail.process_attachments
    :no-index:
 
 SMTP & IMAP
@@ -98,6 +98,12 @@ SMTP & IMAP
 .. autofunction:: sendMail.get_smtp_connection
    :no-index:
 .. autofunction:: sendMail.save_to_sent
+   :no-index:
+
+Configuration & Validation
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: sendMail.check_mandatory_param
    :no-index:
 
 Filtering & Data Processing
