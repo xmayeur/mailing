@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 def test_filter():
     filter = {}
-    assert sendMail._filter(filter, {}, {}) == False
+    assert sendMail.filter(filter, {}, {}) == False
 
 
 def test_filter_with_data():
@@ -54,41 +54,41 @@ def test_filter_with_data():
     }
 
     row = ['xavier@mayeur.be', '', 100, 'Xavier', 'Mayeur', 'True']
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     filter['email'] = "is not xavier@mayeur.be"
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     filter['email'] = "is not empty"
     filter['first_name'] = "one of Jean, Arthur"
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     filter['first_name'] = "in Jean, Xavier"
     filter['cotisation'] = "gt 200"
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     filter['cotisation'] = "gt xxx"
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     filter = {"selected": "is True"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     row[2] = "15.0"
     filter = {"cotisation": "eq 15.0"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     filter = {"cotisation": "gt 14.0"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     filter = {"cotisation": "le 16.0"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     filter = {"cotisation": "le 15.0"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     filter = {"cotisation": "ge 15.0"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     filter = {"cotisation": "lt 15.0"}
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     filter = {"cotisation": "ne 15.0"}
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     row[5] = ""
     filter = {"selected": "is empty"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False
     filter = {"selected": "has None"}
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     filter = {"SSelected": "is not empty"}
-    assert sendMail._filter(filter, row, indices) == True
+    assert sendMail.filter(filter, row, indices) == True
     row[5] = "True"
     filter = {"selected": "not in x, y, X, Yes"}
-    assert sendMail._filter(filter, row, indices) == False
+    assert sendMail.filter(filter, row, indices) == False

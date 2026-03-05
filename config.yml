@@ -19,6 +19,7 @@ artscroises:
   database: data/Subscribers.csv
   SHEETID: "artscroisesDBmembreID"
   SA: "artscroisesServiceAccount"
+  domain: "artscroises.be"
   styles: "./css/styles.css"
   filter:
     email: is not empty

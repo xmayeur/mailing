@@ -63,7 +63,7 @@ class TestCoverageGap:
         mock_open_sheet.return_value = mock_wb
         
         with patch('sendMail.readAllSheet', return_value=[['header'], ['row']]):
-            reader, handle = sendMail._get_subscriber_reader(param)
+            reader, handle = sendMail.get_subscriber_reader(param)
             assert handle is None
             assert list(reader) == [['header'], ['row']]
 
@@ -72,7 +72,7 @@ class TestCoverageGap:
         param = Mock()
         param.database = "nonexistent.csv"
         with patch('sendMail.log') as mock_log:
-            reader, handle = sendMail._get_subscriber_reader(param)
+            reader, handle = sendMail.get_subscriber_reader(param)
             assert reader is None
             assert handle is None
             mock_log.critical.assert_called_once()
@@ -85,7 +85,7 @@ class TestCoverageGap:
         param.smtp_port = 587
         mock_smtp.side_effect = Exception("Connection error")
         with patch('sendMail.log') as mock_log:
-            conn = sendMail._get_smtp_connection(param)
+            conn = sendMail.get_smtp_connection(param)
             assert conn is None
             mock_log.error.assert_called_once()
 
@@ -127,7 +127,7 @@ class TestCoverageGap:
         mock_imap_ssl.return_value = mock_imap
         
         with patch('sendMail.log') as mock_log:
-            sendMail._save_to_sent(param, msg)
+            sendMail.save_to_sent(param, msg)
             mock_log.info.assert_called_with("stored in sent folder")
 
     @patch('sendMail.BeautifulSoup')
@@ -190,7 +190,7 @@ class TestCoverageGap:
         param.sendername = "Sender"
         param.sender = "sender@example.com"
         param.max_addr_per_mail = 1
-        param.profile = "artscroises"
+        param.domain = "artscroises.be"
         
         msg, recipients = sendMail.build_email(param, to="to@example.com", cc="cc@example.com", bcc="bcc@example.com", message="Hi")
         assert msg["To"] == "bcc@example.com"
@@ -213,8 +213,8 @@ class TestCoverageGap:
         # 1 image + 1 html part + 1 pdf + 1 txt = 4 parts expected in some structure
         # Mixed -> [Related -> [HTML, Image], PDF, TXT]
         assert len(msg.get_payload()) >= 2 # Mixed contains Related and others
-        
-    @patch('sendMail._get_subscriber_reader')
+
+    @patch('sendMail.get_subscriber_reader')
     def test_generate_mailing_missing_config(self, mock_reader):
         """Cover lines 610-611: AttributeError in generate_mailing"""
         param = Mock()
@@ -225,7 +225,7 @@ class TestCoverageGap:
             assert res == "Error"
             mock_log.critical.assert_called_once()
 
-    @patch('sendMail._get_subscriber_reader')
+    @patch('sendMail.get_subscriber_reader')
     @patch('sendMail.sleep')
     @patch('sendMail.send_mail')
     @patch('sendMail.build_email')
@@ -292,12 +292,12 @@ class TestCoverageGap:
             "emailBounced": "if False"
         }
         with patch('sendMail.log') as mock_log:
-            res = sendMail._filter(filter, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2})
+            res = sendMail.filter(filter, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2})
             assert res is True
             mock_log.warning.assert_called_once()
             
         # Normal mode with missing title index
-        res = sendMail._filter(filter, ["member"], {"title": 50})
+        res = sendMail.filter(filter, ["member"], {"title": 50})
         assert res is True
 
     def test_send_gmail_error(self):
@@ -325,7 +325,7 @@ class TestCoverageGap:
                 assert res is None
                 mock_log.error.assert_called_once()
 
-    @patch('sendMail._get_smtp_connection')
+    @patch('sendMail.get_smtp_connection')
     def test_send_mail_error(self, mock_get_conn):
         """Cover lines 828-831: SMTPException in send_mail"""
         param = Mock()
