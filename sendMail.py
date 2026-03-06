@@ -248,7 +248,7 @@ def get_subscriber_reader(param):
     found, it logs the error and returns None, None.
 
     :param param: The configuration object containing details for data
-                  retrieval (e.g., Google Sheets credentials or CSV
+                  retrieval (e.g., Google Sheets credentials or CSV/XLS
                   database path).
     :type param: object
     :return: A tuple consisting of a data reader object (either for
@@ -261,8 +261,14 @@ def get_subscriber_reader(param):
         return iter(readAllSheet(wb)), None
 
     try:
-        csvfile = open(param.database, "r", newline="", encoding="utf-8-sig")
-        return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
+        if param.database.endswith(".csv"):
+            csvfile = open(param.database, "r", newline="", encoding="utf-8-sig")
+            return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
+        else:
+            from python_calamine import CalamineWorkbook
+            workbook = CalamineWorkbook.from_path(param.database)  # type: ignore[arg-type]
+            return iter(workbook.get_sheet_by_index(0).to_python()), workbook
+
     except FileNotFoundError:
         log.critical(f"Fichier introuvable : '{param.database}'")
         return None, None
@@ -756,7 +762,7 @@ def generate_mailing(param):
         log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
 
-    reader, csvfile = get_subscriber_reader(param)
+    reader, file_object = get_subscriber_reader(param)
     if not reader:
         return "Error"
 
@@ -783,14 +789,6 @@ def generate_mailing(param):
             if param.to_index and current_row_idx > int(param.to_index):
                 break
 
-            # filtering
-            # if param.profile == 'artscroises':
-            #     if _filter_artscroises(param, row, indices):
-            #         continue
-            # elif param.profile == 'cambristi':
-            #     if _filter_cambristi(param, row, indices, param.test):
-            #         continue
-            # else:
             if filter(param.filter, row, indices):
                     continue
 
@@ -845,7 +843,7 @@ def generate_mailing(param):
             f"Terminé. {recipient_count} adresses traitées en {mail_batch_count} envois ({int(time() - start_time)}s)")
         return "OK"
     finally:
-        if csvfile: csvfile.close()
+        if file_object: file_object.close()
 
 
 def filter(filter, row, indices):
@@ -917,13 +915,13 @@ def filter(filter, row, indices):
         res = True
         field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
-            log.warning(f"Invalid field '{k}")
+            log.warning(f"Invalid field '{k}'")
             return True
         # get the operator
         try:
             op = ops[[v.find(x + ' ') for x in ops].index(0)]
         except ValueError:
-            log.warning(f"Invalid filter operation for field '{k}': {v}")
+            log.warning(f"Invalid filter operation for field '{k}: {v}'")
             return True
         # get the value to compare with
         test_value = v.split(op)[1].strip()
@@ -943,7 +941,7 @@ def filter(filter, row, indices):
             try:
                 test_value = float(test_value)
             except ValueError:
-                log.warning(f"Invalid filter value for field '{k}': {test_value}")
+                log.warning(f"Invalid filter value for field '{k}: {test_value}'")
                 return True
             # numeric comparison
             if op == "ge" or op == "greater than or equal to":
@@ -1097,13 +1095,18 @@ def process_profile(args):
         mailing was successfully sent; otherwise, returns "Error".
     """
     config = args.conf[args.profile]
-    # config overrides secret data
-    secret = get_secret(config["MAILCONFIG"])
-    if secret is None:
-        log.warning("No secret configuration found")
-        # sys.exit(1)
-    else:
-        config = {**secret, **config}
+    # Secret retrieval is optional (but more secure)
+    # if secret vault or file is not accessible, just ignore and assume everything is in the config file
+    # config data overrides secret data
+    try:
+        secret = get_secret(config["MAILCONFIG"])
+        if secret is None:
+            log.warning("No secret configuration found")
+            secret = {}
+    except Exception as e:
+        log.warning(f"Error retrieving secret configuration: {e}")
+        secret = {}
+    config = {**secret, **config}
 
     files, service, google_drive_files = process_attachments(args, config)
 
@@ -1173,7 +1176,7 @@ def check_mandatory_param(param):
     # Mailing method specific checks
     if hasattr(param, 'smtp_host'):
         # SMTP/IMAP mode
-        smtp_imap_params = ['smtp_port', 'imap_host', 'imap_port', 'username', 'password', 'sent_folder']
+        smtp_imap_params = ['smtp_port', 'smtp_port', 'imap_host', 'imap_port', 'username', 'password', 'sent_folder']
         for p in smtp_imap_params:
             if not hasattr(param, p) or getattr(param, p) is None:
                 log.error(f"{p.replace('_', ' ').upper()} is mandatory for SMTP/IMAP mode")
