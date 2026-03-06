@@ -702,6 +702,7 @@ class TestGetSubscriberReader:
         assert csvfile is None
         assert reader is not None
 
+
     @patch('builtins.open', mock_open(read_data="name,email\nJohn,john@example.com"))
     def test_get_subscriber_reader_csv(self):
         """Test getting subscriber reader from CSV"""
@@ -712,6 +713,26 @@ class TestGetSubscriberReader:
 
         assert reader is not None
         assert csvfile is not None
+
+    @patch('python_calamine.CalamineWorkbook', create=True)
+    def test_get_subscriber_reader_calamine(self, mock_calamine):
+        """Test getting subscriber reader from Excel using Calamine"""
+        param = Mock()
+        param.database = "test.xlsx"
+
+        mock_workbook = Mock()
+        mock_sheet = Mock()
+        mock_sheet.to_python.return_value = [["header1", "header2"], ["data1", "data2"]]
+        mock_workbook.get_sheet_by_index.return_value = mock_sheet
+        mock_calamine.from_path.return_value = mock_workbook
+
+        reader, workbook = sendMail.get_subscriber_reader(param)
+
+        assert reader is not None
+        assert workbook is not None
+        assert list(reader) == [["header1", "header2"], ["data1", "data2"]]
+        mock_calamine.from_path.assert_called_once_with("test.xlsx")
+        mock_workbook.get_sheet_by_index.assert_called_once_with(0)
 
 class TestMailingGeneration:
     """Tests for generate_mailing function"""
