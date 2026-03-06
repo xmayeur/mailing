@@ -248,7 +248,7 @@ def get_subscriber_reader(param):
     found, it logs the error and returns None, None.
 
     :param param: The configuration object containing details for data
-                  retrieval (e.g., Google Sheets credentials or CSV
+                  retrieval (e.g., Google Sheets credentials or CSV/XLS
                   database path).
     :type param: object
     :return: A tuple consisting of a data reader object (either for
