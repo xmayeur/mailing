@@ -152,12 +152,12 @@ python sendMail.py --profile <profile_name> [options] [files...]
 
 #### Database Options
 
-| Argument           | Type    | Description                                              |
-|--------------------|---------|----------------------------------------------------------|
-| `-db, --database`  | string  | Path to CSV database file (alternative to Google Sheets) |
-| `-f, --from_index` | integer | Starting index in the database                           |
-| `-to, --to_index`  | integer | Stopping index in the database                           |
-| `--selected`       | flag    | Only send to selected recipients                         |
+| Argument           | Type    | Description                                                       |
+|--------------------|---------|-------------------------------------------------------------------|
+| `-db, --database`  | string  | Path to CSV or Excel database file (alternative to Google Sheets) |
+| `-f, --from_index` | integer | Starting index in the database                                    |
+| `-to, --to_index`  | integer | Stopping index in the database                                    |
+| `--selected`       | flag    | Only send to selected recipients                                  |
 
 #### Rate Limiting & Batch Options
 
