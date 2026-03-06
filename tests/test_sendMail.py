@@ -1261,13 +1261,6 @@ def test_process_artscroises_wait_and_no_config():
     args.wait = 1
     args.test = False
     args.password = "password"
-    #
-    # with patch("sendMail.get_secret") as mock_gs:
-    #     mock_gs.return_value = None
-    #     with patch("sendMail.check_mandatory_param") as mock_cp:
-    #         mock_cp.return_value = True
-    #         with pytest.raises(SystemExit):
-    #             sendMail.process_profile(args)
 
     # Test with wait
     args.wait = 1
@@ -1293,6 +1286,65 @@ def test_process_artscroises_wait_and_no_config():
                     # Mock getpass to avoid interactive prompt
                     with patch("sendMail.getpass", return_value="pass"):
                         with patch("sendMail.check_mandatory_param", return_value=True):
+                            sendMail.process_profile(args)
+
+
+def test_process_artscroises_wait_and_no_secret():
+    """Test process_artscroises with wait and missing secret config"""
+    args = MagicMock()
+    args.profile = "artscroises"
+    args.conf = {"artscroises": {"MAILCONFIG": "secret"}}
+    args.wait = 1
+    args.test = False
+    args.password = "password"
+
+    # Test with wait
+    args.wait = 1
+    args.body = "body"
+    args.message = "message"
+    args.test = False
+    secret_config = None
+
+    # Reset mock and give it value
+    with patch("sendMail.get_secret") as mock_gs:
+        mock_gs.return_value = secret_config
+        with patch("sendMail.process_attachments", return_value=([], None, [])):
+            with patch("sendMail.sleep"):
+                with patch("sendMail.generate_mailing", return_value="OK"):
+                    # Mock getpass to avoid interactive prompt
+                    with patch("sendMail.getpass", return_value="pass"):
+                        with patch("sendMail.check_mandatory_param", return_value=True):
+                            sendMail.process_profile(args)
+
+
+def test_process_artscroises_wait_and_no_secret_file():
+    """Test process_artscroises with wait and missing secret config"""
+    args = MagicMock()
+    args.profile = "artscroises"
+    args.conf = {"artscroises": {"MAILCONFIG": "secret"}}
+    args.wait = 1
+    args.test = False
+    args.password = "password"
+
+    # Test with wait
+    args.wait = 1
+    args.body = "body"
+    args.message = "message"
+    args.test = False
+
+    def my_side_effect():
+        raise Exception("Secret file not found")
+
+    # Reset mock and give it value
+    with patch("sendMail.get_secret") as mock_gs:
+        # mock_gs.return_value = secret_config
+        with patch("sendMail.process_attachments", return_value=([], None, [])):
+            with patch("sendMail.sleep"):
+                with patch("sendMail.generate_mailing", return_value="OK"):
+                    # Mock getpass to avoid interactive prompt
+                    with patch("sendMail.getpass", return_value="pass"):
+                        with patch("sendMail.check_mandatory_param", return_value=True):
+                            mock_gs.side_effect = Exception("Secret file not found")
                             sendMail.process_profile(args)
 
 
