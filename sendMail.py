@@ -32,6 +32,8 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from getpass import getpass
 from glob import glob
+from os import getenv, mkdir
+from os.path import join, exists
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 from time import time, sleep
 from uuid import uuid4
@@ -53,6 +55,51 @@ from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
+
+
+def get_default_config_path():
+    """
+    Determines the home directory of the current user based on the operating system.
+
+    This function checks the operating system and retrieves the appropriate
+    environment variable that represents the user's home directory. For Windows,
+    it uses the `USERPROFILE` environment variable. For other operating systems,
+    it uses the `HOME` environment variable.
+
+    :return: The path to the user's home directory as a string, or None if it
+        cannot be determined.
+    :rtype: Optional[str]
+    """
+    home = getenv("USERPROFILE") if os.name == 'nt' else getenv("HOME")
+    cfg = join(home, ".config", "sendMail.yml")
+    if not exists(cfg):
+        dir = join(home, ".config")
+        if not exists(dir):
+            mkdir(dir)
+        default = {
+            "username": "jdoe",
+            "password": "foobar",
+            "sender": "john.doe@example.com",
+            "sendername": "John Doe",
+            "database": "subscribers.csv",
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "imap_host": "imap.example.com",
+            "imap_port": 993,
+            "sent_folder": "Sent",
+            "pause": 1,
+            "styles": "./css/styles.css",
+            "filter": {
+                "email": "is not empty",
+                "bounced": "is not bounced",
+                "cotisation": "greater than 0",
+                "first_name": "one of \"Jean\", \"Xavier\""
+            }
+        }
+        with open(cfg, "w") as f:
+            yaml.dump(default, f)
+        log.warning(f"Configuration file created at '{cfg}' with default values.")
+    return cfg
 
 
 def init_log(log_file=None):
@@ -1207,6 +1254,7 @@ def setup_argparse():
     :rtype: argparse.Namespace
 
     Options:
+        - -cfg, --config: Path to the configuration file (default: User Home folder).
         - -s, --subject: Subject of the mail (default: None).
         - -m, --message: Text message of the mail (default: an empty string).
         - file: A list of files to attach to the mail (default: []).
@@ -1230,6 +1278,7 @@ def setup_argparse():
         - --profile: Specifies the mail profile to use (default: None).
     """
     parser = argparse.ArgumentParser()
+    parser.add_argument("-cfg", "--config", help="path to the config file", default=None)
     parser.add_argument("-s", "--subject", help="Subject of the mail")
     parser.add_argument("-m", "--message", help="Text message of the mail", default="")
     parser.add_argument("file", nargs="*", help="files to attach to the mail")
@@ -1261,7 +1310,13 @@ def main():
     """
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     args = setup_argparse()
-    args.conf = yaml.safe_load(open("config.yml"))
+
+    if args.config:
+        with open(args.config) as config_file:
+            args.conf = yaml.safe_load(config_file)
+    else:
+        with open(get_default_config_path()) as config_file:
+            args.conf = yaml.safe_load(config_file)
 
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
