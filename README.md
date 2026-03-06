@@ -63,7 +63,9 @@ pip install -r requirements.txt
 
 ### config.yml
 
-Create a `config.yml` file with profile-specific settings (IMAP/SMTP):
+Create a `sendMail.yml` config file with profile-specific settings (IMAP/SMTP)
+Store this file in the following directory: `$HOME/.config` (MAC or Unix) or `%USERPROFILE%/.config` (Windows)
+or specify the config file path with the `sendMail -cfg myConfigFile.yml` argument
 
 ```yaml
 myProfile:
@@ -135,13 +137,14 @@ python sendMail.py --profile <profile_name> [options] [files...]
 
 #### Basic Options
 
-| Argument        | Type   | Description                                                                              |
-|-----------------|--------|------------------------------------------------------------------------------------------|
-| `--profile`     | string | **Required**. Mail profile to use (`artscroises` or `cambristi`)                         |
-| `-s, --subject` | string | Subject of the email                                                                     |
-| `-m, --message` | string | Text message body of the email - optional if files argument given                        |
-| `file`          | list   | Files `(.html, .txt, .pdf, .md, .png, .jpg)`to attach to the email (positional argument) |
-| `--keep-html`   | flag   | Keep HTML files after conversion of `.md` Markdown files                                 | 
+| Argument         | Type   | Description                                                                              |
+|------------------|--------|------------------------------------------------------------------------------------------|
+| `--profile`      | string | **Required**. Mail profile to use (`artscroises` or `cambristi`)                         |
+| `-cfg, --config` | string | Path to config file (default: `$HOME/.config/sendMail.yml`)                              |
+| `-s, --subject`  | string | Subject of the email                                                                     |
+| `-m, --message`  | string | Text message body of the email - optional if files argument given                        |
+| `file`           | list   | Files `(.html, .txt, .pdf, .md, .png, .jpg)`to attach to the email (positional argument) |
+| `--keep-html`    | flag   | Keep HTML files after conversion of `.md` Markdown files                                 | 
 
 #### Test & Debug Options
 
