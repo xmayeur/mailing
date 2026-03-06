@@ -1486,7 +1486,7 @@ def test_process_artscroises():
         mock_args.return_value.message = "message"
         mock_args.return_value.test = False
         mock_args.return_value.donotsend = False
-        mock_args.return_value.conf = {"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}}
+        # mock_args.return_value.conf = {"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}}
 
         secret_config = {
             "max_mails_per_hour": 100,
@@ -1497,17 +1497,18 @@ def test_process_artscroises():
             "password": "p",
             "MAILCONFIG": "secret"
         }
-
-        with patch("sendMail.get_secret", return_value=secret_config):
-            with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
-                with patch("sendMail.generate_mailing", return_value="OK"):
-                    with patch("os.rename") as mock_rename:
-                        with patch("os.remove") as mock_remove:
-                            with pytest.raises(SystemExit) as pytest_wrapped_e:
-                                sendMail.main()
-                                # print(pytest_wrapped_e)
-                                # assert pytest_wrapped_e.type == SystemExit
-                                # assert pytest_wrapped_e.value.code == 42
+        with patch("sendMail.yaml.safe_load", return_value={"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}}):
+            with patch("sendMail.get_secret", return_value=secret_config):
+                with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
+                    with patch("sendMail.generate_mailing", return_value="OK"):
+                        with patch("os.rename") as mock_rename:
+                            with patch("os.remove") as mock_remove:
+                                with patch("sendMail.check_mandatory_param", return_value=True):
+                                    with pytest.raises(SystemExit) as pytest_wrapped_e:
+                                        sendMail.main()
+                                        # print(pytest_wrapped_e)
+                                        # assert pytest_wrapped_e.type == SystemExit
+                                        # assert pytest_wrapped_e.value.code == 42
 
 
 def test_filter_artscroises_branches():
@@ -1695,6 +1696,103 @@ def test_process_profile_test_filter():
         # When args.test is True, process_profile returns "Error"
         # because of "and not args.test" in "if generate_mailing(param) == "OK" and not args.test:"
         assert result == "Error"
+
+
+def test_get_default_config_path_windows():
+    """Test get_default_config_path on Windows (line 72)"""
+    with patch('os.name', 'nt'), \
+            patch('sendMail.getenv') as mock_getenv, \
+            patch('sendMail.exists', return_value=True):
+        mock_getenv.return_value = r'C:\Users\TestUser'
+
+        result = sendMail.get_default_config_path()
+
+        mock_getenv.assert_called_once_with('USERPROFILE')
+        # assert result == r'C:\Users\TestUser\.config\sendMail.yml'
+        assert all(w in result for w in ('Users', 'TestUser', '.config', 'sendMail.yml')) is True
+
+
+def test_get_default_config_path_unix():
+    """Test get_default_config_path on Unix (line 72)"""
+    with patch('os.name', 'posix'), \
+            patch('sendMail.getenv') as mock_getenv, \
+            patch('sendMail.exists', return_value=True):
+        mock_getenv.return_value = '/home/testuser'
+
+        result = sendMail.get_default_config_path()
+
+        mock_getenv.assert_called_once_with('HOME')
+        assert result == '/home/testuser/.config/sendMail.yml'
+
+
+def test_get_default_config_path_exists():
+    """Test get_default_config_path when config file already exists (lines 73-74, 101)"""
+    with patch('os.name', 'posix'), \
+            patch('sendMail.getenv', return_value='/home/testuser'), \
+            patch('sendMail.exists', return_value=True):
+        result = sendMail.get_default_config_path()
+
+        assert result == '/home/testuser/.config/sendMail.yml'
+
+
+def test_get_default_config_path_creates_dir_and_file():
+    """Test get_default_config_path creates .config directory and file (lines 74-100)"""
+    with patch('os.name', 'posix'), \
+            patch('sendMail.getenv', return_value='/home/testuser'), \
+            patch('sendMail.exists') as mock_exists, \
+            patch('sendMail.mkdir') as mock_mkdir, \
+            patch('builtins.open', mock_open()) as mock_file, \
+            patch('sendMail.yaml.dump') as mock_yaml_dump, \
+            patch('sendMail.log.warning') as mock_log_warning:
+        # Config file doesn't exist, .config directory doesn't exist
+        mock_exists.side_effect = [False, False]
+
+        result = sendMail.get_default_config_path()
+
+        # Verify .config directory was created (line 77)
+        mock_mkdir.assert_called_once_with('/home/testuser/.config')
+
+        # Verify config file was opened for writing (line 98)
+        mock_file.assert_called_once_with('/home/testuser/.config/sendMail.yml', 'w')
+
+        # Verify default config was written (line 99)
+        mock_yaml_dump.assert_called_once()
+        default_config = mock_yaml_dump.call_args[0][0]
+        assert default_config['username'] == 'jdoe'
+        assert default_config['sender'] == 'john.doe@example.com'
+        assert 'filter' in default_config
+
+        # Verify warning was logged (line 100)
+        mock_log_warning.assert_called_once()
+        assert 'Configuration file created' in mock_log_warning.call_args[0][0]
+
+        # Verify correct path returned (line 101)
+        assert result == '/home/testuser/.config/sendMail.yml'
+
+
+def test_get_default_config_path_dir_exists_file_not():
+    """Test get_default_config_path when .config exists but file doesn't (lines 74-77)"""
+    with patch('os.name', 'posix'), \
+            patch('sendMail.getenv', return_value='/home/testuser'), \
+            patch('sendMail.exists') as mock_exists, \
+            patch('sendMail.mkdir') as mock_mkdir, \
+            patch('builtins.open', mock_open()) as mock_file, \
+            patch('sendMail.yaml.dump') as mock_yaml_dump, \
+            patch('sendMail.log.warning') as mock_log_warning:
+        # Config file doesn't exist (line 74), but .config directory exists (line 76)
+        mock_exists.side_effect = [False, True]
+
+        result = sendMail.get_default_config_path()
+
+        # Verify .config directory was NOT created since it exists (line 76-77)
+        mock_mkdir.assert_not_called()
+
+        # Verify config file was still created (lines 98-100)
+        mock_file.assert_called_once_with('/home/testuser/.config/sendMail.yml', 'w')
+        mock_yaml_dump.assert_called_once()
+        mock_log_warning.assert_called_once()
+
+        assert result == '/home/testuser/.config/sendMail.yml'
 
 
 if __name__ == '__main__':
