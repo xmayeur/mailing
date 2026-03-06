@@ -70,21 +70,26 @@ artscroises:
   MAILCONFIG: "ArtsCroisesMailConfig"               # key name of all the below parameters in a secure vault
   SA: "artscroisesServiceAccount"                   # key name of Service Account credentials in the secure vault
   sheetid: "artscroisesmembersdb"                   # key name of the Google Sheets identifier in vault 
-  sender: "sender@example.com"
-  sendername: "John Doe"
-  password: "password"
-  mailing_folder: "folder_id_from_google_drive"
-  sent_folder: "SENT"
-  smtp_host: "smtp.example.com"
-  smtp_port: 587
-  imap_host: "imap.example.com"
-  imap_port: 993
-  max_mails_per_hour: 1000
-  max_addr_per_mail: 50
-  pause: 3
-  filter: # see below for details
+  sender: "sender@example.com"                      # Email address to send from
+  sendername: "John Doe"                            # Displayed name in the message header
+  username: "jdoe"                                  # Username for SMTP/IMAP authentication
+  password: "password"                              # Password for SMTP/IMAP authentication
+  mailing_folder: "folder_id_from_google_drive"     # optional, if message attachments are stored in Google Drive
+  smtp_host: "smtp.example.com"                     # SMTP server address
+  smtp_port: 587                                    # SMTP server port
+  smtp_tls:                                         # Enable TLS encryption (optional)
+  imap_host: "imap.example.com"                     # IMAP server address
+  imap_port: 993                                    # IMAP server port
+  sent_folder: "Sent"                               # folder to store sent messages
+  max_mails_per_hour: 1000                          # maximum emails to send per hour
+  max_addr_per_mail: 50                             # maximum number of addresses per mail
+  pause: 3                                          # pause duration in seconds between operations
+  filter: # Filtering options - see below for details
     email: is not empty
     status: is active
+  filter_test: # filter active in test mode
+    email: is "tester@example.com"
+    group: in "test, Test"
 
 cambristi:
   MAILCONFIG: "CambristiMailConfig"
@@ -111,7 +116,7 @@ The syntax is:
 
 ### Secrets Management
 
-Credentials and API keys should be stored securely using the `getSecrets` module. Required secrets:
+Optionally, Credentials and API keys can be stored securely using the `getSecrets` module. Typical secrets:
 
 - **MAILCONFIG**: SMTP/IMAP credentials
 - **Service Account**: Google API credentials
@@ -139,11 +144,11 @@ python sendMail.py --profile <profile_name> [options] [files...]
 
 #### Test & Debug Options
 
-| Argument          | Type | Description                               |
-|-------------------|------|-------------------------------------------|
-| `-t, --test`      | flag | Test mode - send only to the tester group |
-| `-v, --verbose`   | flag | Increase output verbosity                 |
-| `-x, --doNotSend` | flag | Do not send any mail (dry run)            |
+| Argument          | Type | Description                                                                 |
+|-------------------|------|-----------------------------------------------------------------------------|
+| `-t, --test`      | flag | Test mode - send only to the tester group according to filter_test settings |
+| `-v, --verbose`   | flag | Increase output verbosity                                                   |
+| `-x, --doNotSend` | flag | Do not send any mail (dry run)                                              |
 
 #### Database Options
 
