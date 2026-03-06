@@ -82,6 +82,7 @@ def get_default_config_path():
             "sender": "john.doe@example.com",
             "sendername": "John Doe",
             "database": "subscribers.csv",
+            "domain": "example.com",
             "smtp_host": "smtp.example.com",
             "smtp_port": 587,
             "imap_host": "imap.example.com",
