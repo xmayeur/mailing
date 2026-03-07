@@ -681,6 +681,77 @@ class TestGmailFunctions:
         assert result is not None
         assert result["id"] == "12345"
 
+    @patch('sendMail.get_subscriber_reader')
+    @patch('sendMail.get_indices')
+    @patch('sendMail.format_message')
+    @patch('sendMail.build_email')
+    @patch('sendMail.send_mail')
+    @patch('sendMail.send_gmail')
+    @patch('sendMail.get_gmail_service')
+    @patch('sendMail.sleep')
+    @patch('sendMail.filter')
+    def test_generate_mailing_gmail_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail,
+                                            mock_send_mail,
+                                            mock_build, mock_format, mock_indices, mock_reader_func):
+        """Test successful mailing generation for ArtsCroises profile"""
+        param = Mock()
+        param.max_addr_per_mail = 2
+        param.pause = 0
+        param.max_mails_per_hour = 100
+        param.from_index = None
+        param.to_index = None
+        param.profile = 'artscroises'
+        param.verbose = False
+        param.donotsend = False
+        param.message = "Template"
+        param.subject = "Subject"
+        param.file = None
+        param.filter = {
+            "email": "is not empty",
+            "status": "is active"
+        }
+
+        del param.smtp_host
+        # Mock reader to return header and three rows
+        header = ["email", "status", "group", "selected"]
+        rows = [
+            ["user1@example.com", "active", "Group", "x"],
+            ["user2@example.com", "active", "Group", "x"],
+            ["user3@example.com", "active", "Group", "x"]
+        ]
+
+        # We need to return an iterator that yields header then rows
+        # The code does: header = next(reader, None); for row in reader:
+        class Reader:
+            def __init__(self, data):
+                self.data = iter(data)
+
+            def __next__(self):
+                return next(self.data)
+
+            def __iter__(self):
+                return self
+
+        mock_reader = Reader([header] + rows)
+        mock_reader_func.return_value = (mock_reader, None)
+
+        mock_indices.return_value = {"email": 0, "status": 1, "group": 2, "selected": 3}
+        mock_format.return_value = "Formatted Message"
+        mock_filter.return_value = False  # Do not filter out anyone
+
+        mock_msg = MagicMock()
+        mock_msg._temp_dirs = []
+        mock_build.return_value = (mock_msg, ["user1@example.com", "user2@example.com"])
+
+        result = sendMail.generate_mailing(param)
+
+        assert result == "OK"
+        # Should be called twice: once for the first 2 users (in the loop), once for the remaining 1 user (after the loop)
+        assert mock_send_gmail.call_count == 2
+        assert mock_build.call_count == 2
+
+
+
 class TestGetSubscriberReader:
     """Tests for subscriber reader function"""
 
@@ -746,7 +817,8 @@ class TestMailingGeneration:
     @patch('sendMail.get_gmail_service')
     @patch('sendMail.sleep')
     @patch('sendMail.filter')
-    def test_generate_mailing_artscroises_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail, mock_send_mail,
+    def test_generate_mailing_smtp_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail,
+                                           mock_send_mail,
                                                  mock_build, mock_format, mock_indices, mock_reader_func):
         """Test successful mailing generation for ArtsCroises profile"""
         param = Mock()
@@ -801,6 +873,7 @@ class TestMailingGeneration:
         # Should be called twice: once for the first 2 users (in the loop), once for the remaining 1 user (after the loop)
         assert mock_send_mail.call_count == 2
         assert mock_build.call_count == 2
+
 
     @patch('sendMail.get_subscriber_reader')
     def test_generate_mailing_missing_config(self, mock_reader_func):
@@ -1594,6 +1667,22 @@ def test_main_missing_args():
             # assert pytest_wrapped_e.type == SystemExit
             # assert pytest_wrapped_e.value.code == 2
 
+def test_main_using_default_config():
+    with patch("sendMail.setup_argparse") as mock_args:
+        mock_args.return_value.profile = "artscroises"
+        mock_args.return_value.message = None
+        mock_args.return_value.md2html = None
+        mock_args.return_value.file = None
+        mock_args.return_value.body = None
+        mock_args.return_value.subject = None
+        mock_args.return_value.config = None
+
+        with patch('builtins.open', mock_open(read_data="{}")) as mock_file:
+            with pytest.raises(SystemExit) as pytest_wrapped_e:
+                sendMail.main()
+                assert pytest_wrapped_e.type == SystemExit
+                assert pytest_wrapped_e.value.code == 2
+
 
 def test_main_missing_profile():
     """Test main with missing profile"""
@@ -1748,7 +1837,8 @@ def test_get_default_config_path_creates_dir_and_file():
                 patch('sendMail.mkdir') as mock_mkdir, \
                 patch('builtins.open', mock_open()) as mock_file, \
                 patch('sendMail.yaml.dump') as mock_yaml_dump, \
-                patch('sendMail.log.warning') as mock_log_warning:
+                patch('sendMail.log.warning') as mock_log_warning, \
+                pytest.raises(SystemExit) as pytest_wrapped_e:
             # Config file doesn't exist, .config directory doesn't exist
             mock_exists.side_effect = [False, False]
 
@@ -1784,7 +1874,8 @@ def test_get_default_config_path_dir_exists_file_not():
                 patch('sendMail.mkdir') as mock_mkdir, \
                 patch('builtins.open', mock_open()) as mock_file, \
                 patch('sendMail.yaml.dump') as mock_yaml_dump, \
-                patch('sendMail.log.warning') as mock_log_warning:
+                patch('sendMail.log.warning') as mock_log_warning, \
+                pytest.raises(SystemExit) as pytest_wrapped_e:
             # Config file doesn't exist (line 74), but .config directory exists (line 76)
             mock_exists.side_effect = [False, True]
 
