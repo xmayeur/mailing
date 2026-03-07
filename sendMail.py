@@ -99,7 +99,9 @@ def get_default_config_path():
         }
         with open(cfg, "w") as f:
             yaml.dump(default, f)
-        log.warning(f"Configuration file created at '{cfg}' with default values.")
+        log.warning(
+            f"Configuration file created at '{cfg}' with default values - Please configure your default parameters")
+        sys.exit(1)
     return cfg
 
 

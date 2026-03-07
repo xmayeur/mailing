@@ -14,9 +14,11 @@ A comprehensive email campaign management system for organizations managing mail
 **sendMail** is a Python-based bulk email management system that provides:
 
 * **Bulk email sending** with rate limiting and batch processing
-* **Multiple email profiles** (Arts Croisés, Cambristi)
+* **Multiple email profiles**
 * **Google Sheets integration** for subscriber management
+* **CSV/Excel database support** for dynamic subscriber lists
 * **Google Drive integration** for attachment handling
+* **Markdown support** for email content
 * **HTML email templates** with inline image support
 * **SMTP and Gmail API** support for sending emails
 * **Flexible filtering** based on subscriber attributes
@@ -58,14 +60,15 @@ pip install -r requirements.txt
 - requests
 - certifi
 - markdown2
+- python-calamine
 
 ## Configuration
 
-### config.yml
+### sendMail.yml
 
 Create a `sendMail.yml` config file with profile-specific settings (IMAP/SMTP)
 Store this file in the following directory: `$HOME/.config` (MAC or Unix) or `%USERPROFILE%/.config` (Windows)
-or specify the config file path with the `sendMail -cfg myConfigFile.yml` argument
+or specify your own config file path with the `sendMail -cfg myConfigFile.yml` argument
 
 ```yaml
 myProfile:
@@ -96,7 +99,23 @@ myProfile:
 
 myOtherProfile:
   MAILCONFIG: "myOtherMailConfig"
-  # Similar configuration...
+  # Similar configuration... excepted for gmail_api_key and gmail_api_secret if used
+  gmailCredentials:
+    installed:
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth"
+      "client_id": "*****"
+      "client_secret": "****"
+      "project_id": "****"
+      "redirect_uris":
+        - "http://localhost"
+      "refresh_token": ""
+      "token_uri": "https://oauth2.googleapis.com/token"
+  TOKEN_FILE: 'token.json'
+  SCOPES:
+    - 'https://www.googleapis.com/auth/gmail.readonly'
+    - 'https://www.googleapis.com/auth/gmail.modify'
+    - 'https://www.googleapis.com/auth/gmail.send'
 ```
 
 The filter section is optional and can be used to filter subscribers based on specific attributes.
