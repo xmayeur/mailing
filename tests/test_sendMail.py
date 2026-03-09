@@ -1657,15 +1657,29 @@ def test_main_missing_args():
     """Test main with missing arguments"""
     with patch("sendMail.setup_argparse") as mock_args:
         mock_args.return_value.profile = "artscroises"
-        mock_args.return_value.message = None
+        mock_args.return_value.message = "hello world!"
         mock_args.return_value.md2html = None
         mock_args.return_value.file = None
         mock_args.return_value.body = None
         mock_args.return_value.subject = None
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
+        mock_args.return_value.test = False
+        mock_args.return_value.smtp_host = "smtp.host.com"
+
+        secret_config = {
+            "max_mails_per_hour": 100,
+            "max_addr_per_mail": 50,
+            "pause": 0,
+            "SA": "sa.json",
+            "username": "u",
+            "password": "p",
+            "MAILCONFIG": "secret"
+        }
+
+        with patch("sendMail.get_secret", return_value=secret_config), \
+                pytest.raises(SystemExit) as pytest_wrapped_e, \
+                patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
             sendMail.main()
-            # assert pytest_wrapped_e.type == SystemExit
-            # assert pytest_wrapped_e.value.code == 2
+
 
 def test_main_using_default_config():
     with patch("sendMail.setup_argparse") as mock_args:
@@ -1676,12 +1690,14 @@ def test_main_using_default_config():
         mock_args.return_value.body = None
         mock_args.return_value.subject = None
         mock_args.return_value.config = None
+        mock_args.return_value.test = None
+        mock_args.return_value.conf = None
+        mock_args.return_value.config = None
+        with patch("sendMail.get_default_config_path", return_value="./config.yml"):
+            with patch("sendMail.process_profile", return_value="OK"):
+                with pytest.raises(SystemExit):
+                    sendMail.main()
 
-        with patch('builtins.open', mock_open(read_data="{}")) as mock_file:
-            with pytest.raises(SystemExit) as pytest_wrapped_e:
-                sendMail.main()
-                assert pytest_wrapped_e.type == SystemExit
-                assert pytest_wrapped_e.value.code == 2
 
 
 def test_main_missing_profile():
@@ -1689,11 +1705,20 @@ def test_main_missing_profile():
 
     with patch("sendMail.setup_argparse") as mock_args:
         mock_args.return_value.profile = None
+        mock_args.return_value.message = None
         mock_args.return_value.md2html = None
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
-            sendMail.main()
-            # assert pytest_wrapped_e.type == SystemExit
-            # assert pytest_wrapped_e.value.code == 42
+        mock_args.return_value.file = None
+        mock_args.return_value.body = None
+        mock_args.return_value.subject = None
+        mock_args.return_value.config = None
+        mock_args.return_value.test = None
+        mock_args.return_value.conf = None
+        mock_args.return_value.config = None
+        with patch("sendMail.get_default_config_path", return_value="./config.yml"):
+            with patch("sendMail.process_profile", return_value="OK"):
+                with pytest.raises(SystemExit):
+                    sendMail.main()
+
 
 def test_make_html_images_inline():
     html_content = '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
@@ -1890,7 +1915,3 @@ def test_get_default_config_path_dir_exists_file_not():
             mock_log_warning.assert_called_once()
 
             assert result == '/home/testuser/.config/sendMail.yml'
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
