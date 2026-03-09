@@ -1313,23 +1313,25 @@ def main():
     """
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     args = setup_argparse()
-
+    args.conf = None
     if args.config:
         with open(args.config) as config_file:
             args.conf = yaml.safe_load(config_file)
     else:
         with open(get_default_config_path()) as config_file:
             args.conf = yaml.safe_load(config_file)
-
+    if args.conf is None:
+        log.critical("No configuration file found")
+        sys.exit(-1)
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
         file = args.file[0].replace(".md", ".html")
         make_html_images_inline(file, file)
         sys.exit(0)
 
-    if not (args.message or args.body or args.file) and not args.subject:
-        print("Missing subject and message text or file")
-        sys.exit(-1)
+    # if not (args.message or args.body or args.file) and not args.subject:
+    # print("Missing subject and message text or file")
+    # sys.exit(-1)
 
     if args.profile:
         sys.exit(0 if process_profile(args) == "OK" else -1)
