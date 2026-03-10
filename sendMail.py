@@ -1156,32 +1156,32 @@ def process_profile(args):
     except Exception as e:
         log.warning(f"Error retrieving secret configuration: {e}")
         secret = {}
+
     config = {**secret, **config}
-
-    files, service, google_drive_files = process_attachments(args, config)
-
-    body_txt = args.body if args.body else ""
-    args.newsletter_name = ""
-
-    args = get_newsletter_name(files, args)
-    if not args.message:
-        args.message = config["default_message"]
-        args.message = args.message.replace("${newsletter_name}", args.newsletter_name)
-        args.message = args.message.replace("${body}", body_txt)
-
     config.update(vars(args))
+    param = Dict2Class(config)
+
+    if not check_mandatory_param(param):
+        return "Error"
+
+    files, service, google_drive_files = process_attachments(param, config)
+    param.file = files  # Mise à jour explicite des fichiers filtrés
+    body_txt = param.body if param.body else ""
+    param.newsletter_name = ""
+
+    param = get_newsletter_name(files, param)
+    if not param.message:
+        param.message = config["default_message"]
+        param.message = param.message.replace("${newsletter_name}", param.newsletter_name)
+        param.message = param.message.replace("${body}", body_txt)
+
     if "password" not in config:
         config["password"] = getpass("Enter mail user's password")
-
-    param = Dict2Class(config)
-    param.file = files  # Mise à jour explicite des fichiers filtrés
 
     if param.test:
         param.filter = param.filter_test
 
-    if not check_mandatory_param(param):
-        return "Error"
-    if generate_mailing(param) == "OK" and not args.test:
+    if generate_mailing(param) == "OK" and not param.test:
         for f in google_drive_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         for f in glob("input/*.*"):
@@ -1297,7 +1297,7 @@ def setup_argparse():
     parser.add_argument("-mh", "--max-mails-per-hour", default=1000, type=int)
     parser.add_argument("-na", "--max_addr_per_mail", default=50, type=int)
     parser.add_argument("-p", "--pause", default=3, type=int)
-    parser.add_argument("--profile", help="mail profile")
+    parser.add_argument("--profile", help="mail profile", default="default")
     parser.add_argument("--md2html", action="store_true", help="convert md file to html & exit")
     parser.add_argument("--keep-html", action="store_true", help="keep the generated html file")
     return parser.parse_args()
@@ -1323,6 +1323,7 @@ def main():
     if args.conf is None:
         log.critical("No configuration file found")
         sys.exit(-1)
+
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
         file = args.file[0].replace(".md", ".html")
