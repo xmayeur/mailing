@@ -2,9 +2,10 @@
 
 [![Tests](https://github.com/xmayeur/mailing/workflows/Tests/badge.svg)](https://github.com/xmayeur/mailing/actions)
 [![codecov](https://codecov.io/gh/xmayeur/mailing/branch/master/graph/badge.svg)](https://codecov.io/gh/xmayeur/mailing)
-[![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Build and Release Executables](https://github.com/xmayeur/mailing/actions/workflows/main.yml/badge.svg)](https://github.com/xmayeur/mailing/actions/workflows/main.yml)
 
 A comprehensive email campaign management system for organizations managing mailing lists, newsletters, and membership communications.
 
@@ -13,12 +14,12 @@ A comprehensive email campaign management system for organizations managing mail
 **sendMail** is a Python-based bulk email management system that provides:
 
 * **Bulk email sending** with rate limiting and batch processing
-* **Multiple email profiles** (Arts Croisés, Cambristi)
+* **Multiple email profiles**
 * **Google Sheets integration** for subscriber management
+* **CSV/Excel database support** for dynamic subscriber lists
 * **Google Drive integration** for attachment handling
+* **Markdown support** for email content
 * **HTML email templates** with inline image support
-* **Invoice generation** via Billit.be API
-* **Membership management** and cotisation reminders
 * **SMTP and Gmail API** support for sending emails
 * **Flexible filtering** based on subscriber attributes
 
@@ -28,7 +29,6 @@ A comprehensive email campaign management system for organizations managing mail
 - 📊 **Google Sheets integration** for dynamic subscriber lists
 - 📁 **Google Drive integration** for automatic attachment downloads
 - 🎨 **HTML email support** with automatic inline image processing
-- 🧾 **Invoice generation** using Billit.be API
 - ⏱️ **Rate limiting** to comply with email provider restrictions
 - 🔄 **Batch processing** with pause and resume capabilities
 - 🧪 **Test mode** for safe campaign testing
@@ -59,40 +59,90 @@ pip install -r requirements.txt
 - Pillow
 - requests
 - certifi
+- markdown2
+- python-calamine
 
 ## Configuration
 
-### config.yml
+### sendMail.yml
 
-Create a `config.yml` file with profile-specific settings:
+Create a `sendMail.yml` config file with profile-specific settings (IMAP/SMTP)
+Store this file in the following directory: `$HOME/.config` (MAC or Unix) or `%USERPROFILE%/.config` (Windows)
+or specify your own config file path with the `sendMail -cfg myConfigFile.yml` argument
 
 ```yaml
-artscroises:
-  MAILCONFIG: "ArtsCroisesMailConfig"
-  SA: "artscroisesServiceAccount"
-  sheetid: "artscroisesmembersdb"
-  mailing_folder: "folder_id_from_google_drive"
-  smtp_host: "smtp.example.com"
-  smtp_port: 587
-  imap_host: "imap.example.com"
-  imap_port: 993
-  max_mails_per_hour: 1000
-  max_addr_per_mail: 50
-  pause: 3
+myProfile:
+  sender: "sender@example.com"                      # Email address to send from
+  sendername: "John Doe"                            # Displayed name in the message header
+  username: "jdoe"                                  # Username for SMTP/IMAP authentication
+  password: "password"                              # Password for SMTP/IMAP authentication
+  smtp_host: "smtp.example.com"                     # SMTP server address
+  smtp_port: 587                                    # SMTP server port
+  smtp_tls:                                         # Enable TLS encryption (optional)
+  imap_host: "imap.example.com"                     # IMAP server address
+  imap_port: 993                                    # IMAP server port
+  domain: "example.com"                             # Domain for email address validation 
+  sent_folder: "Sent"                               # folder to store sent messages
+  max_mails_per_hour: 1000                          # maximum emails to send per hour
+  max_addr_per_mail: 50                             # maximum number of addresses per mail
+  pause: 3                                          # pause duration in seconds between operations
+  filter: # Filtering options - see below for details
+    email: is not empty
+    status: is active
+  filter_test: # filter active in test mode
+    email: is "tester@example.com"
+    group: in "test, Test"
+  MAILCONFIG: "myProfile"                           # (optional) key name to retrieve some of the below parameters that are in a secure vault
+  SA: "myServiceAccount"                            # (optional) if attachment are on a Google Driven key name of Service Account credentials in the secure vault
+  sheetid: "myMembersDB"                            # (optional) key name of the member database as Google Sheets identifier in vault 
+  mailing_folder: "folder_id_from_google_drive"     # (optional) Google driver folder ID where message attachments are stored
 
-cambristi:
-  MAILCONFIG: "CambristiMailConfig"
-  # Similar configuration...
+myOtherProfile:
+  MAILCONFIG: "myOtherMailConfig"
+  # Similar configuration... excepted for gmail_api_key and gmail_api_secret if used
+  gmailCredentials:
+    installed:
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth"
+      "client_id": "*****"
+      "client_secret": "****"
+      "project_id": "****"
+      "redirect_uris":
+        - "http://localhost"
+      "refresh_token": ""
+      "token_uri": "https://oauth2.googleapis.com/token"
+  TOKEN_FILE: 'token.json'
+  SCOPES:
+    - 'https://www.googleapis.com/auth/gmail.readonly'
+    - 'https://www.googleapis.com/auth/gmail.modify'
+    - 'https://www.googleapis.com/auth/gmail.send'
 ```
+
+The filter section is optional and can be used to filter subscribers based on specific attributes.
+
+if all the conditions are met, the subscriber is added to the mailing list
+
+The syntax is:
+
+    filter:
+        <field_name>: <operation> <value>
+        <field_name>: <operation> <value>
+
+    where:
+    <field_name>: is a field from the subscriber database (email, first_name...)
+    <operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
+                            "is empty", "is not empty", "greater than", "less than",
+                            "greater or equal to", "less or equal to", "one of", "none of",
+                            "is equal to", "is not equal to"
+    <value>: is the value to compare with
 
 ### Secrets Management
 
-Credentials and API keys should be stored securely using the `getSecrets` module. Required secrets:
+Optionally, Credentials and API keys can be stored securely using the `getSecrets` module. Typical secrets:
 
 - **MAILCONFIG**: SMTP/IMAP credentials
 - **Service Account**: Google API credentials
 - **Sheet ID**: Google Sheets identifier
-- **Billit API Token**: For invoice generation (Arts Croisés profile)
 
 ## Command-Line Usage
 
@@ -106,29 +156,31 @@ python sendMail.py --profile <profile_name> [options] [files...]
 
 #### Basic Options
 
-| Argument        | Type   | Description                                                      |
-|-----------------|--------|------------------------------------------------------------------|
-| `--profile`     | string | **Required**. Mail profile to use (`artscroises` or `cambristi`) |
-| `-s, --subject` | string | Subject of the email                                             |
-| `-m, --message` | string | Text message body of the email                                   |
-| `file`          | list   | Files to attach to the email (positional argument)               |
+| Argument         | Type   | Description                                                                              |
+|------------------|--------|------------------------------------------------------------------------------------------|
+| `--profile`      | string | **Required**. Mail profile to use (`artscroises` or `cambristi`)                         |
+| `-cfg, --config` | string | Path to config file (default: `$HOME/.config/sendMail.yml`)                              |
+| `-s, --subject`  | string | Subject of the email                                                                     |
+| `-m, --message`  | string | Text message body of the email - optional if files argument given                        |
+| `file`           | list   | Files `(.html, .txt, .pdf, .md, .png, .jpg)`to attach to the email (positional argument) |
+| `--keep-html`    | flag   | Keep HTML files after conversion of `.md` Markdown files                                 | 
 
 #### Test & Debug Options
 
-| Argument          | Type | Description                               |
-|-------------------|------|-------------------------------------------|
-| `-t, --test`      | flag | Test mode - send only to the tester group |
-| `-v, --verbose`   | flag | Increase output verbosity                 |
-| `-x, --doNotSend` | flag | Do not send any mail (dry run)            |
+| Argument          | Type | Description                                                                 |
+|-------------------|------|-----------------------------------------------------------------------------|
+| `-t, --test`      | flag | Test mode - send only to the tester group according to filter_test settings |
+| `-v, --verbose`   | flag | Increase output verbosity                                                   |
+| `-x, --doNotSend` | flag | Do not send any mail (dry run)                                              |
 
 #### Database Options
 
-| Argument           | Type    | Description                                              |
-|--------------------|---------|----------------------------------------------------------|
-| `-db, --database`  | string  | Path to CSV database file (alternative to Google Sheets) |
-| `-f, --from_index` | integer | Starting index in the database                           |
-| `-to, --to_index`  | integer | Stopping index in the database                           |
-| `--selected`       | flag    | Only send to selected recipients                         |
+| Argument           | Type    | Description                                                       |
+|--------------------|---------|-------------------------------------------------------------------|
+| `-db, --database`  | string  | Path to CSV or Excel database file (alternative to Google Sheets) |
+| `-f, --from_index` | integer | Starting index in the database                                    |
+| `-to, --to_index`  | integer | Stopping index in the database                                    |
+| `--selected`       | flag    | Only send to selected recipients                                  |
 
 #### Rate Limiting & Batch Options
 
@@ -139,14 +191,11 @@ python sendMail.py --profile <profile_name> [options] [files...]
 | `-p, --pause`               | integer | Pause duration in seconds between operations (default: 3) |
 | `-w, --wait`                | integer | Wait x minutes before starting to send mail               |
 
-#### Membership & Invoice Options
+#### Other Options
 
-| Argument                    | Type   | Description                              |
-|-----------------------------|--------|------------------------------------------|
-| `--cotisation`              | flag   | Generate cotisation reminder mail        |
-| `-y, --cotisation_year`     | string | Cotisation year (default: "2026")        |
-| `-amt, --cotisation_amount` | string | Cotisation amount (default: "15.00")     |
-| `--sync`                    | flag   | Synchronize members database with Billit |
+| Argument    | Type | Description                              |
+|-------------|------|------------------------------------------|
+| `--md2html` | flag | Convert a Markdown file to HTML and exit |
 
 ## Usage Examples
 
@@ -175,7 +224,7 @@ python sendMail.py --profile artscroises \
 
 ### Example 3: HTML Email with Rate Limiting
 
-Send HTML email with controlled rate limiting:
+Send HTML email from converted mardonx file with controlled rate limiting:
 
 ```bash
 python sendMail.py --profile cambristi \
@@ -183,21 +232,13 @@ python sendMail.py --profile cambristi \
     -mh 500 \
     -na 25 \
     -p 5 \
-    email_template.html
+    -keephtml \
+    email_template.md
 ```
 
-### Example 4: Membership Cotisation Reminder
+email_template.html will be created in the same directory and can be published to a web site
 
-Generate and send cotisation invoices for 2026:
-
-```bash
-python sendMail.py --profile artscroises \
-    --cotisation \
-    -y 2026 \
-    -amt 15.00
-```
-
-### Example 5: Partial Database Processing
+### Example 4: Partial Database Processing
 
 Process only records 100 to 200 from the database:
 
@@ -209,7 +250,7 @@ python sendMail.py --profile artscroises \
     newsletter.pdf
 ```
 
-### Example 6: Dry Run (No Sending)
+### Example 5: Dry Run (No Sending)
 
 Preview what would be sent without actually sending emails:
 
@@ -221,7 +262,7 @@ python sendMail.py --profile artscroises \
     newsletter.pdf
 ```
 
-### Example 7: Selected Recipients Only
+### Example 6: Selected Recipients Only
 
 Send only to recipients marked as "selected" in the database:
 
@@ -232,7 +273,7 @@ python sendMail.py --profile artscroises \
     announcement.pdf
 ```
 
-### Example 8: Using CSV Database
+### Example 7: Using CSV Database
 
 Use a local CSV file instead of Google Sheets:
 
@@ -243,7 +284,7 @@ python sendMail.py --profile artscroises \
     newsletter.pdf
 ```
 
-### Example 9: Delayed Send with Wait Time
+### Example 8: Delayed Send with Wait Time
 
 Wait 30 minutes before starting the mail campaign:
 
@@ -252,15 +293,6 @@ python sendMail.py --profile artscroises \
     -s "Scheduled Newsletter" \
     -w 30 \
     newsletter.pdf
-```
-
-### Example 10: Sync Members with Billit
-
-Synchronize member database with Billit invoicing system:
-
-```bash
-python sendMail.py --profile artscroises \
-    --sync
 ```
 
 ## Database Structure
@@ -332,15 +364,6 @@ The system can automatically download attachments from Google Drive:
 2. Upload files to the specified folder
 3. Run without specifying files - they'll be downloaded automatically
 4. After successful sending, files are renamed with `published_` prefix
-
-## Invoice Generation (Arts Croisés Profile)
-
-The Billit.be integration allows:
-
-- Creating/updating client records
-- Generating invoices for membership fees
-- Automatic payment reference generation
-- Email templates with payment instructions
 
 ## Best Practices
 
@@ -416,7 +439,6 @@ The test suite covers:
 - ✅ **Dictionary to Class conversion** utilities
 - ✅ **File utilities** (MIME type detection, Base64 encoding)
 - ✅ **Message formatting** with variable substitution
-- ✅ **Billit invoice** class initialization and methods
 - ✅ **Filtering functions** for both profiles
 - ✅ **Email building** with various configurations
 - ✅ **Google Drive** connection, file listing, download, upload, and rename
@@ -435,8 +457,8 @@ Tests run automatically on every push and pull request via GitHub Actions:
 
 | Component         | Status                                                               | Coverage                                                                 |
 |-------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------|
-| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg) |
-| googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg) |
+| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg) |
+| googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg) |
 
 ### Writing New Tests
 
@@ -474,6 +496,8 @@ class TestYourFeature:
 
 ## Documentation
 
+Online documentation is available at https://mailing.readthedocs.io/.
+
 Full API documentation is available in the `docs/` directory. Build with:
 
 ```bash
@@ -484,7 +508,7 @@ View at `docs/_build/html/index.html`
 
 ## Copyright
 
-© Copyright 2022-2026 Xavier Mayeur
+© Copyright 2025-2026 Xavier Mayeur
 
 ## License
 
@@ -498,3 +522,10 @@ For issues and questions, please contact the maintainer or file an issue in the 
 
 Contributions are welcome! Please follow the existing code style and include tests for new features.
 
+
+## Changelog
+
+All notable changes to this project will be documented here.
+
+### 2026-02-11
+- Added initial changelog section to README.
