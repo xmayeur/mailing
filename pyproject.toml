@@ -10,8 +10,11 @@ dependencies = [
     "spamcheck>=1.0.4",
     "get-hc-secrets>=1.5.27",
     "oauth2client",
-    "pillow>=12.1.0",
+    "pillow>=12.1.1",
     "markdown2",
     "google-auth>=2.47.0",
     "google-auth-oauthlib>=1.2.2",
+    "pyasn1>=0.6.2",
+    "protobuf>=6.33.5"
+
 ]
