@@ -1180,7 +1180,7 @@ def test_process_attachments_no_files_and_no_mailing_folder():
         with patch("sendMail.glob", return_value=[]):
             files, service, gd_files = sendMail.process_attachments(args, config)
             assert files == []
-            assert service == mock_connect.return_value
+            assert service == None
             assert gd_files == []
 
 

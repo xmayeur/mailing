@@ -552,14 +552,14 @@ def process_attachments(args, config, folder="input"):
         object (or None if unused), and metadata about files fetched from Google Drive.
     :rtype: tuple[list[str], Union[Resource, None], list[dict]]
     """
-    service, google_drive_files = None, []
+    service, google_drive_files, files = None, [], []
     if args.file:
         for f in args.file:
             if not os.path.isfile(f):
                 log.critical(f"File not found: {f}")
                 sys.exit(-1)
         files = args.file
-    else:
+    elif 'SA' in config and 'mailing_folder' in config:
         # Nettoyage et téléchargement depuis Google Drive
         for f in glob(f"{folder}/*.*"):
             os.remove(f)
@@ -1154,7 +1154,7 @@ def process_profile(args):
             log.warning("No secret configuration found")
             secret = {}
     except Exception as e:
-        log.warning(f"Error retrieving secret configuration: {e}")
+        log.info(f"No secret configuration used using: {e} key")
         secret = {}
 
     config = {**secret, **config}
