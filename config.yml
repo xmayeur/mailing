@@ -86,3 +86,6 @@ default:
     bounced: is not bounced
     cotisation: greater than 0
     first_name: one of "Jean", "Xavier"
+  filter_test:
+    email: is "Toto the Tester"
+
