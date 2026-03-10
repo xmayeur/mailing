@@ -32,10 +32,11 @@ MOCK_MODULES = [
     'googleapiclient',
     'googleapiclient.discovery',
     'googleapiclient.errors',
+    'googleapiclient.http',
     'oauth2client',
     'oauth2client.service_account',
-    'googleDriveLib',
     'PIL',
+    'markdown2'
 ]
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
@@ -44,11 +45,11 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'sendMail'
-copyright = '2026, Xavier'
-author = 'Xavier'
+copyright = '2025-2026, Xavier Mayeur'
+author = 'Xavier Mayeur'
 
-version = '1.0'
-release = '1.0'
+version = '1.1'
+release = '1.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -105,7 +106,6 @@ html_static_path = ['_static']
 # ReadTheDocs theme options
 html_theme_options = {
     'logo_only': False,
-    'display_version': True,
     'prev_next_buttons_location': 'bottom',
     'style_external_links': False,
     'vcs_pageview_mode': '',

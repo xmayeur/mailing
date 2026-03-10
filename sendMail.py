@@ -14,7 +14,6 @@ HTML content and converting data structures.
 import argparse
 import base64
 import csv
-import datetime as dt
 import email.mime.application
 import email.utils
 import imaplib
@@ -33,16 +32,18 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from getpass import getpass
 from glob import glob
+from os import getenv, mkdir
+from os.path import join, exists
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 from time import time, sleep
 from uuid import uuid4
 
 import gspread
+import markdown2 as md
 import requests
 import yaml
 from PIL import Image
 from bs4 import BeautifulSoup
-from certifi import where
 from getSecrets import get_secret
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -54,6 +55,54 @@ from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
+
+
+def get_default_config_path():
+    """
+    Determines the home directory of the current user based on the operating system.
+
+    This function checks the operating system and retrieves the appropriate
+    environment variable that represents the user's home directory. For Windows,
+    it uses the `USERPROFILE` environment variable. For other operating systems,
+    it uses the `HOME` environment variable.
+
+    :return: The path to the user's home directory as a string, or None if it
+        cannot be determined.
+    :rtype: Optional[str]
+    """
+    home = getenv("USERPROFILE") if os.name == 'nt' else getenv("HOME")
+    cfg = join(home, ".config", "sendMail.yml")
+    if not exists(cfg):
+        dir = join(home, ".config")
+        if not exists(dir):
+            mkdir(dir)
+        default = {
+            "username": "jdoe",
+            "password": "foobar",
+            "sender": "john.doe@example.com",
+            "sendername": "John Doe",
+            "database": "subscribers.csv",
+            "domain": "example.com",
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "imap_host": "imap.example.com",
+            "imap_port": 993,
+            "sent_folder": "Sent",
+            "pause": 1,
+            "styles": "./css/styles.css",
+            "filter": {
+                "email": "is not empty",
+                "bounced": "is not bounced",
+                "cotisation": "greater than 0",
+                "first_name": "one of \"Jean\", \"Xavier\""
+            }
+        }
+        with open(cfg, "w") as f:
+            yaml.dump(default, f)
+        log.warning(
+            f"Configuration file created at '{cfg}' with default values - Please configure your default parameters")
+        sys.exit(1)
+    return cfg
 
 
 def init_log(log_file=None):
@@ -170,6 +219,38 @@ def file_to_base64(filepath):
     return encoded_str.decode("utf-8")
 
 
+def make_html_images_inline(in_filepath, out_filepath=None) -> str:
+    """
+    Takes an HTML file and writes a new version with inline Base64 encoded
+    images.
+    :param in_filepath: Input file path (HTML)
+    :type in_filepath: str
+    :param out_filepath: Output file path (HTML) - if None, return the data
+    :type out_filepath: str
+    :returns the html data with inline images
+    """
+    basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
+    with open(in_filepath, "r") as file:
+        soup = BeautifulSoup(file, "html.parser")
+    for img in soup.find_all("img"):
+        if 'http' in img.attrs["src"]:
+            img_path = urllib.parse.unquote(img.attrs["src"])
+        else:
+            img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
+        mimetype = guess_type(img_path)
+        if ";base64," not in img_path:
+            img.attrs["src"] = f"data:{mimetype};base64,{file_to_base64(img_path)}"
+
+        else:
+            # TODO Change by a regex to ensure the string start with data:.*?;base64...
+            img.attrs["src"] = img_path[6:]
+
+    if out_filepath:
+        with open(out_filepath, "w") as of:
+            of.write(str(soup))
+    return str(soup)
+
+
 def prepare_html_for_cid(in_filepath):
     """
     Prepare HTML content for embedding inline images as Content-ID (CID) references.
@@ -208,201 +289,7 @@ def prepare_html_for_cid(in_filepath):
     return str(soup), image_paths
 
 
-class Billit:
-    """
-    Handles invoicing and order management operations using an external API.
-
-    The Invoice class provides functionality to interact with the Billit.be third-party
-    API to manage orders and clients. It allows creating clients, managing
-    invoices, and interacting with API endpoints for various operations.
-
-    Class Attributes:
-    :ivar EXPIRY_DAYS: Number of days after which an invoice expires.
-    :type EXPIRY_DAYS: int
-
-    Instance Attributes:
-    :ivar token: API token for authentication.
-    :type token: str
-    :ivar base: Base URL for the API (depends on the environment).
-    :type base: str
-    :ivar headers: Headers used for API requests, including authentication.
-    :type headers: dict
-    """
-
-    EXPIRY_DAYS = 30
-
-    def __init__(self, prod=False):
-        token_dict = get_secret("ArtsCroisesAPIToken")
-        if prod:
-            self.token = token_dict["token"]
-            self.base = token_dict["baseUrl"]
-        else:
-            self.token = token_dict["devToken"]
-            self.base = token_dict["devBaseUrl"]
-        self.headers = {"apiKey": self.token, "accept": "application/json"}
-
-    def _make_request(self, method, endpoint, json=None):
-        """
-        Makes a request to the Billit.be API using the specified method and endpoint.
-        :param method:
-        :param endpoint:
-        :param json:
-        :return:
-        """
-        url = self.base + endpoint
-        headers = (
-            {**self.headers, "content-type": "text/json"} if json else self.headers
-        )
-        response = requests.request(
-            method, url, headers=headers, json=json, verify=where()
-        )
-        if response.status_code != 200:
-            log.error(f"{method} {endpoint} failed: {response.text}")
-            return None
-        return response
-
-    def get_client(self, client_id):
-        """
-        Retrieves details for a client using its ID.
-        :param client_id:
-        :return:
-        """
-        response = self._make_request("GET", f"parties/{client_id}")
-        if response.status_code != 200:
-            return None
-        return response.json()
-
-    def create_client(self, row, indices):
-        """
-        Creates or update a new client using the provided row data.
-        :param row:
-        :param indices:
-        :return:
-        """
-        data = {
-            "PartyID": row[indices["id"]],
-            "Nr": row[indices["id"]],
-            "Name": row[indices["first_name"]] + " " + row[indices["last_name"]],
-            "Mobile": row[indices["mobile_phone"]],
-            "Phone": row[indices["phone"]],
-            "Email": row[indices["email"]],
-            "ContactFirstName": row[indices["first_name"]],
-            "ContactLastName": row[indices["last_name"]],
-            "PartyType": "Customer",
-        }
-        response = self._make_request("POST", "parties", json=data)
-        if not response or response.status_code != 200:
-            return -1
-        return response.text
-
-    def create_order(self, client=None, product_name="", price=0.0, qty=1):
-        """
-        Creates a new order for the specified client.
-        :param client:          "client" object returned by _get_client()
-        :param product_name:    product_name
-        :param price:           product unit price
-        :param qty:             product qua,tity
-        :return:                an "order" object
-        """
-
-        if not client:
-            return -1
-
-        today = dt.date.today()
-        order_data = {
-            "OrderType": "Invoice",
-            "OrderDirection": "Income",
-            "OrderDate": today.isoformat(),
-            "ExpiryDate": (today + dt.timedelta(days=self.EXPIRY_DAYS)).isoformat(),
-            "OrderTitle": product_name,
-            "OrderLines": [
-                {
-                    "Quantity": qty,
-                    "UnitPriceExcl": price,
-                    "Description": product_name,
-                    "VATPercentage": 0.0,
-                    "Reference": "C2026",
-                }
-            ],
-            "Customer": client,
-        }
-
-        response = self._make_request("POST", "orders", json=order_data)
-        if not response:
-            return -1
-
-        order_id = response.text
-        log.debug(f"OrderID: {order_id}")
-
-        # Refresh order details
-        response = self._make_request("GET", f"orders/{order_id}")
-        if not response:
-            return -1
-        return response.json()
-
-
-def _process_membership_invoice(param, row, indices):
-    """
-    Processes a membership invoice for the Arts Croisés association. The function validates the provided
-    information, creates a client if necessary, generates a membership invoice, and composes a message
-    for the member conveying payment details.
-
-    It ensures the client meets the criteria for membership renewal, attempts to handle the creation of
-    a client and order, and formats the final message detailing how to proceed with the payment.
-
-    :param param: An object that contains properties and behaviors necessary for invoice processing.
-    :param row: A dictionary-like object containing the details of a single member or transaction.
-    :param indices: A dictionary mapping field names to their corresponding indices within the row object.
-    :return: A boolean indicating whether the membership invoice was successfully processed. Returns
-        None if any mandatory step in processing fails.
-    """
-    if param.profile != 'artscroises':
-        return None
-    if not (row[indices["member"]] == "yes" and
-            not row[indices["membershippaid"]] and
-            row[indices["email"]]):
-        return None
-
-    client_id = param.invoice.create_client(row, indices)
-    if client_id == -1:
-        log.error(f"Failed to create client for {row[indices['id']]}.")
-        return None
-
-    client = param.invoice.get_client(client_id)
-    if not client:
-        return None
-
-    order = param.invoice.create_order(
-        client=client,
-        product_name=f"Cotisation Arts Croisés {param.cotisation_year}",
-        price=param.cotisation_amount,
-        qty=1,
-    )
-    if order["OrderID"] == -1:
-        log.error(f"Failed to create invoice for {row[indices['id']]}.")
-        return None
-
-    bank = order["Supplier"]["BankAccounts"][0]
-    acc_name = bank.get("Name", order["Supplier"]["Name"])
-
-    param.message = f"""
-        <html>
-        Chère/cher {row[indices["first_name"]]} {row[indices["last_name"]]},<br/><br/>
-        Nous vous souhaitons tous nos meilleurs voeux pour {param.cotisation_year}.<br/><br/>
-        Voici le temps de renouveler votre cotisation en tant que membre de notre association Arts Croisés.<br/><br/>
-        Si vous souhaitez rester membre, veuillez payer le montant de {param.cotisation_amount} {bank['Currency']} 
-        par personne sur le compte suivant :<br/><br/>
-        {acc_name}<br/>
-        IBAN : {bank['IBAN']}<br/>
-        Communication: {order["PaymentReference"]}<br/><br/>
-        Cordialement,<br/>
-        L'équipe Arts Croisés<br/>
-        {order["Supplier"]["Email"]}
-        </html>
-    """
-    return True
-
-def _get_subscriber_reader(param):
+def get_subscriber_reader(param):
     """
     Returns a reader object and file handle for retrieving subscriber
     data based on the given parameter. The function retrieves the data
@@ -411,7 +298,7 @@ def _get_subscriber_reader(param):
     found, it logs the error and returns None, None.
 
     :param param: The configuration object containing details for data
-                  retrieval (e.g., Google Sheets credentials or CSV
+                  retrieval (e.g., Google Sheets credentials or CSV/XLS
                   database path).
     :type param: object
     :return: A tuple consisting of a data reader object (either for
@@ -424,14 +311,20 @@ def _get_subscriber_reader(param):
         return iter(readAllSheet(wb)), None
 
     try:
-        csvfile = open(param.database, "r", newline="", encoding="utf-8-sig")
-        return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
+        if param.database.endswith(".csv"):
+            csvfile = open(param.database, "r", newline="", encoding="utf-8-sig")
+            return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
+        else:
+            from python_calamine import CalamineWorkbook
+            workbook = CalamineWorkbook.from_path(param.database)  # type: ignore[arg-type]
+            return iter(workbook.get_sheet_by_index(0).to_python()), workbook
+
     except FileNotFoundError:
         log.critical(f"Fichier introuvable : '{param.database}'")
         return None, None
 
 
-def _get_indices(header):
+def get_indices(header):
     """
     Create a dictionary that maps each header element to its corresponding
     index in the list of headers.
@@ -445,7 +338,7 @@ def _get_indices(header):
     return {h: i for i, h in enumerate(header)}
 
 
-def _get_smtp_connection(param):
+def get_smtp_connection(param):
     """
     Open a connection to the SMTP server.
     :param param:
@@ -485,8 +378,10 @@ def get_gmail_service(param):
     if os.path.exists(param.token_file):
         creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
     else:
-        token = get_secret(param.token_id)
-        creds = Credentials.from_authorized_user_info(token, param.scopes)
+        creds = None
+    # else:
+    #     token = get_secret(param.token_id)
+    #     creds = Credentials.from_authorized_user_info(token, param.scopes)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -494,7 +389,7 @@ def get_gmail_service(param):
         else:
             credentials = get_secret(param.credentials_id)
             # flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_ID, SCOPES)
-            flow = InstalledAppFlow.from_client_config(credentials, param.SCOPES)
+            flow = InstalledAppFlow.from_client_config(credentials, param.scopes)
             creds = flow.run_local_server(port=0)
         with open(param.token_file, 'w') as token:
             token.write(creds.to_json())
@@ -502,14 +397,15 @@ def get_gmail_service(param):
     return build('gmail', 'v1', credentials=creds)
 
 
-def _save_to_sent(param, msg):
+def save_to_sent(param, msg):
     """
     Store the message in the Sent folder using IMAP.
     :param param:
     :param msg:
     :return:
     """
-    for attempt in range(2):
+    n = 3
+    for attempt in range(n):
         try:
             imap = imaplib.IMAP4_SSL(param.imap_host, param.imap_port)
             imap.login(param.username, param.password)
@@ -524,7 +420,7 @@ def _save_to_sent(param, msg):
                 log.info("stored in sent folder")
             return
         except Exception as e:
-            if attempt == 0:
+            if attempt < n-1 :
                 log.warning(f"Retrying IMAP storage: {e}")
                 sleep(10)
             else:
@@ -556,10 +452,32 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
 
     for img in soup.find_all("img"):
         src = img.attrs.get("src", "")
-        if not src or src.startswith(('http', 'data:')):
+        if not src or src.startswith('http'):
             continue
 
-        img_path = urllib.parse.unquote(os.path.join(basepath, src))
+        if src.startswith('data:'):
+            # Traitement des images intégrées en base64
+            try:
+                # Format attendu : data:image/[type];base64,[data]
+                header, encoded = src.split(",", 1)
+                img_data = base64.b64decode(encoded)
+                # On essaie de deviner l'extension à partir du header
+                ext = "png" # par défaut
+                if "image/" in header:
+                    ext = header.split("image/")[1].split(";")[0]
+                
+                cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+                temp_img_path = os.path.join(temp_dir, f"embedded_{cid}.{ext}")
+                with open(temp_img_path, "wb") as f:
+                    f.write(img_data)
+                
+                img_path = temp_img_path
+            except Exception as e:
+                log.error(f"Impossible de traiter l'image en base64 : {e}")
+                continue
+        else:
+            img_path = urllib.parse.unquote(os.path.join(basepath, src))
+
         if os.path.exists(img_path):
             cid = email.utils.make_msgid(domain="inline.img")[1:-1]
 
@@ -588,7 +506,7 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
     return str(soup), inline_images, temp_dir
 
 
-def _format_message(template, row, header):
+def format_message(template, row, header):
     """
     Formats a message template by replacing placeholders with corresponding values
     from the `row` list, based on the column names provided in the `header`.
@@ -634,14 +552,14 @@ def process_attachments(args, config, folder="input"):
         object (or None if unused), and metadata about files fetched from Google Drive.
     :rtype: tuple[list[str], Union[Resource, None], list[dict]]
     """
-    service, google_drive_files = None, []
+    service, google_drive_files, files = None, [], []
     if args.file:
         for f in args.file:
             if not os.path.isfile(f):
                 log.critical(f"File not found: {f}")
                 sys.exit(-1)
         files = args.file
-    else:
+    elif 'SA' in config and 'mailing_folder' in config:
         # Nettoyage et téléchargement depuis Google Drive
         for f in glob(f"{folder}/*.*"):
             os.remove(f)
@@ -656,6 +574,97 @@ def process_attachments(args, config, folder="input"):
 
     return files, service, google_drive_files
 
+def md2html(file_path, styles=None, embed_styles=False):
+    """
+    Converts a Markdown file to an HTML file with optional styling.
+
+    The function reads a Markdown file, converts its content to an HTML
+    document using the `Markdown` library, and writes the resulting HTML
+    to a new file. Default and optional CSS styles can be embedded in or
+    linked from the resulting HTML document.
+
+    :param file_path: The file path of the Markdown file to be converted.
+    :type file_path: str
+    :param styles: Optional path to a CSS file for custom styling.
+                   Defaults to None.
+    :type styles: str, optional
+    :param embed_styles: Specifies whether to embed styles directly into
+                         the HTML. If True and a valid `styles` path is
+                         provided, the CSS content will be embedded as
+                         inline styles. Defaults to False.
+    :type embed_styles: bool
+    :return: The file path of the created HTML file, or None if the process
+             fails (e.g., if the Markdown file does not exist).
+    :rtype: str or None
+    """
+    default_styles = """
+        body {background-color: PapayaWhip;}
+        h1  {color: red; text-align: center}
+        h2  {color: darkred; padding-left: 20px;}
+        h3, h4, h5  { padding-left: 20px;}
+        h6  {color: skyblue;}
+        p, b {color: DarkSlateGray;padding-left: 50px;}
+        ul  {color: DarkSlateGray;padding-left: 80px;}
+        li  {
+            color: DarkSlateGray;
+            padding-left: 10px;
+            }
+        img {
+            max-width: 1000px;
+            height: auto;   display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        table {width: 100%;}
+    """
+
+    if not os.path.exists(file_path):
+        log.error(f"Le fichier Markdown {file_path} n'existe pas.")
+        return None
+    else:
+        with open(file_path, "r") as f:
+            data = f.read()
+
+    # if not styles is None and not os.path.exists(styles):
+    #     log.warning(f"Le fichier CSS {styles} n'existe pas. Default styles used instead.")
+    #     styles = None
+
+    converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
+
+    if styles is None:
+        head = f"""
+    <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <style>{default_styles}</style>
+    </head>
+    
+"""
+    elif embed_styles and os.path.exists(styles):
+        with open(styles, "r") as f:
+            default_styles = f.read()
+            head = f"""
+                <!-- Add locale and title header -->
+                <head>
+                    <meta charset="UTF-8">
+                    <style>{default_styles}</style>
+                </head>
+
+            """
+    else:
+        head = f"""
+   <!-- Add locale and title header -->
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="{styles}">
+    </head>
+"""
+
+    html = "<html>\n" + head + converter.convert(data) + "\n</html>"
+    file_path = file_path.split(".")[0] + ".html"
+    with open(file_path, "w") as f:
+        f.write(html)
+    return file_path
 
 def build_email(param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None):
     """
@@ -695,7 +704,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"  # , <{unsubscribe_url}>"
     msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click" # Recommandé par les nouveaux standards Gmail/Yahoo 2024
 
-    if param.cotisation or param.max_addr_per_mail == 1:
+    if param.max_addr_per_mail == 1:
         to = bcc
         bcc = None
         msg["To"] = to
@@ -706,8 +715,9 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
     if bcc:
         msg["Bcc"] = bcc
     msg["Date"] = email.utils.formatdate(localtime=True)
-    if param.profile == 'artscroises':
-        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="artscroises.be")
+
+    if param.domain:
+        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain=param.domain)
     # elif param.profile == 'cambristi':
     #    msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
 
@@ -723,16 +733,19 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
         if os.path.exists(img_path):
             cid = email.utils.make_msgid(domain="inline.img")[1:-1]
             all_inline_images.append({'path': img_path, 'cid': cid})
-            # Note: Si vous utilisez cette option, vous devrez manuellement
-            # mettre cid:id dans votre message texte.
 
     for att in [attachments] if isinstance(attachments, str) else (attachments or []):
-        if att.endswith(("htm", "html")):
+        if att.endswith(("htm", "html", "md")):
+            is_md = att.endswith("md")
+            if is_md:
+                att = md2html(att, styles=param.styles if hasattr(param, "styles") else None, embed_styles=True)
             # C'est ici que la magie opère pour le HTML
             html_content, found_images, t_dir = prepare_html_and_get_images(att)
             message = html_content
             all_inline_images.extend(found_images)
             temp_dirs.append(t_dir)
+            if is_md and not hasattr(param, "keep-html"):
+                os.remove(att)
         else:
             with open(att, "rb") as f:
                 content = f.read()
@@ -775,42 +788,38 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
 
 def generate_mailing(param):
     """
-    Generates and sends email batches based on the specified parameters and subscription data.
+    Generates and sends emails to a list of subscribers based on provided parameters and subscriber information.
 
-    The function processes subscriber data, filters the recipients based on given conditions,
-    formats the message body, and sends emails in batches while adhering to specified constraints
-    such as maximum recipients per mail and maximum emails per hour. Handles special cases like
-    membership-specific invoicing, restricts email sending to specific recipient indices,
-    and optionally resumes at a specified index.
+    This function reads a list of recipients from a CSV file and sends them emails in batched groups. The
+    function supports various profiles for filtering recipients, skipping initial records, and processing
+    up to a certain index. It respects constraints like maximum recipients per email, maximum emails
+    sent per hour, and pauses between batches. The email messages can include custom formatting, attachments,
+    and can be sent using different email delivery methods based on the profile.
 
-    :param param: Object containing configurations and parameters for the email generation
-                  and sending process (e.g., max address per mail, pause duration, verbose
-                  mode, subscription filters, etc.).
-    :type param: object
+    If an error occurs during execution, the function logs the error and attempts to finish gracefully.
 
-    :return: A string indicating the result of the operation. Returns "OK" if successful, or
-             "Error" in case of a failure.
+    :param param: An object containing configuration attributes required to generate, filter, and send emails.
+                  The attributes include limits, filters, email parameters, and operational flags.
+    :type param: Any
+    :return: A string "OK" if email generation and sending complete successfully, or "Error" if an error occurs.
     :rtype: str
-
-    :raises AttributeError: Raised if a required configuration key is missing in the
-                            `param` object.
     """
     try:
-        max_add = 1 if param.cotisation else param.max_addr_per_mail
-        pause = 0 if param.cotisation else param.pause
+        max_add = param.max_addr_per_mail
+        pause =  param.pause
         max_mail_per_hour = param.max_mails_per_hour
     except AttributeError as e:
         log.critical(f"Clé de configuration manquante : {e}")
         return "Error"
 
-    reader, csvfile = _get_subscriber_reader(param)
+    reader, file_object = get_subscriber_reader(param)
     if not reader:
         return "Error"
 
     try:
         header = next(reader, None)
         if not header: return "Error"
-        indices = _get_indices(header)
+        indices = get_indices(header)
 
         # Skip initial records if requested
         current_row_idx = 1
@@ -830,15 +839,7 @@ def generate_mailing(param):
             if param.to_index and current_row_idx > int(param.to_index):
                 break
 
-            # filtering
-            if param.profile == 'artscroises':
-                if param.cotisation:
-                    if not _process_membership_invoice(param, row, indices):
-                        continue
-                elif _filter_artscroises(param, row, indices):
-                    continue
-            elif param.profile == 'cambristi':
-                if _filter_cambristi(param, row, indices, param.test):
+            if filter(param.filter, row, indices):
                     continue
 
             if param.verbose:
@@ -849,15 +850,16 @@ def generate_mailing(param):
 
             if len(addressees) >= max_add:
                 log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
-                msg_body = _format_message(param.message, row, header)
+                msg_body = format_message(param.message, row, header)
                 if not param.donotsend:
-                    msg, recipents = build_email(param=param,subject=param.subject, message=msg_body,
+                    msg, recipients = build_email(param=param, subject=param.subject, message=msg_body,
                               bcc=",".join(addressees), attachments=param.file)
                     try:
-                        if param.profile == 'artscroises':
-                            send_mail(param=param, message=msg, recipients=recipents)
-                        elif param.profile == 'cambristi':
-                            send_gmail(get_gmail_service(param), message= msg)
+                        if hasattr(param, 'smtp_host'):
+                            send_mail(param=param, message=msg, recipients=recipients)
+                        else:
+                            send_gmail(get_gmail_service(param), message=msg)
+
                     finally:
                         # Nettoyage des dossiers temporaires créés pour ce mail
                         if hasattr(msg, '_temp_dirs'):
@@ -877,13 +879,13 @@ def generate_mailing(param):
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
-            msg_body = _format_message(param.message, row, header)
+            msg_body = format_message(param.message, row, header)
             if not param.donotsend:
                 msg, recipients = build_email(param=param, subject=param.subject, message=msg_body,
                                   bcc=",".join(addressees), attachments=param.file)
-                if param.profile == 'artscroises':
+                if hasattr(param, 'smtp_host'):    # param.profile == 'artscroises':
                     send_mail(param=param, message=msg, recipients=recipients)
-                elif param.profile == 'cambristi':
+                else:
                     send_gmail(get_gmail_service(param), message=msg)
             mail_batch_count += 1
 
@@ -891,90 +893,155 @@ def generate_mailing(param):
             f"Terminé. {recipient_count} adresses traitées en {mail_batch_count} envois ({int(time() - start_time)}s)")
         return "OK"
     finally:
-        if csvfile: csvfile.close()
+        if file_object: file_object.close()
 
 
-def _filter_artscroises(param, row, indices):
+def filter(filter, row, indices):
     """
-    Filters rows based on specific conditions such as status, group, selection,
-    and email presence. The function evaluates multiple constraints using the
-    provided parameters, data row, and column indices to determine the
-    exclusion or inclusion of the row.
+    Evaluates a set of filtering conditions on a given row of data using field indices.
 
-    :param param: An object containing filtering options such as test mode
-        and selection criteria.
-    :type param: Any
-    :param row: A list or array representing a single row of data to be
-        evaluated by the filter.
+    This function checks each field-value pair in a filter dictionary against a row of
+    data by performing the specified operations. Only rows that do not match the filter
+    criteria will pass (return `False`). The function supports a variety of comparison
+    operations, such as equality, inequality, greater-than, less-than, and membership.
+
+    Supported operations:
+    - "is"
+    - "is not"
+    - "gt" (greater than)
+    - "lt" (less than)
+    - "ge" (greater than or equal)
+    - "le" (less than or equal)
+    - "in"
+    - "not in"
+    - "is empty"
+    - "is not empty"
+    - "greater than" (alias for "gt")
+    - "less than" (alias for "lt")
+    - "greater or equal to" (alias for "ge")
+    - "less or equal to" (alias for "le")
+    - "one of" (alias for "in")
+    - "none of" (alias for "not in")
+    - "is equal to" (alias for "is")
+    - "is not equal to" (alias for "is not")
+    - "eq" (alias for "is equal to")
+    - "ne" (alias for "is not equal to")
+
+    Filter values can specify further conditions through implicit parsing. For example:
+    - Comma-separated values for membership tests (e.g., "in").
+    - Empty string values to test for emptiness.
+
+    The function logs warnings for invalid operations or values encountered in the filter.
+
+    :param filter: Dictionary containing filter conditions, where each key represents
+                   a field name, and the value is a string describing the operation
+                   and target value (e.g., "gt 10").
+    :type filter: dict
+    :param row: A list of field values representing a single data row that will be
+                checked against the filtering criteria.
     :type row: list
-    :param indices: A dictionary mapping column names to their respective
-        indices in the row for easy access to specific data points.
+    :param indices: Dictionary mapping filter field names to their respective column
+                    index positions in the `row` list. Used to retrieve field values
+                    for comparison.
     :type indices: dict
-    :return: A boolean value. True if the row should NOT pass the filter
-        (i.e., be excluded), False if it should pass.
+    :return: `True` if the given row does not satisfy the filter criteria, `False`
+             otherwise.
     :rtype: bool
     """
-    is_active = row[indices["status"]] == "active"
-    is_test_match = not param.test or "Test" in row[indices["group"]]
-    is_selected = (
-            not param.selected or row[indices["selected"]].lower() == "x"
-    )
-    has_email = bool(row[indices["email"]])
-    return not (is_active and is_test_match and is_selected and has_email)
+    if filter == {}:
+        return False
 
+    result = True
 
-def _filter_cambristi(param, row, indices, test):
-    """
-    Filters data based on specific conditions related to membership status and test mode.
+    # Allowed operations
+    ops = [
+        "is", "is not", "gt", "lt", "ge", "le", "in", "not in",
+        "is empty", "is not empty", "greater than", "less than",
+        "greater or equal to", "less or equal to", "one of", "none of",
+        "is equal to", "is not equal to", "eq", "ne"
+    ]
 
-    This function implements a filtering mechanism to process a given row of data based on
-    conditions defined by the input parameters. It differentiates behaviors depending on
-    whether the test mode is enabled or not.
-
-    :param param: Context-specific parameter used for processing. Implementation details
-                  of this parameter are not specified in the function body.
-    :type param: Any
-    :param row: The current row of data to process.
-    :type row: List[Any]
-    :param indices: A dictionary mapping relevant column names to their respective indices
-                    in the row.
-    :type indices: Dict[str, int]
-    :param test: A flag indicating whether the function operates in test mode (`True`) or
-                 normal mode (`False`).
-    :type test: bool
-    :return: Indicates whether the row passes the filtering conditions.
-             Returns `True` if the row does not satisfy the filtering criteria and should
-             be excluded; `False` otherwise.
-    :rtype: bool
-    """
-    if test:
-        try:
-            return not ('test' in row[indices["title"]] )
-        except IndexError:
-            log.warning(f"No title in row {row[indices['nom']]}, {row[indices['prenom']]}")
+    for k, v in filter.items():
+        res = True
+        field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
+        if field_value is None:
+            log.warning(f"Invalid field '{k}'")
             return True
-    else:
+        # get the operator
         try:
-            is_active = row[indices["title"]] == "member"
-            has_mail = bool(row[indices["email"]])
-            return not (is_active and has_mail)
-        except IndexError:
+            op = ops[[v.find(x + ' ') for x in ops].index(0)]
+        except ValueError:
+            log.warning(f"Invalid filter operation for field '{k}: {v}'")
             return True
+        # get the value to compare with
+        test_value = v.split(op)[1].strip()
+        # correct the operator if needed
+        if 'not ' in test_value:
+            op += ' not'
+            test_value = test_value.split('not')[1].strip()
+        if 'empty' in test_value:
+            op += ' empty'
+            test_value = None
+        # find if test_value should be a list
+        if test_value and ',' in test_value:
+            test_value = test_value.replace(' ', '').split(',')
+
+        try:
+            field_value = float(field_value)
+            try:
+                test_value = float(test_value)
+            except ValueError:
+                log.warning(f"Invalid filter value for field '{k}: {test_value}'")
+                return True
+            # numeric comparison
+            if op == "ge" or op == "greater than or equal to":
+                res = (field_value >= test_value)
+            elif op == "gt" or op == "greater than":
+                res = (field_value > test_value)
+            elif op == "le" or op == "less than or equal to":
+                res = (field_value <= test_value)
+            elif op == "lt" or op == "less than":
+                res = (field_value < test_value)
+            elif op == "eq" or op == "is equal to":
+                res = (field_value == test_value)
+            elif op == "ne" or op == "is not equal to":
+                res = (field_value != test_value)
+
+        except ValueError:
+            # string comparison
+            if op == "in" or op == 'one of':
+                res = (field_value in test_value)
+            elif op == "not in" or op == 'none of':
+                res = (field_value not in test_value)
+            elif op == "is" or op == 'is equal to':
+                res = (field_value == test_value)
+            elif op == "is not" or op == 'is not equal to':
+                res = (field_value != test_value)
+            elif op == "is not empty":
+                res = (field_value != "" and field_value is not None)
+            elif op == "is empty":
+                res = (field_value == "" or field_value is None)
+
+        if not res:
+            return True
+        result = result and res
+
+    return not result
 
 
-def send_gmail(service,message=None):
+def send_gmail(service, message=None):
     """
-    This function is used to send an email using the Gmail API. The provided `service`
-    object facilitates interaction with the Gmail API. An input `message` object must
-    also be provided, containing the email to be sent. The function encodes the email
-    in a URL-safe format and sends it using the API. In the case of an error during
-    transmission, the error is logged, and `None` is returned.
+    Sends an email message using the Gmail API.
 
-    :param service: A resource object with methods for interacting with the Gmail API.
-    :param message: An email message object containing the data to send. Should
-       implement the `as_bytes` method for conversion to raw bytes format.
-    :return: The API response on successful email sending, or `None` if an error
-       occurs.
+    This function encodes the message in Base64 and uses the provided Gmail service
+    to send the email. It handles errors and logs any failures.
+
+    :param service: An authorized Gmail API service instance.
+    :type service: googleapiclient.discovery.Resource
+    :param message: The email message as a MIME object.
+    :type message: MIMEMultipart or MIMEText
+    :return: The sent message resource if successful, None otherwise.
+    :rtype: dict or None
     """
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
@@ -1012,7 +1079,7 @@ def send_mail(param=None,message=None, recipients=None):
         log.info(f"Sending email to {recipients}")
     success = False
     for attempt in range(2):
-        conn = _get_smtp_connection(param)
+        conn = get_smtp_connection(param)
         if conn:
             try:
                 conn.sendmail(message["From"], recipients, message.as_string())
@@ -1027,109 +1094,32 @@ def send_mail(param=None,message=None, recipients=None):
                     sleep(10)
 
     if success:
-        _save_to_sent(param, message)
+        save_to_sent(param, message)
+    return success
 
 
-def _sync(param):
+def get_newsletter_name(files, args):
     """
-    Synchronize Arts Croisés members only database with Billit
-    :param param:
-    :return:
+    Parses given files and updates newsletter-related attributes in the provided arguments.
+
+    The function analyses filenames and their extensions to infer newsletter-related details such as
+    subject, newsletter name, and message body. It modifies the attributes of the provided `args`
+    object accordingly.
+
+    :param files: List of file paths to analyze
+    :type files: list[str]
+    :param args: Arguments object that holds properties like `subject`, `newsletter_name`, and `message`
+    :type args: Any
+    :return: Updated arguments object with inferred newsletter details
+    :rtype: Any
     """
-    if param.profile != 'artscroises':
-        return "N/A"
-    reader, csvfile = _get_subscriber_reader(param)
-    header = next(reader, None)
-    if not header:
-        return "Error"
-
-    # mapping des headers
-    indices = {
-        "email": header.index("email"),
-        "id": header.index("id"),
-        "first_name": header.index("first_name"),
-        "last_name": header.index("last_name"),
-        "phone": header.index("phone"),
-        "mobile_phone": header.index("mobile_phone"),
-        "address": header.index("address"),
-        "city": header.index("city"),
-        "zip": header.index("zip"),
-        "member": header.index("member"),
-        "membershippaid": header.index(f"Cotisation {param.cotisation_year}"),
-        "group": header.index("mailing_list"),
-        "selected": header.index("selected"),
-        "status": header.index("status"),
-    }
-    # Sauter les enregistrements initiaux
-    current_row_idx = 1
-    if param.from_index:
-        log.info(f"Reprise à l'index {param.from_index}")
-        for _ in range(2, int(param.from_index)):
-            next(reader, None)
-            current_row_idx += 1
-
-    for row in reader:
-        current_row_idx += 1
-        if param.to_index and current_row_idx > int(param.to_index):
-            break
-
-        # Filtres de sélection
-        has_email = bool(row[indices["email"]])
-        is_member = row[indices["member"]] == "yes"
-
-        if is_member:  # and has_email:
-            # Create or update member as client
-            client_id = param.invoice.create_client(row, indices)
-            if client_id == -1:
-                log.error(f"Failed to create client for {row[indices['id']]}.")
-                continue
-            client = param.invoice.get_client(client_id)
-            if not client:
-                continue
-            log.info(
-                f"Client for {row[indices['first_name']]} {row[indices['last_name']] } sync'ed."
-            )
-
-    return "Done"
-
-
-def process_artscroises(args):
-    """
-    Processes and configures the Arts Croisés mailing workflow including handling of
-    attachments, configuration settings, and messaging details derived from the provided
-    arguments and configurations.
-
-    :param args: Parsed arguments containing configuration details for mailing options.
-    :type args: argparse.Namespace
-    :return: None
-    """
-    config = args.conf[args.profile]
-    # config overrides secret data
-    config = {**get_secret(config["MAILCONFIG"]), **config }
-    if config is None:
-        log.critical("No secret configuration found")
-        sys.exit(1)
-
-    # and args overrides config data
-    if config["max_mails_per_hour"]:
-        args.max_addr_per_mail = int(config["max_addr_per_mail"])
-    if config["max_addr_per_mail"]:
-        args.max_mails_per_hour = int(config["max_mails_per_hour"])
-    if config["pause"]:
-        args.pause = int(config["pause"])
-
-    files, service, google_drive_files = process_attachments(args, config)
-
-    body_txt = args.body if args.body else ""
-    args.newsletter_name = ""
-
     # Analyse des fichiers pour le sujet et le corps
     for f in files:
         basename = os.path.basename(f)
         ext = basename.split(".")[-1].lower()
         name_part = basename.split(".")[0]
 
-        if ext in ["pdf", "html"]:
+        if ext in ["pdf", "html", "md"]:
             if not args.subject:
                 args.subject = name_part
             if "letter" in name_part.lower() or "lettre" in name_part.lower():
@@ -1140,69 +1130,119 @@ def process_artscroises(args):
             body_txt = open(f, encoding="utf-8").read()
             args.message = body_txt
             files.remove(f)
+    return args
 
-    if not args.message:
-        args.message = f"\nChers amies et amis des Arts Croisés,\n{body_txt}\nVeuillez trouver en pièce jointe notre newsletter {args.newsletter_name}.\nBonne lecture!\n\nL'équipe Arts Croisés, asbl.\n"
 
-    if args.wait:
-        log.info(f"Start sending in {args.wait} minutes")
-        for i in range(args.wait):
-            print(f"Sleeping for {args.wait - i} minutes      \r", end="", flush=True)
-            sleep(60)
+def process_profile(args):
+    """
+    Processes the user profile to configure and send a mailing task with attachments. The function
+    integrates configurations, manages secrets, processes attachments, and dynamically generates
+    and sends the mailing.
 
+    :param args: The argparse.Namespace object containing the configurations and command-line
+        arguments required for the mailing process.
+    :return: A string indicating the success or failure of the process. Returns "OK" if the
+        mailing was successfully sent; otherwise, returns "Error".
+    """
+    config = args.conf[args.profile]
+    # Secret retrieval is optional (but more secure)
+    # if secret vault or file is not accessible, just ignore and assume everything is in the config file
+    # config data overrides secret data
+    try:
+        secret = get_secret(config["MAILCONFIG"])
+        if secret is None:
+            log.warning("No secret configuration found")
+            secret = {}
+    except Exception as e:
+        log.info(f"No secret configuration used using: {e} key")
+        secret = {}
+
+    config = {**secret, **config}
     config.update(vars(args))
+    param = Dict2Class(config)
+
+    if not check_mandatory_param(param):
+        return "Error"
+
+    files, service, google_drive_files = process_attachments(param, config)
+    param.file = files  # Mise à jour explicite des fichiers filtrés
+    body_txt = param.body if param.body else ""
+    param.newsletter_name = ""
+
+    param = get_newsletter_name(files, param)
+    if not param.message:
+        param.message = config["default_message"]
+        param.message = param.message.replace("${newsletter_name}", param.newsletter_name)
+        param.message = param.message.replace("${body}", body_txt)
+
     if "password" not in config:
         config["password"] = getpass("Enter mail user's password")
 
-    param = Dict2Class(config)
-    param.file = files  # Mise à jour explicite des fichiers filtrés
+    if param.test:
+        param.filter = param.filter_test
 
-    if args.cotisation:
-        param.invoice = Billit(prod=not args.test)
-        param.subject = f"Arts Croisés - Cotisation {param.cotisation_year}"
-
-    if args.sync:
-        param.invoice = Billit(prod=not args.test)
-        _sync(param)
-
-    elif generate_mailing(param) == "OK" and not args.test:
+    if generate_mailing(param) == "OK" and not param.test:
         for f in google_drive_files:
             gd.rename_file(service, f["id"], f"published_{f['name']}")
         for f in glob("input/*.*"):
             os.remove(f)
+        return "OK"
+    else:
+        return "Error"
 
 
-def process_cambristi(args):
+def check_mandatory_param(param):
     """
-    Processes and sends emails with optional attachment handling and message body
-    generation based on the provided profile configuration.
+    Validates that all mandatory parameters are present and correctly configured.
 
-    This function initializes the configuration based on the provided arguments,
-    combines it with secret configuration data, and processes any attachments.
-    It then uses the updated configuration to create and send mailing content
-    through a specified email service.
+    This function ensures that required parameters for mailing operations are
+    set and valid before proceeding with the mailing process. It checks for:
 
-    :param args: The argparse.Namespace object containing the command-line
-        arguments, including profile and other configurations.
-    :returns: None
+    - **Common Parameters**: subject, sender, sendername, message.
+    - **Data Source**: either a CSV database path or (Google Service Account and Sheet ID).
+    - **Mailing Method**:
+        - *SMTP/IMAP mode*: smtp_host, smtp_port, imap_host, imap_port, username, password, sent_folder.
+        - *Gmail mode*: token_file, scopes, credentials_id.
+
+    :param param: An object containing configuration parameters.
+    :type param: Dict2Class
+    :return: True if all mandatory parameters are present, False otherwise.
+    :rtype: bool
     """
-    config = args.conf[args.profile]
-    # config overrides secret data
-    if "MAILCONFIG" in config:
-        config = {**get_secret(config["MAILCONFIG"]), **config }
-    if config is None:
-        log.critical("No secret configuration found")
-        sys.exit(1)
-    files, service, google_drive_files = process_attachments(args, config)
+    ret = True
 
-    config.update(vars(args))
-    param = Dict2Class(config)
-    param.file = files
-    # if 'html' in files[0]:
-    #     param.message = open(files[0], encoding="utf-8").read()
-    #     param.file=files[1:]
-    generate_mailing(param)
+    # Parameters mandatory for ALL modes
+    common_params = ['subject', 'sender', 'sendername', 'message']
+    for p in common_params:
+        if not hasattr(param, p) or getattr(param, p) is None:
+            log.error(f"{p.replace('_', ' ').capitalize()} is mandatory")
+            ret = False
 
+    # Data source check
+    if not hasattr(param, 'database') and not (hasattr(param, 'sa') and hasattr(param, 'sheetid')):
+        log.error("Database path or (Service Account (SA) and SheetID) is mandatory")
+        ret = False
+
+    # Mailing method specific checks
+    if hasattr(param, 'smtp_host'):
+        # SMTP/IMAP mode
+        smtp_imap_params = ['smtp_port', 'smtp_port', 'imap_host', 'imap_port', 'username', 'password', 'sent_folder']
+        for p in smtp_imap_params:
+            if not hasattr(param, p) or getattr(param, p) is None:
+                log.error(f"{p.replace('_', ' ').upper()} is mandatory for SMTP/IMAP mode")
+                ret = False
+    else:
+        # Gmail mode
+        gmail_params = ['token_file', 'scopes', 'credentials_id']
+        for p in gmail_params:
+            if not hasattr(param, p) or getattr(param, p) is None:
+                log.error(f"{p.replace('_', ' ').capitalize()} is mandatory for Gmail mode")
+                ret = False
+
+    if not ret:
+        log.critical("Please check and update your configuration file")
+
+    return ret
 
 def setup_argparse():
     """
@@ -1217,6 +1257,7 @@ def setup_argparse():
     :rtype: argparse.Namespace
 
     Options:
+        - -cfg, --config: Path to the configuration file (default: User Home folder).
         - -s, --subject: Subject of the mail (default: None).
         - -m, --message: Text message of the mail (default: an empty string).
         - file: A list of files to attach to the mail (default: []).
@@ -1230,20 +1271,17 @@ def setup_argparse():
           (default: None).
         - --selected: Flag to send only selected mail (default: False).
         - --body: Specifies the email body (default: None).
-        - --cotisation: Generates a cotisation reminder mail (default: False).
-        - -y, --cotisation_year: Year for cotisation reminders (default: '2026').
-        - -amt, --cotisation_amount: Amount for cotisation reminders (default:
-          '15.00').
         - -mh, --max-mails-per-hour: Maximum emails to send per hour (default:
           1000).
         - -na, --max_addr_per_mail: Maximum number of addresses per mail (default:
           50).
         - -p, --pause: Pause duration in seconds between operations (default: 3).
-        - --sync: Flag to enable synchronization mode (default: False).
-        - --check_spam: Flag to perform spam detection checks (default: False).
+        - --md2html: Flag to convert input Markdown file to embedded HTML (default: False).
+        - --keep-html: Flag to keep the generated HTML file (default: False).
         - --profile: Specifies the mail profile to use (default: None).
     """
     parser = argparse.ArgumentParser()
+    parser.add_argument("-cfg", "--config", help="path to the config file", default=None)
     parser.add_argument("-s", "--subject", help="Subject of the mail")
     parser.add_argument("-m", "--message", help="Text message of the mail", default="")
     parser.add_argument("file", nargs="*", help="files to attach to the mail")
@@ -1256,15 +1294,12 @@ def setup_argparse():
     parser.add_argument("-w", "--wait", help="Wait x minutes before restarting sending mail", type=int)
     parser.add_argument("--selected", action="store_true", help="Only send selected mail", default=False)
     parser.add_argument("--body")
-    parser.add_argument("--cotisation", help="Generate cotisation reminder mail", action="store_true", default=False)
-    parser.add_argument("-y", "--cotisation_year", help="Cotisation year", default="2026")
-    parser.add_argument("-amt", "--cotisation_amount", help="Cotisation amount", default="15.00")
     parser.add_argument("-mh", "--max-mails-per-hour", default=1000, type=int)
     parser.add_argument("-na", "--max_addr_per_mail", default=50, type=int)
     parser.add_argument("-p", "--pause", default=3, type=int)
-    parser.add_argument("--sync", action="store_true")
-    parser.add_argument("--check_spam", action="store_true")
-    parser.add_argument("--profile", help="mail profile")
+    parser.add_argument("--profile", help="mail profile", default="default")
+    parser.add_argument("--md2html", action="store_true", help="convert md file to html & exit")
+    parser.add_argument("--keep-html", action="store_true", help="keep the generated html file")
     return parser.parse_args()
 
 
@@ -1278,11 +1313,32 @@ def main():
     """
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     args = setup_argparse()
-    args.conf = yaml.safe_load(open("config.yml"))
-    if args.profile == "artscroises":
-        process_artscroises(args)
-    elif args.profile == "cambristi":
-        process_cambristi(args)
+    args.conf = None
+    if args.config:
+        with open(args.config) as config_file:
+            args.conf = yaml.safe_load(config_file)
+    else:
+        with open(get_default_config_path()) as config_file:
+            args.conf = yaml.safe_load(config_file)
+    if args.conf is None:
+        log.critical("No configuration file found")
+        sys.exit(-1)
+
+    if args.md2html and args.file[0].endswith(".md"):
+        md2html(args.file[0], "../css/styles.css")
+        file = args.file[0].replace(".md", ".html")
+        make_html_images_inline(file, file)
+        sys.exit(0)
+
+    # if not (args.message or args.body or args.file) and not args.subject:
+    # print("Missing subject and message text or file")
+    # sys.exit(-1)
+
+    if args.profile:
+        sys.exit(0 if process_profile(args) == "OK" else -1)
+    else:
+        log.critical("No profile specified")
+        sys.exit(-1)
 
 if __name__ == "__main__":
     main()
