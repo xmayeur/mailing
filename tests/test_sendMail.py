@@ -1180,7 +1180,7 @@ def test_process_attachments_no_files_and_no_mailing_folder():
         with patch("sendMail.glob", return_value=[]):
             files, service, gd_files = sendMail.process_attachments(args, config)
             assert files == []
-            assert service == mock_connect.return_value
+            assert service == None
             assert gd_files == []
 
 
@@ -1557,6 +1557,7 @@ def test_process_artscroises():
         mock_args.return_value.wait = 0
         mock_args.return_value.body = "body"
         mock_args.return_value.message = "message"
+        mock_args.return_value.subject = "subject"
         mock_args.return_value.test = False
         mock_args.return_value.donotsend = False
         # mock_args.return_value.conf = {"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}}
@@ -1757,7 +1758,7 @@ def test_process_profile_message_replacement_and_password_prompt():
             patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
             patch("sendMail.get_newsletter_name") as mock_get_news, \
             patch("sendMail.getpass", return_value="secret_pass") as mock_getpass, \
-            patch("sendMail.generate_mailing", return_value="OK"), \
+            patch("sendMail.generate_mailing", return_value="OK") as mock_generate, \
             patch("sendMail.check_mandatory_param", return_value=True):
         # Mock _get_newsletter_name to set a specific name
         def side_effect(files, a):
@@ -1768,8 +1769,9 @@ def test_process_profile_message_replacement_and_password_prompt():
 
         result = sendMail.process_profile(args)
 
-        # Verify lines 1187-1190: message was replaced
-        assert args.message == "Newsletter: MyNewsletter, Body: Test Body Content"
+        # Verify lines 1187-1190: message was replaced in param, not args
+        called_param = mock_generate.call_args[0][0]
+        assert called_param.message == "Newsletter: MyNewsletter, Body: Test Body Content"
 
         # Verify line 1194: getpass was called
         mock_getpass.assert_called_once_with("Enter mail user's password")
