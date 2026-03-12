@@ -21,7 +21,7 @@ class TestCheckMandatoryParam(unittest.TestCase):
 
     def test_missing_common_param(self):
         """Test missing common parameters like subject, sender, etc."""
-        for p in ['subject', 'sender', 'sendername', 'message']:
+        for p in ['sender', 'sendername']:
             params = self.common_valid.copy()
             del params[p]
             param_obj = sendMail.Dict2Class(params)

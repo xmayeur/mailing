@@ -79,6 +79,7 @@ default:
   imap_host: imap.example.com
   imap_port: 993
   sent_folder: "Sent"
+  default_message: ""
   pause: 1
   styles: "./css/styles.css"
   filter:
