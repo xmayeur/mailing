@@ -90,6 +90,7 @@ def get_default_config_path():
             "imap_port": 993,
             "sent_folder": "Sent",
             "pause": 1,
+                "default_message": "Hello",
             "styles": "./css/styles.css",
             "filter": {
                 "email": "is not empty",
@@ -1190,7 +1191,7 @@ def process_profile(args):
         param.message = param.message.replace("${body}", body_txt)
 
     if not param.subject:
-        log.error("No subject found in the configuration")
+        log.error("No subject given - use -s 'some subject' argument")
         return "Error"
 
     if "password" not in config:
@@ -1343,6 +1344,7 @@ def main():
         with open(args.config) as config_file:
             args.conf = yaml.safe_load(config_file)
     else:
+        print(get_default_config_path())
         with open(get_default_config_path()) as config_file:
             args.conf = yaml.safe_load(config_file)
     if args.conf is None:
