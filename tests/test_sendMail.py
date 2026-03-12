@@ -1339,6 +1339,7 @@ def test_process_artscroises_wait_and_no_config():
     args.wait = 1
     args.body = "body"
     args.message = "message"
+    args.subject = "subject"
     args.test = False
     secret_config = {
         "max_mails_per_hour": 100,
@@ -1375,6 +1376,7 @@ def test_process_artscroises_wait_and_no_secret():
     args.wait = 1
     args.body = "body"
     args.message = "message"
+    args.subject = "subject"
     args.test = False
     secret_config = None
 
@@ -1403,6 +1405,7 @@ def test_process_artscroises_wait_and_no_secret_file():
     args.wait = 1
     args.body = "body"
     args.message = "message"
+    args.subject = "subject"
     args.test = False
 
     def my_side_effect():
@@ -1700,6 +1703,26 @@ def test_main_using_default_config():
                     sendMail.main()
 
 
+def test_main_with_frozen_program():
+    with patch("sendMail.setup_argparse") as mock_args:
+        mock_args.return_value.profile = "artscroises"
+        mock_args.return_value.message = None
+        mock_args.return_value.md2html = None
+        mock_args.return_value.file = None
+        mock_args.return_value.body = None
+        mock_args.return_value.subject = None
+        mock_args.return_value.config = None
+        mock_args.return_value.test = None
+        mock_args.return_value.conf = None
+        mock_args.return_value.config = None
+        with patch("sendMail.get_default_config_path", return_value="./config.yml"):
+            with patch("sendMail.process_profile", return_value="OK"):
+                with patch("sendMail.sys") as mock_sys:
+                    mock_sys.frozen = True
+                    mock_sys.executable = "python.exe"
+                    sendMail.main()
+
+
 
 def test_main_missing_profile():
     """Test main with missing profile"""
@@ -1750,6 +1773,7 @@ def test_process_profile_message_replacement_and_password_prompt():
     }
     args.body = "Test Body Content"
     args.message = None  # To trigger lines 1187-1190
+    args.subject = "Test Subject"
     args.test = False
 
     secret_config = {"MAILCONFIG": "dummy_config"}  # No password here to trigger line 1194
@@ -1791,6 +1815,7 @@ def test_process_profile_test_filter():
     }
     args.body = ""
     args.message = "Direct message"
+    args.subject = "Test Subject"
     args.test = True  # To trigger line 1200
 
     secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
@@ -1812,6 +1837,42 @@ def test_process_profile_test_filter():
         # When args.test is True, process_profile returns "Error"
         # because of "and not args.test" in "if generate_mailing(param) == "OK" and not args.test:"
         assert result == "Error"
+
+
+def test_process_profile_test_nosubject():
+    """Tests line 1200 of sendMail.py"""
+    args = MagicMock()
+    args.profile = "test_profile"
+    args.conf = {
+        "test_profile": {
+            "MAILCONFIG": "dummy_config",
+            "filter_test": {"title": "Test Filter"}
+        }
+    }
+    args.body = ""
+    args.message = "Direct message"
+    args.subject = None
+    args.test = True  # To trigger line 1200
+
+    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
+
+    with patch("sendMail.get_secret", return_value=secret_config), \
+            patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
+            patch("sendMail.get_newsletter_name", side_effect=lambda f, a: a), \
+            patch("sendMail.check_mandatory_param", return_value=True):
+        result = sendMail.process_profile(args)
+
+        # Verify line 1200: param.filter was set to param.filter_test
+        # We check the call to generate_mailing to see what 'param' looked like
+        # param is a Dict2Class instance
+        # called_param = mock_generate.call_args[0][0]
+        # assert called_param.test is True
+
+        # When args.test is True, process_profile returns "Error"
+        # because of "and not args.test" in "if generate_mailing(param) == "OK" and not args.test:"
+        assert result == "Error"
+
+
 
 
 def test_get_default_config_path_windows():
