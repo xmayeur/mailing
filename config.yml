@@ -38,8 +38,6 @@ artscroises:
     L'équipe Arts Croisés, asbl.
 
 
-
-
 cambristi:
   SCOPES:
     - 'https://www.googleapis.com/auth/gmail.readonly'
@@ -67,6 +65,7 @@ cambristi:
     title: in test, Test
     email: is not empty
   styles: "./css/styles.css"
+  default_message: ''
 
 default:
   username: jdoe
