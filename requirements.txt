@@ -8,15 +8,13 @@ google-auth-httplib2
 gspread>=6.2.1
 oauth2client
 pillow>=12.1.1
-pyasn1>=0.6.2
-protobuf>=6.33.5
 PyYAML
 requests
 markdown2
 # Custom/local dependencies
 get_hc_secrets>=1.5.25
 python-calamine
-
+chardet
 # Development dependencies
 pytest>=7.4.0
 pytest-cov>=4.1.0
