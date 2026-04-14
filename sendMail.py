@@ -76,7 +76,8 @@ def get_default_config_path():
         dir = join(home, ".config")
         if not exists(dir):
             mkdir(dir)
-        default = {
+        default = {"default":
+            {
             "username": "jdoe",
             "password": "foobar",
             "sender": "john.doe@example.com",
@@ -89,12 +90,17 @@ def get_default_config_path():
             "imap_port": 993,
             "sent_folder": "Sent",
             "pause": 1,
+                "default_message": "Hello",
             "styles": "./css/styles.css",
             "filter": {
                 "email": "is not empty",
                 "bounced": "is not bounced",
                 "cotisation": "greater than 0",
                 "first_name": "one of \"Jean\", \"Xavier\""
+            },
+                "filter_test": {
+                    "email": "is john.doe@example.com"
+                }
             }
         }
         with open(cfg, "w") as f:
@@ -871,6 +877,8 @@ def generate_mailing(param):
                                 except Exception as e:
                                     log.error(f"Erreur lors du nettoyage de {d}: {e}")
 
+                else:
+                    log.info(f"do not sent activated")
                 addressees, mail_batch_count = [], mail_batch_count + 1
                 sleep(pause)
                 if recipient_count % max_mail_per_hour == 0:
@@ -887,6 +895,9 @@ def generate_mailing(param):
                     send_mail(param=param, message=msg, recipients=recipients)
                 else:
                     send_gmail(get_gmail_service(param), message=msg)
+            else:
+                log.info(f"do not sent activated")
+
             mail_batch_count += 1
 
         log.info(
@@ -1158,7 +1169,11 @@ def process_profile(args):
         secret = {}
 
     config = {**secret, **config}
-    config.update(vars(args))
+    # zz = [{arg: v} for arg ,v in vars(args).items() if getattr(args, arg)]
+    for k, v in vars(args).items():
+        if v is not None or k not in config:
+            config.update({k: v})
+
     param = Dict2Class(config)
 
     if not check_mandatory_param(param):
@@ -1174,6 +1189,10 @@ def process_profile(args):
         param.message = config["default_message"]
         param.message = param.message.replace("${newsletter_name}", param.newsletter_name)
         param.message = param.message.replace("${body}", body_txt)
+
+    if not param.subject:
+        log.error("No subject given - use -s 'some subject' argument")
+        return "Error"
 
     if "password" not in config:
         config["password"] = getpass("Enter mail user's password")
@@ -1212,7 +1231,7 @@ def check_mandatory_param(param):
     ret = True
 
     # Parameters mandatory for ALL modes
-    common_params = ['subject', 'sender', 'sendername', 'message']
+    common_params = ['sender', 'sendername']
     for p in common_params:
         if not hasattr(param, p) or getattr(param, p) is None:
             log.error(f"{p.replace('_', ' ').capitalize()} is mandatory")
@@ -1311,13 +1330,21 @@ def main():
 
     :return: None
     """
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    if hasattr(sys, 'frozen'):
+        application_path = os.path.dirname(sys.executable)
+    else:
+        application_path = os.path.dirname(__file__)
+
+    # config_path = os.path.join(application_path, config_name)
+    # os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(os.path.abspath(application_path))
     args = setup_argparse()
     args.conf = None
     if args.config:
         with open(args.config) as config_file:
             args.conf = yaml.safe_load(config_file)
     else:
+        print(get_default_config_path())
         with open(get_default_config_path()) as config_file:
             args.conf = yaml.safe_load(config_file)
     if args.conf is None:
