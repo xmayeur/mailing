@@ -53,6 +53,8 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Add this to allow release creation
 
     steps:
       - name: Checkout repository
