@@ -1768,7 +1768,8 @@ def test_process_profile_message_replacement_and_password_prompt():
     args.conf = {
         "test_profile": {
             "MAILCONFIG": "dummy_config",
-            "default_message": "Newsletter: ${newsletter_name}, Body: ${body}"
+            "default_message": "Newsletter: ${newsletter_name}, Body: ${body}",
+            "smtp_host": "smtp.example.com"
         }
     }
     args.body = "Test Body Content"
