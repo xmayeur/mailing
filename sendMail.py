@@ -155,6 +155,7 @@ def openGoogleDBMembersSheet(sa, id):
         "https://www.googleapis.com/auth/drive",
     ]
 
+    secr = get_secret(sa)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)
     gc = gspread.authorize(creds)
 
@@ -621,7 +622,6 @@ def md2html(file_path, styles=None, embed_styles=False):
             margin-left: auto;
             margin-right: auto;
         }
-        table {width: 100%;}
     """
 
     if not os.path.exists(file_path):
@@ -642,6 +642,7 @@ def md2html(file_path, styles=None, embed_styles=False):
     <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' https://cloud.cambrsiti.com data:;">
         <style>{default_styles}</style>
     </head>
     
@@ -653,6 +654,7 @@ def md2html(file_path, styles=None, embed_styles=False):
                 <!-- Add locale and title header -->
                 <head>
                     <meta charset="UTF-8">
+                    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' https://cloud.cambrsiti.com data:;">
                     <style>{default_styles}</style>
                 </head>
 
@@ -662,6 +664,7 @@ def md2html(file_path, styles=None, embed_styles=False):
    <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' https://cloud.cambrsiti.com data:;">
         <link rel="stylesheet" href="{styles}">
     </head>
 """
@@ -722,7 +725,7 @@ def build_email(param, subject="", to="", cc="", bcc="", message="", images=None
         msg["Bcc"] = bcc
     msg["Date"] = email.utils.formatdate(localtime=True)
 
-    if param.domain:
+    if hasattr(param, "domain"):
         msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain=param.domain)
     # elif param.profile == 'cambristi':
     #    msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
@@ -1165,7 +1168,7 @@ def process_profile(args):
             log.warning("No secret configuration found")
             secret = {}
     except Exception as e:
-        log.info(f"No secret configuration used using: {e} key")
+        # log.info(f"No secret configuration used using: {e} key")
         secret = {}
 
     config = {**secret, **config}
@@ -1194,7 +1197,7 @@ def process_profile(args):
         log.error("No subject given - use -s 'some subject' argument")
         return "Error"
 
-    if "password" not in config:
+    if "password" not in config and hasattr(param, 'smtp_host'):
         config["password"] = getpass("Enter mail user's password")
 
     if param.test:
