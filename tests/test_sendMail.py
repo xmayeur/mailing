@@ -1,6 +1,7 @@
 """
 Unit tests for sendMail.py module
 """
+
 import email
 import os
 import shutil
@@ -14,27 +15,29 @@ import pytest
 from googleapiclient import errors
 
 # Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Mock external dependencies
 # Note: googleDriveLib is tested separately in test_googleDriveLib.py
 # We mock its dependencies here to allow it to import properly
 mock_get_secret = MagicMock(return_value={"key": "value"})
 
-sys.modules['gspread'] = MagicMock()
-sys.modules['yaml'] = MagicMock()
+sys.modules["gspread"] = MagicMock()
+sys.modules["yaml"] = MagicMock()
 # sys.modules['bs4'] = MagicMock()
-sys.modules['certifi'] = MagicMock()
-sys.modules['getSecrets'] = MagicMock()
-sys.modules['getSecrets'].get_secret = mock_get_secret
-sys.modules['google'] = MagicMock()
-sys.modules['google.auth'] = MagicMock()
-sys.modules['google.auth.transport'] = MagicMock()
-sys.modules['google.auth.transport.requests'] = MagicMock()
-sys.modules['google.oauth2'] = MagicMock()
-sys.modules['google.oauth2.credentials'] = MagicMock()
-sys.modules['google_auth_oauthlib'] = MagicMock()
-sys.modules['google_auth_oauthlib.flow'] = MagicMock()
+sys.modules["certifi"] = MagicMock()
+sys.modules["getSecrets"] = MagicMock()
+sys.modules["getSecrets"].get_secret = mock_get_secret
+sys.modules["google"] = MagicMock()
+sys.modules["google.auth"] = MagicMock()
+sys.modules["google.auth.transport"] = MagicMock()
+sys.modules["google.auth.transport.requests"] = MagicMock()
+sys.modules["google.oauth2"] = MagicMock()
+sys.modules["google.oauth2.credentials"] = MagicMock()
+sys.modules["google_auth_oauthlib"] = MagicMock()
+sys.modules["google_auth_oauthlib.flow"] = MagicMock()
+
+
 # Mock googleapiclient.errors before importing sendMail
 class MockHttpError(Exception):
     def __init__(self, resp, content, uri=None):
@@ -48,12 +51,13 @@ class MockHttpError(Exception):
 
 mock_errors = MagicMock()
 mock_errors.HttpError = MockHttpError
-sys.modules['googleapiclient'] = MagicMock()
-sys.modules['googleapiclient.discovery'] = MagicMock()
-sys.modules['googleapiclient.errors'] = mock_errors
-sys.modules['googleapiclient.http'] = MagicMock()
+sys.modules["googleapiclient"] = MagicMock()
+sys.modules["googleapiclient.discovery"] = MagicMock()
+sys.modules["googleapiclient.errors"] = mock_errors
+sys.modules["googleapiclient.http"] = MagicMock()
 
 import sendMail
+
 # Use the same HttpError class in the test module's namespace and in sendMail
 errors.HttpError = MockHttpError
 sendMail.errors.HttpError = MockHttpError
@@ -84,14 +88,14 @@ class TestFileUtilities:
         """Test MIME type guessing with magic library"""
         mock_magic = MagicMock()
         mock_magic.from_file.return_value = "application/pdf"
-        with patch.dict('sys.modules', {'magic': mock_magic}):
+        with patch.dict("sys.modules", {"magic": mock_magic}):
             result = sendMail.guess_type("test.pdf")
             assert result == "application/pdf"
             mock_magic.from_file.assert_called_once_with("test.pdf", mime=True)
 
     def test_guess_type_without_magic(self):
         """Test MIME type guessing without magic library"""
-        with patch.dict('sys.modules', {'magic': None}):
+        with patch.dict("sys.modules", {"magic": None}):
             result = sendMail.guess_type("test.pdf")
             # Should fall back to mimetypes
             assert result is not None
@@ -99,12 +103,12 @@ class TestFileUtilities:
     def test_file_to_base64_local_file(self):
         """Test Base64 encoding of local file"""
         test_content = b"test content"
-        with patch('builtins.open', mock_open(read_data=test_content)):
+        with patch("builtins.open", mock_open(read_data=test_content)):
             result = sendMail.file_to_base64("/path/to/file.txt")
             assert isinstance(result, str)
             assert len(result) > 0
 
-    @patch('sendMail.requests.get')
+    @patch("sendMail.requests.get")
     def test_file_to_base64_http_file(self, mock_get):
         """Test Base64 encoding of HTTP file"""
         mock_response = Mock()
@@ -116,7 +120,7 @@ class TestFileUtilities:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch('sendMail.requests.get')
+    @patch("sendMail.requests.get")
     def test_file_to_base64_http_404(self, mock_get):
         """Test Base64 encoding with HTTP 404 error"""
         mock_response = Mock()
@@ -124,7 +128,7 @@ class TestFileUtilities:
         mock_get.return_value = mock_response
 
         result = sendMail.file_to_base64("http://example.com/missing.txt")
-        assert result == ''
+        assert result == ""
 
 
 class TestIndicesHelper:
@@ -175,6 +179,7 @@ class TestFormatMessage:
         result = sendMail.format_message(template, row, header)
         assert result == template
 
+
 class TestFilterFunctions:
     """Tests for filtering functions"""
 
@@ -183,10 +188,7 @@ class TestFilterFunctions:
         param = Mock()
         param.test = False
         param.selected = True
-        param.filter = {
-            "email": "is not empty",
-            "status": "is active"
-        }
+        param.filter = {"email": "is not empty", "status": "is active"}
 
         row = ["active", "Test Group", "x", "test@example.com"]
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
@@ -199,11 +201,7 @@ class TestFilterFunctions:
         param = MagicMock()
         param.test = False
         param.selected = False
-        param.filter = {
-            "email": "is not empty",
-            "status": "is active"
-        }
-
+        param.filter = {"email": "is not empty", "status": "is active"}
 
         row = ["inactive", "Group", "", "test@example.com"]
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
@@ -217,7 +215,7 @@ class TestFilterFunctions:
         param.filter = {
             "title": "in member, inactive",
             "email": "is not empty",
-            "emailBounced": "is empty"
+            "emailBounced": "is empty",
         }
 
         row = ["member", "John", "Doe", "test@example.com", ""]
@@ -232,7 +230,7 @@ class TestFilterFunctions:
         param.filter = {
             "title": "in test, Test",
             "email": "is not empty",
-            "emailBounced": "is empty"
+            "emailBounced": "is empty",
         }
 
         row = ["Test", "John", "Doe", "test@example.com"]
@@ -258,7 +256,7 @@ class TestEmailBuilding:
             param=param,
             subject="Test Subject",
             to="recipient@example.com",
-            message="Test message"
+            message="Test message",
         )
 
         assert isinstance(msg, MIMEMultipart)
@@ -279,7 +277,7 @@ class TestEmailBuilding:
             subject="Test Subject",
             to="to@example.com",
             bcc="bcc@example.com",
-            message="Test message"
+            message="Test message",
         )
 
         assert "bcc@example.com" in recipients
@@ -295,7 +293,7 @@ class TestEmailBuilding:
         monkeypatch.setattr(
             sendMail,
             "prepare_html_and_get_images",
-            lambda p: ("<html><body>Converted</body></html>", [], str(tmp_path / "t"))
+            lambda p: ("<html><body>Converted</body></html>", [], str(tmp_path / "t")),
         )
 
         # Track removal of the generated HTML file
@@ -312,35 +310,37 @@ class TestEmailBuilding:
         param.styles = None
         delattr(param, "keep-html")
 
-
         msg, _ = sendMail.build_email(
-            param=param,
-            subject="S",
-            to="to@example.com",
-            attachments=[str(md_file)]
+            param=param, subject="S", to="to@example.com", attachments=[str(md_file)]
         )
 
         # The temporary HTML (derived from the .md) must be removed
         assert removed.get("p") == str(md_file).replace(".md", ".html")
 
         # HTML body is attached inside a multipart/related part
-        related_parts = [p for p in msg.get_payload() if p.get_content_subtype() == "related"]
+        related_parts = [
+            p for p in msg.get_payload() if p.get_content_subtype() == "related"
+        ]
         assert related_parts, "Expected a multipart/related part with HTML body"
-        html_parts = [p for p in related_parts[0].get_payload() if p.get_content_subtype() == "html"]
+        html_parts = [
+            p
+            for p in related_parts[0].get_payload()
+            if p.get_content_subtype() == "html"
+        ]
         assert html_parts, "Expected an HTML part in the related container"
 
 
 class TestArgumentParser:
     """Tests for argument parser setup"""
 
-    @patch('sys.argv', ['sendMail.py', '--profile', 'artscroises', '-s', 'Test'])
+    @patch("sys.argv", ["sendMail.py", "--profile", "artscroises", "-s", "Test"])
     def test_setup_argparse_basic(self):
         """Test basic argument parsing"""
         args = sendMail.setup_argparse()
         assert args.profile == "artscroises"
         assert args.subject == "Test"
 
-    @patch('sys.argv', ['sendMail.py', '--profile', 'test', '-t', '-v'])
+    @patch("sys.argv", ["sendMail.py", "--profile", "test", "-t", "-v"])
     def test_setup_argparse_flags(self):
         """Test flag arguments"""
         args = sendMail.setup_argparse()
@@ -351,10 +351,13 @@ class TestArgumentParser:
 class TestHTMLProcessing:
     """Tests for HTML processing functions"""
 
-    @patch('builtins.open', mock_open(read_data='<html><body><img src="test.jpg"/></body></html>'))
-    @patch('os.path.exists')
-    @patch('os.path.join')
-    @patch('sendMail.BeautifulSoup')
+    @patch(
+        "builtins.open",
+        mock_open(read_data='<html><body><img src="test.jpg"/></body></html>'),
+    )
+    @patch("os.path.exists")
+    @patch("os.path.join")
+    @patch("sendMail.BeautifulSoup")
     def test_prepare_html_for_cid(self, mock_bs, mock_join, mock_exists):
         """Test HTML CID preparation"""
         mock_exists.return_value = True
@@ -367,7 +370,9 @@ class TestHTMLProcessing:
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img]
-        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:test@inline.img"/></body></html>')
+        mock_soup.__str__ = Mock(
+            return_value='<html><body><img src="cid:test@inline.img"/></body></html>'
+        )
 
         mock_bs.return_value = mock_soup
 
@@ -377,8 +382,13 @@ class TestHTMLProcessing:
         assert len(images) > 0
         assert images[0][0] == "/basepath/test.jpg"
 
-    @patch('builtins.open', mock_open(read_data='<html><body><img src="http://example.com/test.jpg"/></body></html>'))
-    @patch('os.path.exists')
+    @patch(
+        "builtins.open",
+        mock_open(
+            read_data='<html><body><img src="http://example.com/test.jpg"/></body></html>'
+        ),
+    )
+    @patch("os.path.exists")
     def test_prepare_html_for_cid_external_images(self, mock_exists):
         """Test HTML CID preparation skips external images"""
         mock_exists.return_value = True
@@ -387,13 +397,18 @@ class TestHTMLProcessing:
 
         assert len(images) == 0  # External images should be skipped
 
-    @patch('builtins.open', mock_open(read_data='<html><body><img src="test.jpg"/></body></html>'))
-    @patch('os.path.exists')
-    @patch('os.path.join')
-    @patch('tempfile.mkdtemp')
-    @patch('sendMail.Image')
-    @patch('sendMail.BeautifulSoup')
-    def test_prepare_html_and_get_images(self, mock_bs, mock_image, mock_temp, mock_join, mock_exists):
+    @patch(
+        "builtins.open",
+        mock_open(read_data='<html><body><img src="test.jpg"/></body></html>'),
+    )
+    @patch("os.path.exists")
+    @patch("os.path.join")
+    @patch("tempfile.mkdtemp")
+    @patch("sendMail.Image")
+    @patch("sendMail.BeautifulSoup")
+    def test_prepare_html_and_get_images(
+            self, mock_bs, mock_image, mock_temp, mock_join, mock_exists
+    ):
         """Test HTML processing with image optimization"""
         mock_exists.return_value = True
         mock_join.return_value = "/basepath/test.jpg"
@@ -414,23 +429,33 @@ class TestHTMLProcessing:
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img_tag]
-        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:test@inline.img"/></body></html>')
+        mock_soup.__str__ = Mock(
+            return_value='<html><body><img src="cid:test@inline.img"/></body></html>'
+        )
 
         mock_bs.return_value = mock_soup
 
-        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
+        html, images, temp_dir = sendMail.prepare_html_and_get_images(
+            "/basepath/test.html"
+        )
 
         assert "cid:" in html
         assert len(images) > 0
         assert temp_dir == "/tmp/test_dir"
 
-    @patch('sendMail.open', new_callable=mock_open, read_data='<html><body><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="/></body></html>')
-    @patch('os.path.exists')
-    @patch('tempfile.mkdtemp')
-    @patch('sendMail.Image')
-    @patch('sendMail.BeautifulSoup')
-    @patch('email.utils.make_msgid')
-    def test_prepare_html_and_get_images_base64(self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open):
+    @patch(
+        "sendMail.open",
+        new_callable=mock_open,
+        read_data='<html><body><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="/></body></html>',
+    )
+    @patch("os.path.exists")
+    @patch("tempfile.mkdtemp")
+    @patch("sendMail.Image")
+    @patch("sendMail.BeautifulSoup")
+    @patch("email.utils.make_msgid")
+    def test_prepare_html_and_get_images_base64(
+            self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open
+    ):
         """Test HTML processing with base64 image"""
         mock_exists.return_value = True
         mock_temp.return_value = "/tmp/test_dir"
@@ -447,12 +472,16 @@ class TestHTMLProcessing:
 
         # Create a mock img tag
         mock_img_tag = Mock()
-        mock_img_tag.attrs = {"src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}
+        mock_img_tag.attrs = {
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        }
 
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img_tag]
-        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:cid2@inline.img"/></body></html>')
+        mock_soup.__str__ = Mock(
+            return_value='<html><body><img src="cid:cid2@inline.img"/></body></html>'
+        )
 
         mock_bs.return_value = mock_soup
 
@@ -460,27 +489,38 @@ class TestHTMLProcessing:
         # Let's mock the save method to avoid it calling open.
         mock_img.save = Mock()
 
-        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
+        html, images, temp_dir = sendMail.prepare_html_and_get_images(
+            "/basepath/test.html"
+        )
 
         assert "cid:" in html
         assert len(images) > 0
         assert temp_dir == "/tmp/test_dir"
-        
+
         # The base64 image is first saved to embedded_<cid1>.<ext>
-        m_open.assert_any_call(os.path.join(temp_dir, "embedded_cid1@inline.img.png"), "wb")
-        
+        m_open.assert_any_call(
+            os.path.join(temp_dir, "embedded_cid1@inline.img.png"), "wb"
+        )
+
         # The optimized image is saved by PIL.Image.save
         mock_img.save.assert_called()
         # Verify the path passed to save()
         args, kwargs = mock_img.save.call_args
         assert args[0] == os.path.join(temp_dir, "cid2@inline.img.jpg")
 
-    @patch('builtins.open', mock_open(read_data='<html><body><img src="data:image/png;base64,INVALID"/></body></html>'))
-    @patch('os.path.exists')
-    @patch('tempfile.mkdtemp')
-    @patch('sendMail.BeautifulSoup')
-    @patch('sendMail.log')
-    def test_prepare_html_and_get_images_base64_error(self, mock_log, mock_bs, mock_temp, mock_exists):
+    @patch(
+        "builtins.open",
+        mock_open(
+            read_data='<html><body><img src="data:image/png;base64,INVALID"/></body></html>'
+        ),
+    )
+    @patch("os.path.exists")
+    @patch("tempfile.mkdtemp")
+    @patch("sendMail.BeautifulSoup")
+    @patch("sendMail.log")
+    def test_prepare_html_and_get_images_base64_error(
+            self, mock_log, mock_bs, mock_temp, mock_exists
+    ):
         """Test HTML processing with invalid base64 image"""
         mock_exists.return_value = True
         mock_temp.return_value = "/tmp/test_dir"
@@ -492,11 +532,15 @@ class TestHTMLProcessing:
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img_tag]
-        mock_soup.__str__ = Mock(return_value='<html><body><img src="data:image/png;base64,INVALID"/></body></html>')
+        mock_soup.__str__ = Mock(
+            return_value='<html><body><img src="data:image/png;base64,INVALID"/></body></html>'
+        )
 
         mock_bs.return_value = mock_soup
 
-        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
+        html, images, temp_dir = sendMail.prepare_html_and_get_images(
+            "/basepath/test.html"
+        )
 
         # Should skip the image and log error
         assert len(images) == 0
@@ -506,7 +550,7 @@ class TestHTMLProcessing:
 class TestAttachmentProcessing:
     """Tests for attachment processing"""
 
-    @patch('os.path.isfile')
+    @patch("os.path.isfile")
     def test_process_attachments_with_files(self, mock_isfile):
         """Test processing with file arguments"""
         mock_isfile.return_value = True
@@ -521,7 +565,7 @@ class TestAttachmentProcessing:
         assert service is None
         assert gd_files == []
 
-    @patch('os.path.isfile')
+    @patch("os.path.isfile")
     def test_process_attachments_file_not_found(self, mock_isfile):
         """Test processing with missing file"""
         mock_isfile.return_value = False
@@ -537,8 +581,8 @@ class TestAttachmentProcessing:
 class TestSMTPConnection:
     """Tests for SMTP connection handling"""
 
-    @patch('sendMail.SMTP')
-    @patch('ssl.create_default_context')
+    @patch("sendMail.SMTP")
+    @patch("ssl.create_default_context")
     def test_get_smtp_connection_success(self, mock_ssl, mock_smtp):
         """Test successful SMTP connection"""
         param = Mock()
@@ -556,8 +600,8 @@ class TestSMTPConnection:
         mock_conn.starttls.assert_called_once()
         mock_conn.login.assert_called_once_with("user@example.com", "password123")
 
-    @patch('sendMail.SMTP')
-    @patch('ssl.create_default_context')
+    @patch("sendMail.SMTP")
+    @patch("ssl.create_default_context")
     def test_get_smtp_connection_auth_error(self, mock_ssl, mock_smtp):
         """Test SMTP connection with authentication error"""
         from smtplib import SMTPAuthenticationError
@@ -569,7 +613,9 @@ class TestSMTPConnection:
         param.password = "wrong_password"
 
         mock_conn = Mock()
-        mock_conn.login.side_effect = SMTPAuthenticationError(535, "Authentication failed")
+        mock_conn.login.side_effect = SMTPAuthenticationError(
+            535, "Authentication failed"
+        )
         mock_smtp.return_value = mock_conn
 
         with pytest.raises(SystemExit):
@@ -579,8 +625,8 @@ class TestSMTPConnection:
 class TestEmailSending:
     """Tests for email sending functions"""
 
-    @patch('sendMail.imaplib.IMAP4_SSL', side_effect=Exception('fail'))
-    @patch('sendMail.sleep')
+    @patch("sendMail.imaplib.IMAP4_SSL", side_effect=Exception("fail"))
+    @patch("sendMail.sleep")
     def test_save_to_sent_failure_retries_and_logs(self, mock_sleep, mock_imap):
         param = Mock()
         param.imap_host = "imap.example.com"
@@ -598,8 +644,8 @@ class TestEmailSending:
         # sleep should have been called twice (between 3 attempts)
         assert mock_sleep.call_count == 2
 
-    @patch('sendMail.get_smtp_connection')
-    @patch('sendMail.save_to_sent')
+    @patch("sendMail.get_smtp_connection")
+    @patch("sendMail.save_to_sent")
     def test_send_mail_success(self, mock_save, mock_conn_func):
         """Test successful email sending"""
         param = Mock()
@@ -620,7 +666,7 @@ class TestEmailSending:
         mock_conn.quit.assert_called_once()
         mock_save.assert_called_once()
 
-    @patch('sendMail.get_smtp_connection')
+    @patch("sendMail.get_smtp_connection")
     def test_send_mail_connection_failure(self, mock_conn_func):
         """Test email sending with connection failure"""
         param = Mock()
@@ -634,8 +680,8 @@ class TestEmailSending:
         # Should handle gracefully without raising exception
         sendMail.send_mail(param=param, message=msg, recipients=recipients)
 
-    @patch('sendMail.imaplib.IMAP4_SSL')
-    @patch('sendMail.time')
+    @patch("sendMail.imaplib.IMAP4_SSL")
+    @patch("sendMail.time")
     def test_save_to_sent_success(self, mock_time, mock_imap):
         """Test saving message to sent folder"""
         param = Mock()
@@ -664,7 +710,7 @@ class TestEmailSending:
 class TestGmailFunctions:
     """Tests for Gmail API functions"""
 
-    @patch('sendMail.base64.urlsafe_b64encode')
+    @patch("sendMail.base64.urlsafe_b64encode")
     def test_send_gmail_success(self, mock_b64):
         """Test successful Gmail sending"""
         mock_b64.return_value.decode.return_value = "encoded_message"
@@ -681,18 +727,27 @@ class TestGmailFunctions:
         assert result is not None
         assert result["id"] == "12345"
 
-    @patch('sendMail.get_subscriber_reader')
-    @patch('sendMail.get_indices')
-    @patch('sendMail.format_message')
-    @patch('sendMail.build_email')
-    @patch('sendMail.send_mail')
-    @patch('sendMail.send_gmail')
-    @patch('sendMail.get_gmail_service')
-    @patch('sendMail.sleep')
-    @patch('sendMail.filter')
-    def test_generate_mailing_gmail_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail,
-                                            mock_send_mail,
-                                            mock_build, mock_format, mock_indices, mock_reader_func):
+    @patch("sendMail.get_subscriber_reader")
+    @patch("sendMail.get_indices")
+    @patch("sendMail.format_message")
+    @patch("sendMail.build_email")
+    @patch("sendMail.send_mail")
+    @patch("sendMail.send_gmail")
+    @patch("sendMail.get_gmail_service")
+    @patch("sendMail.sleep")
+    @patch("sendMail.filter")
+    def test_generate_mailing_gmail_success(
+            self,
+            mock_filter,
+            mock_sleep,
+            mock_get_gmail,
+            mock_send_gmail,
+            mock_send_mail,
+            mock_build,
+            mock_format,
+            mock_indices,
+            mock_reader_func,
+    ):
         """Test successful mailing generation for ArtsCroises profile"""
         param = Mock()
         param.max_addr_per_mail = 2
@@ -700,16 +755,13 @@ class TestGmailFunctions:
         param.max_mails_per_hour = 100
         param.from_index = None
         param.to_index = None
-        param.profile = 'artscroises'
+        param.profile = "artscroises"
         param.verbose = False
         param.donotsend = False
         param.message = "Template"
         param.subject = "Subject"
         param.file = None
-        param.filter = {
-            "email": "is not empty",
-            "status": "is active"
-        }
+        param.filter = {"email": "is not empty", "status": "is active"}
 
         del param.smtp_host
         # Mock reader to return header and three rows
@@ -717,7 +769,7 @@ class TestGmailFunctions:
         rows = [
             ["user1@example.com", "active", "Group", "x"],
             ["user2@example.com", "active", "Group", "x"],
-            ["user3@example.com", "active", "Group", "x"]
+            ["user3@example.com", "active", "Group", "x"],
         ]
 
         # We need to return an iterator that yields header then rows
@@ -751,12 +803,11 @@ class TestGmailFunctions:
         assert mock_build.call_count == 2
 
 
-
 class TestGetSubscriberReader:
     """Tests for subscriber reader function"""
 
-    @patch('sendMail.openGoogleDBMembersSheet')
-    @patch('sendMail.readAllSheet')
+    @patch("sendMail.openGoogleDBMembersSheet")
+    @patch("sendMail.readAllSheet")
     def test_get_subscriber_reader_google_sheets(self, mock_read, mock_open):
         """Test getting subscriber reader from Google Sheets"""
         param = Mock()
@@ -773,8 +824,7 @@ class TestGetSubscriberReader:
         assert csvfile is None
         assert reader is not None
 
-
-    @patch('builtins.open', mock_open(read_data="name,email\nJohn,john@example.com"))
+    @patch("builtins.open", mock_open(read_data="name,email\nJohn,john@example.com"))
     def test_get_subscriber_reader_csv(self):
         """Test getting subscriber reader from CSV"""
         param = Mock()
@@ -785,7 +835,7 @@ class TestGetSubscriberReader:
         assert reader is not None
         assert csvfile is not None
 
-    @patch('python_calamine.CalamineWorkbook', create=True)
+    @patch("python_calamine.CalamineWorkbook", create=True)
     def test_get_subscriber_reader_calamine(self, mock_calamine):
         """Test getting subscriber reader from Excel using Calamine"""
         param = Mock()
@@ -805,21 +855,31 @@ class TestGetSubscriberReader:
         mock_calamine.from_path.assert_called_once_with("test.xlsx")
         mock_workbook.get_sheet_by_index.assert_called_once_with(0)
 
+
 class TestMailingGeneration:
     """Tests for generate_mailing function"""
 
-    @patch('sendMail.get_subscriber_reader')
-    @patch('sendMail.get_indices')
-    @patch('sendMail.format_message')
-    @patch('sendMail.build_email')
-    @patch('sendMail.send_mail')
-    @patch('sendMail.send_gmail')
-    @patch('sendMail.get_gmail_service')
-    @patch('sendMail.sleep')
-    @patch('sendMail.filter')
-    def test_generate_mailing_smtp_success(self, mock_filter, mock_sleep, mock_get_gmail, mock_send_gmail,
-                                           mock_send_mail,
-                                                 mock_build, mock_format, mock_indices, mock_reader_func):
+    @patch("sendMail.get_subscriber_reader")
+    @patch("sendMail.get_indices")
+    @patch("sendMail.format_message")
+    @patch("sendMail.build_email")
+    @patch("sendMail.send_mail")
+    @patch("sendMail.send_gmail")
+    @patch("sendMail.get_gmail_service")
+    @patch("sendMail.sleep")
+    @patch("sendMail.filter")
+    def test_generate_mailing_smtp_success(
+            self,
+            mock_filter,
+            mock_sleep,
+            mock_get_gmail,
+            mock_send_gmail,
+            mock_send_mail,
+            mock_build,
+            mock_format,
+            mock_indices,
+            mock_reader_func,
+    ):
         """Test successful mailing generation for ArtsCroises profile"""
         param = Mock()
         param.max_addr_per_mail = 2
@@ -827,42 +887,41 @@ class TestMailingGeneration:
         param.max_mails_per_hour = 100
         param.from_index = None
         param.to_index = None
-        param.profile = 'artscroises'
+        param.profile = "artscroises"
         param.verbose = False
         param.donotsend = False
         param.message = "Template"
         param.subject = "Subject"
         param.file = None
-        param.filter = {
-            "email": "is not empty",
-            "status": "is active"
-        }
+        param.filter = {"email": "is not empty", "status": "is active"}
 
         # Mock reader to return header and three rows
         header = ["email", "status", "group", "selected"]
         rows = [
             ["user1@example.com", "active", "Group", "x"],
             ["user2@example.com", "active", "Group", "x"],
-            ["user3@example.com", "active", "Group", "x"]
+            ["user3@example.com", "active", "Group", "x"],
         ]
-        
+
         # We need to return an iterator that yields header then rows
         # The code does: header = next(reader, None); for row in reader:
         class Reader:
             def __init__(self, data):
                 self.data = iter(data)
+
             def __next__(self):
                 return next(self.data)
+
             def __iter__(self):
                 return self
-        
+
         mock_reader = Reader([header] + rows)
         mock_reader_func.return_value = (mock_reader, None)
-        
+
         mock_indices.return_value = {"email": 0, "status": 1, "group": 2, "selected": 3}
         mock_format.return_value = "Formatted Message"
-        mock_filter.return_value = False # Do not filter out anyone
-        
+        mock_filter.return_value = False  # Do not filter out anyone
+
         mock_msg = MagicMock()
         mock_msg._temp_dirs = []
         mock_build.return_value = (mock_msg, ["user1@example.com", "user2@example.com"])
@@ -874,37 +933,40 @@ class TestMailingGeneration:
         assert mock_send_mail.call_count == 2
         assert mock_build.call_count == 2
 
-
-    @patch('sendMail.get_subscriber_reader')
+    @patch("sendMail.get_subscriber_reader")
     def test_generate_mailing_missing_config(self, mock_reader_func):
         """Test generate_mailing with missing configuration"""
-        param = Mock(spec=[]) # No attributes
-        
+        param = Mock(spec=[])  # No attributes
+
         result = sendMail.generate_mailing(param)
         assert result == "Error"
 
-    @patch('sendMail.get_subscriber_reader')
+    @patch("sendMail.get_subscriber_reader")
     def test_generate_mailing_no_reader(self, mock_reader_func):
         """Test generate_mailing when reader fails to initialize"""
         param = Mock()
         param.max_addr_per_mail = 10
         param.pause = 0
         param.max_mails_per_hour = 100
-        
+
         mock_reader_func.return_value = (None, None)
-        
+
         result = sendMail.generate_mailing(param)
         assert result == "Error"
+
 
 class TestGoogleSheetHelpers:
     """Tests for Google Sheets helper functions"""
 
-    @patch('sendMail.ServiceAccountCredentials')
-    @patch('sendMail.gspread')
-    @patch('sendMail.get_secret')
-    def test_open_google_db_members_sheet(self, mock_get_secret, mock_gspread, mock_sac):
-        sa_key = 'sa_key'
-        id_key = 'id_key'
+    @patch("sendMail.ServiceAccountCredentials")
+    @patch("sendMail.gspread")
+    @patch("sendMail.get_secret")
+    def test_open_google_db_members_sheet(
+            self, mock_get_secret, mock_gspread, mock_sac
+    ):
+        sa_key = "sa_key"
+        id_key = "id_key"
+
         # Mock secrets
         def secret_side_effect(arg):
             if arg == sa_key:
@@ -912,6 +974,7 @@ class TestGoogleSheetHelpers:
             if arg == id_key:
                 return {"ID": "SHEET_ID"}
             return {}
+
         mock_get_secret.side_effect = secret_side_effect
 
         creds = Mock()
@@ -925,7 +988,7 @@ class TestGoogleSheetHelpers:
         result = sendMail.openGoogleDBMembersSheet(sa_key, id_key)
         assert result == wb
         mock_gspread.authorize.assert_called_once_with(creds)
-        mock_gc.open_by_key.assert_called_once_with('SHEET_ID')
+        mock_gc.open_by_key.assert_called_once_with("SHEET_ID")
 
     def test_read_all_sheet_default(self):
         ws = Mock()
@@ -941,20 +1004,23 @@ class TestGoogleSheetHelpers:
         ws.get_all_values.return_value = [["x"]]
         wb = Mock()
         wb.worksheet.return_value = ws
-        result = sendMail.readAllSheet(wb, sheet_name='Sheet2')
+        result = sendMail.readAllSheet(wb, sheet_name="Sheet2")
         assert result == [["x"]]
-        wb.worksheet.assert_called_once_with('Sheet2')
+        wb.worksheet.assert_called_once_with("Sheet2")
+
 
 class TestGetGmailService:
     """Tests for get_gmail_service function"""
 
-    @patch('sendMail.os.path.exists', return_value=True)
-    @patch('sendMail.Credentials')
-    @patch('sendMail.build')
-    def test_get_gmail_service_with_token_file(self, mock_build, mock_credentials, mock_exists):
+    @patch("sendMail.os.path.exists", return_value=True)
+    @patch("sendMail.Credentials")
+    @patch("sendMail.build")
+    def test_get_gmail_service_with_token_file(
+            self, mock_build, mock_credentials, mock_exists
+    ):
         param = Mock()
-        param.token_file = 'token.json'
-        param.scopes = ['scope1']
+        param.token_file = "token.json"
+        param.scopes = ["scope1"]
 
         creds = Mock()
         creds.valid = True
@@ -962,31 +1028,41 @@ class TestGetGmailService:
 
         service = sendMail.get_gmail_service(param)
         assert service == mock_build.return_value
-        mock_credentials.from_authorized_user_file.assert_called_once_with('token.json', ['scope1'])
+        mock_credentials.from_authorized_user_file.assert_called_once_with(
+            "token.json", ["scope1"]
+        )
         mock_build.assert_called_once()
 
-    @patch('sendMail.os.path.exists', return_value=False)
-    @patch('sendMail.get_secret')
-    @patch('sendMail.Credentials')
-    @patch('sendMail.InstalledAppFlow')
-    @patch('sendMail.build')
-    @patch('builtins.open', new_callable=mock_open)
-    def test_get_gmail_service_oauth_flow(self, mock_file, mock_build, mock_flow_cls, mock_credentials, mock_get_secret, mock_exists):
+    @patch("sendMail.os.path.exists", return_value=False)
+    @patch("sendMail.get_secret")
+    @patch("sendMail.Credentials")
+    @patch("sendMail.InstalledAppFlow")
+    @patch("sendMail.build")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_get_gmail_service_oauth_flow(
+            self,
+            mock_file,
+            mock_build,
+            mock_flow_cls,
+            mock_credentials,
+            mock_get_secret,
+            mock_exists,
+    ):
         param = Mock()
-        param.token_file = 'token.json'
-        param.scopes = ['scope1']
-        param.token_id = 'token_id'
-        param.credentials_id = 'creds_id'
-        param.SCOPES = ['scope1']
+        param.token_file = "token.json"
+        param.scopes = ["scope1"]
+        param.token_id = "token_id"
+        param.credentials_id = "creds_id"
+        param.SCOPES = ["scope1"]
 
         # First get creds from secret (no token file)
-        token_info = {'token': 'abc'}
-        mock_get_secret.side_effect = [token_info, {'client_id': 'x'}]
+        token_info = {"token": "abc"}
+        mock_get_secret.side_effect = [token_info, {"client_id": "x"}]
         creds = Mock()
         creds.valid = False
         creds.expired = False
         creds.refresh_token = None
-        creds.to_json.return_value = '{}'
+        creds.to_json.return_value = "{}"
         mock_credentials.from_authorized_user_info.return_value = creds
 
         flow = Mock()
@@ -996,7 +1072,8 @@ class TestGetGmailService:
         service = sendMail.get_gmail_service(param)
         assert service == mock_build.return_value
         # Should have written token file
-        mock_file.assert_called_once_with('token.json', 'w')
+        mock_file.assert_called_once_with("token.json", "w")
+
 
 class TestGetNewsletterName:
     """Tests for helper that infers subject/newsletter/message from file list"""
@@ -1023,17 +1100,25 @@ class TestGetNewsletterName:
         # body.txt should be removed from files list
         assert str(body_path) not in files
 
+
 class TestProcessFunctions:
     """Tests for process_artscroises and process_cambristi"""
 
-    @patch('sendMail.check_mandatory_param')
-    @patch('sendMail.get_secret')
-    @patch('sendMail.process_attachments')
-    @patch('sendMail.generate_mailing')
-    @patch('sendMail.getpass')
-    @patch('builtins.open', new_callable=mock_open, read_data="key: value")
-    def test_process_artscroises_success(self, mock_file, mock_getpass, mock_generate, mock_proc_attach,
-                                         mock_get_secret, mock_check_param):
+    @patch("sendMail.check_mandatory_param")
+    @patch("sendMail.get_secret")
+    @patch("sendMail.process_attachments")
+    @patch("sendMail.generate_mailing")
+    @patch("sendMail.getpass")
+    @patch("builtins.open", new_callable=mock_open, read_data="key: value")
+    def test_process_artscroises_success(
+            self,
+            mock_file,
+            mock_getpass,
+            mock_generate,
+            mock_proc_attach,
+            mock_get_secret,
+            mock_check_param,
+    ):
         """Test process_artscroises success path"""
         args = Mock()
         args.config = "config.yml"
@@ -1044,7 +1129,7 @@ class TestProcessFunctions:
                 "max_mails_per_hour": 100,
                 "max_addr_per_mail": 10,
                 "pause": 1,
-                "default_message": "hello ${body_txt}, here the file ${news_letter_name}"
+                "default_message": "hello ${body_txt}, here the file ${news_letter_name}",
             }
         }
         args.body = "Buddy"
@@ -1052,7 +1137,7 @@ class TestProcessFunctions:
         args.wait = None
         args.test = False
         args.message = None
-        
+
         mock_get_secret.return_value = {"password": "secret_password"}
         mock_proc_attach.return_value = (["test.pdf"], None, [])
         mock_generate.return_value = "OK"
@@ -1063,30 +1148,29 @@ class TestProcessFunctions:
         assert result == "OK"  # returns None
         mock_generate.assert_called_once()
 
+
 def test_module_imports():
     """Test that the module imports successfully"""
-    assert hasattr(sendMail, 'Dict2Class')
-    assert hasattr(sendMail, 'build_email')
-    assert hasattr(sendMail, 'send_mail')
-    assert hasattr(sendMail, 'generate_mailing')
+    assert hasattr(sendMail, "Dict2Class")
+    assert hasattr(sendMail, "build_email")
+    assert hasattr(sendMail, "send_mail")
+    assert hasattr(sendMail, "generate_mailing")
 
 
 @pytest.fixture
 def mock_config():
     return {
-        'artscroises': {
-            'MAILCONFIG': 'artscroises_secret',
-            'max_mails_per_hour': 100,
-            'max_addr_per_mail': 50,
-            'pause': 1,
-            'SA': 'service_account.json',
-            'mailing_folder': 'folder_id'
+        "artscroises": {
+            "MAILCONFIG": "artscroises_secret",
+            "max_mails_per_hour": 100,
+            "max_addr_per_mail": 50,
+            "pause": 1,
+            "SA": "service_account.json",
+            "mailing_folder": "folder_id",
         },
-        'cambristi': {
-            'MAILCONFIG': 'cambristi_secret',
-            'SA': 'service_account.json'
-        }
+        "cambristi": {"MAILCONFIG": "cambristi_secret", "SA": "service_account.json"},
     }
+
 
 def test_prepare_html_for_cid_with_invalid_src():
     """Test prepare_html_for_cid with invalid src (should continue)"""
@@ -1100,7 +1184,10 @@ def test_prepare_html_for_cid_with_invalid_src():
         with patch("os.path.exists", return_value=True):
             # If it's already mocked, we try to use the mock to return something sensible
             import bs4
-            with patch("sendMail.BeautifulSoup", side_effect=bs4.BeautifulSoup) as mock_bs:
+
+            with patch(
+                    "sendMail.BeautifulSoup", side_effect=bs4.BeautifulSoup
+            ) as mock_bs:
                 # Force the mock to NOT be a MagicMock if it's already one?
                 # Actually, patch should work if called correctly.
                 html, images = sendMail.prepare_html_for_cid(html_file)
@@ -1130,6 +1217,7 @@ def test_get_smtp_connection_generic_exception():
     with patch("sendMail.SMTP", side_effect=Exception("Connection failed")):
         conn = sendMail.get_smtp_connection(param)
         assert conn is None
+
 
 def test_save_to_sent_verbose_and_retry_exhaustion():
     """Test _save_to_sent with verbose output and when retries are exhausted"""
@@ -1164,7 +1252,9 @@ def test_prepare_html_and_get_images_exceptions():
     with patch("builtins.open", mock_open(read_data=html_content)):
         with patch("os.path.exists", return_value=True):
             with patch("sendMail.Image.open", side_effect=Exception("Corrupt image")):
-                html, images, temp_dir = sendMail.prepare_html_and_get_images("dummy.html")
+                html, images, temp_dir = sendMail.prepare_html_and_get_images(
+                    "dummy.html"
+                )
                 assert len(images) == 0
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
@@ -1174,7 +1264,7 @@ def test_process_attachments_no_files_and_no_mailing_folder():
     """Test process_attachments when no files are provided and no mailing_folder in config"""
     args = MagicMock()
     args.file = []
-    config = {'SA': 'sa.json'}  # Missing mailing_folder
+    config = {"SA": "sa.json"}  # Missing mailing_folder
 
     with patch("sendMail.gd.connect_google_driver") as mock_connect:
         with patch("sendMail.glob", return_value=[]):
@@ -1196,6 +1286,7 @@ def test_md2html_default_styles():
             html_file = sendMail.md2html(md_file)
             assert os.path.exists(html_file)
             # assert os.path.exists(os.path.join(tmp_dir, "styles.css"))
+
 
 def test_md2html_custom_styles():
     """Test md2html creates custom styles.css if styles is provided"""
@@ -1227,7 +1318,9 @@ def test_build_email_max_addr_1():
     param.sender = "sender@example.com"
     param.profile = "other"
 
-    msg, recipients = sendMail.build_email(param, subject="Sub", bcc="bcc@example.com", message="Hi")
+    msg, recipients = sendMail.build_email(
+        param, subject="Sub", bcc="bcc@example.com", message="Hi"
+    )
     assert msg["To"] == "bcc@example.com"
     assert "Bcc" not in msg
 
@@ -1243,8 +1336,10 @@ def test_build_email_attachments_pdf_txt():
     with tempfile.TemporaryDirectory() as tmp_dir:
         pdf_path = os.path.join(tmp_dir, "test.pdf")
         txt_path = os.path.join(tmp_dir, "test.txt")
-        with open(pdf_path, "wb") as f: f.write(b"%PDF-1.4")
-        with open(txt_path, "w") as f: f.write("plain text")
+        with open(pdf_path, "wb") as f:
+            f.write(b"%PDF-1.4")
+        with open(txt_path, "w") as f:
+            f.write("plain text")
 
         msg, recipients = sendMail.build_email(param, attachments=[pdf_path, txt_path])
         # Check that we have multiple parts
@@ -1252,7 +1347,10 @@ def test_build_email_attachments_pdf_txt():
         # Verify attachments are there (basic check)
         payload = msg.get_payload()
         assert any(
-            p.get_content_subtype() == 'pdf' for p in payload if isinstance(p, email.mime.application.MIMEApplication))
+            p.get_content_subtype() == "pdf"
+            for p in payload
+            if isinstance(p, email.mime.application.MIMEApplication)
+        )
 
 
 def test_generate_mailing_from_to_index():
@@ -1276,7 +1374,7 @@ def test_generate_mailing_from_to_index():
         ["2@ex.com"],
         ["3@ex.com"],
         ["4@ex.com"],
-        ["5@ex.com"]
+        ["5@ex.com"],
     ]
 
     with patch("sendMail.get_subscriber_reader", return_value=(iter(rows), None)):
@@ -1298,11 +1396,7 @@ def test_generate_mailing_hourly_limit():
     param.message = "Hello ${email}"
     param.filter = {}
 
-    rows = [
-        ["email"],
-        ["1@ex.com"],
-        ["2@ex.com"]
-    ]
+    rows = [["email"], ["1@ex.com"], ["2@ex.com"]]
 
     with patch("sendMail.get_subscriber_reader", return_value=(iter(rows), None)):
         with patch("sendMail.sleep") as mock_sleep:
@@ -1317,13 +1411,12 @@ def test_filter_cambristi_index_error():
     param.filter = {
         "title": "in member, participant, inactive",
         "email": "is not empty",
-        "emailBounced": "if False"
+        "emailBounced": "if False",
     }
     indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
     row = ["only one col"]
 
     assert sendMail.filter(param.filter, row, indices) == True
-
 
 
 def test_process_artscroises_wait_and_no_config():
@@ -1348,7 +1441,7 @@ def test_process_artscroises_wait_and_no_config():
         "SA": "sa.json",
         "username": "u",
         "password": "p",
-        "MAILCONFIG": "secret"
+        "MAILCONFIG": "secret",
     }
 
     # Reset mock and give it value
@@ -1441,7 +1534,9 @@ def test_send_gmail_error():
     """Test send_gmail when an HttpError occurs"""
     service = MagicMock()
     message = MagicMock()
-    message.__getitem__.side_effect = lambda k: "test@example.com" if k == "To" else None
+    message.__getitem__.side_effect = lambda k: (
+        "test@example.com" if k == "To" else None
+    )
     message.as_bytes.return_value = b"raw message"
 
     with patch("sendMail.log") as mock_log:
@@ -1453,7 +1548,9 @@ def test_send_gmail_error():
         # We need to make sure the call to execute() raises err.
         mock_execute = MagicMock(side_effect=err)
 
-        service.users.return_value.messages.return_value.send.return_value.execute = mock_execute
+        service.users.return_value.messages.return_value.send.return_value.execute = (
+            mock_execute
+        )
 
         # If it STILL returns a MagicMock, maybe it's because service.users()
         # is called twice and returns different mocks?
@@ -1474,8 +1571,14 @@ def test_build_email_image_error():
     param.profile = "other"
     param.max_addr_per_mail = 50
 
-    with patch("sendMail.prepare_html_and_get_images",
-               return_value=("html", [{"path": "nonexistent.png", "cid": "cid1"}], "/tmp/dummy")):
+    with patch(
+            "sendMail.prepare_html_and_get_images",
+            return_value=(
+                    "html",
+                    [{"path": "nonexistent.png", "cid": "cid1"}],
+                    "/tmp/dummy",
+            ),
+    ):
         with patch("builtins.open", side_effect=FileNotFoundError):
             msg, recipients = sendMail.build_email(param, message="dummy.html")
             # Should continue even if image is not found
@@ -1495,10 +1598,7 @@ def test_generate_mailing_batching_and_filtering():
     param.donotsend = True
     param.message = "Hi ${email}"
     param.selected = False
-    param.filter = {
-        "email": "is not empty",
-        "status": "is active"
-    }
+    param.filter = {"email": "is not empty", "status": "is active"}
 
     rows = [
         ["status", "nom", "prenom", "email", "bounced", "group", "selected"],
@@ -1538,11 +1638,13 @@ def test_process_artscroises_wait_and_cleanup():
         "SA": "sa.json",
         "username": "u",
         "password": "p",
-        "MAILCONFIG": "secret"
+        "MAILCONFIG": "secret",
     }
 
     with patch("sendMail.get_secret", return_value=secret_config):
-        with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
+        with patch(
+                "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
+        ):
             with patch("sendMail.generate_mailing", return_value="OK"):
                 with patch("os.rename") as mock_rename:
                     with patch("os.remove") as mock_remove:
@@ -1572,15 +1674,22 @@ def test_process_artscroises():
             "SA": "sa.json",
             "username": "u",
             "password": "p",
-            "MAILCONFIG": "secret"
+            "MAILCONFIG": "secret",
         }
-        with patch("sendMail.yaml.safe_load", return_value={"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}}):
+        with patch(
+                "sendMail.yaml.safe_load",
+                return_value={"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}},
+        ):
             with patch("sendMail.get_secret", return_value=secret_config):
-                with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
+                with patch(
+                        "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
+                ):
                     with patch("sendMail.generate_mailing", return_value="OK"):
                         with patch("os.rename") as mock_rename:
                             with patch("os.remove") as mock_remove:
-                                with patch("sendMail.check_mandatory_param", return_value=True):
+                                with patch(
+                                        "sendMail.check_mandatory_param", return_value=True
+                                ):
                                     with pytest.raises(SystemExit) as pytest_wrapped_e:
                                         sendMail.main()
                                         # print(pytest_wrapped_e)
@@ -1594,10 +1703,7 @@ def test_filter_artscroises_branches():
     param.filter = ["active"]
     param.test = False
     param.selected = False
-    param.filter = {
-        "email": "is not empty",
-        "status": "is active"
-    }
+    param.filter = {"email": "is not empty", "status": "is active"}
     indices = {"status": 0, "bounced": 1, "group": 2, "selected": 3, "email": 4}
 
     # Bounced row (should be filtered -> True)
@@ -1642,7 +1748,9 @@ def test_send_mail_retry_and_verbose():
     param = MagicMock()
     param.verbose = True
     message = MagicMock()
-    message.__getitem__.side_effect = lambda k: "sender@example.com" if k == "From" else None
+    message.__getitem__.side_effect = lambda k: (
+        "sender@example.com" if k == "From" else None
+    )
     message.as_string.return_value = "msg_string"
     recipients = ["to@example.com"]
 
@@ -1676,12 +1784,14 @@ def test_main_missing_args():
             "SA": "sa.json",
             "username": "u",
             "password": "p",
-            "MAILCONFIG": "secret"
+            "MAILCONFIG": "secret",
         }
 
-        with patch("sendMail.get_secret", return_value=secret_config), \
-                pytest.raises(SystemExit) as pytest_wrapped_e, \
-                patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
+        with (
+            patch("sendMail.get_secret", return_value=secret_config),
+            pytest.raises(SystemExit) as pytest_wrapped_e,
+            patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])),
+        ):
             sendMail.main()
 
 
@@ -1723,7 +1833,6 @@ def test_main_with_frozen_program():
                     sendMail.main()
 
 
-
 def test_main_missing_profile():
     """Test main with missing profile"""
 
@@ -1758,7 +1867,7 @@ def test_make_html_images_inline():
         with open(html_file, "r", encoding="utf-8") as f:
             html_content = f.read()
             assert "data:image/png;base64," in html_content
-            assert "src=\"data:image/png;base64," in html_content
+            assert 'src="data:image/png;base64,' in html_content
 
 
 def test_process_profile_message_replacement_and_password_prompt():
@@ -1769,7 +1878,7 @@ def test_process_profile_message_replacement_and_password_prompt():
         "test_profile": {
             "MAILCONFIG": "dummy_config",
             "default_message": "Newsletter: ${newsletter_name}, Body: ${body}",
-            "smtp_host": "smtp.example.com"
+            "smtp_host": "smtp.example.com",
         }
     }
     args.body = "Test Body Content"
@@ -1777,14 +1886,18 @@ def test_process_profile_message_replacement_and_password_prompt():
     args.subject = "Test Subject"
     args.test = False
 
-    secret_config = {"MAILCONFIG": "dummy_config"}  # No password here to trigger line 1194
+    secret_config = {
+        "MAILCONFIG": "dummy_config"
+    }  # No password here to trigger line 1194
 
-    with patch("sendMail.get_secret", return_value=secret_config), \
-            patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
-            patch("sendMail.get_newsletter_name") as mock_get_news, \
-            patch("sendMail.getpass", return_value="secret_pass") as mock_getpass, \
-            patch("sendMail.generate_mailing", return_value="OK") as mock_generate, \
-            patch("sendMail.check_mandatory_param", return_value=True):
+    with (
+        patch("sendMail.get_secret", return_value=secret_config),
+        patch("sendMail.process_attachments", return_value=([], MagicMock(), [])),
+        patch("sendMail.get_newsletter_name") as mock_get_news,
+        patch("sendMail.getpass", return_value="secret_pass") as mock_getpass,
+        patch("sendMail.generate_mailing", return_value="OK") as mock_generate,
+        patch("sendMail.check_mandatory_param", return_value=True),
+    ):
         # Mock _get_newsletter_name to set a specific name
         def side_effect(files, a):
             a.newsletter_name = "MyNewsletter"
@@ -1796,7 +1909,9 @@ def test_process_profile_message_replacement_and_password_prompt():
 
         # Verify lines 1187-1190: message was replaced in param, not args
         called_param = mock_generate.call_args[0][0]
-        assert called_param.message == "Newsletter: MyNewsletter, Body: Test Body Content"
+        assert (
+                called_param.message == "Newsletter: MyNewsletter, Body: Test Body Content"
+        )
 
         # Verify line 1194: getpass was called
         mock_getpass.assert_called_once_with("Enter mail user's password")
@@ -1811,7 +1926,7 @@ def test_process_profile_test_filter():
     args.conf = {
         "test_profile": {
             "MAILCONFIG": "dummy_config",
-            "filter_test": {"title": "Test Filter"}
+            "filter_test": {"title": "Test Filter"},
         }
     }
     args.body = ""
@@ -1821,11 +1936,13 @@ def test_process_profile_test_filter():
 
     secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
 
-    with patch("sendMail.get_secret", return_value=secret_config), \
-            patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
-            patch("sendMail.get_newsletter_name", side_effect=lambda f, a: a), \
-            patch("sendMail.generate_mailing", return_value="OK") as mock_generate, \
-            patch("sendMail.check_mandatory_param", return_value=True):
+    with (
+        patch("sendMail.get_secret", return_value=secret_config),
+        patch("sendMail.process_attachments", return_value=([], MagicMock(), [])),
+        patch("sendMail.get_newsletter_name", side_effect=lambda f, a: a),
+        patch("sendMail.generate_mailing", return_value="OK") as mock_generate,
+        patch("sendMail.check_mandatory_param", return_value=True),
+    ):
         result = sendMail.process_profile(args)
 
         # Verify line 1200: param.filter was set to param.filter_test
@@ -1847,7 +1964,7 @@ def test_process_profile_test_nosubject():
     args.conf = {
         "test_profile": {
             "MAILCONFIG": "dummy_config",
-            "filter_test": {"title": "Test Filter"}
+            "filter_test": {"title": "Test Filter"},
         }
     }
     args.body = ""
@@ -1857,10 +1974,12 @@ def test_process_profile_test_nosubject():
 
     secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
 
-    with patch("sendMail.get_secret", return_value=secret_config), \
-            patch("sendMail.process_attachments", return_value=([], MagicMock(), [])), \
-            patch("sendMail.get_newsletter_name", side_effect=lambda f, a: a), \
-            patch("sendMail.check_mandatory_param", return_value=True):
+    with (
+        patch("sendMail.get_secret", return_value=secret_config),
+        patch("sendMail.process_attachments", return_value=([], MagicMock(), [])),
+        patch("sendMail.get_newsletter_name", side_effect=lambda f, a: a),
+        patch("sendMail.check_mandatory_param", return_value=True),
+    ):
         result = sendMail.process_profile(args)
 
         # Verify line 1200: param.filter was set to param.filter_test
@@ -1874,97 +1993,106 @@ def test_process_profile_test_nosubject():
         assert result == "Error"
 
 
-
-
 def test_get_default_config_path_windows():
     """Test get_default_config_path on Windows (line 72)"""
     if os.name == "nt":
-        with patch('os.name', 'nt'), \
-                patch('sendMail.getenv') as mock_getenv, \
-                patch('sendMail.exists', return_value=True):
-            mock_getenv.return_value = r'C:\Users\TestUser'
+        with (
+            patch("os.name", "nt"),
+            patch("sendMail.getenv") as mock_getenv,
+            patch("sendMail.exists", return_value=True),
+        ):
+            mock_getenv.return_value = r"C:\Users\TestUser"
 
             result = sendMail.get_default_config_path()
 
-            mock_getenv.assert_called_once_with('USERPROFILE')
-            assert result == r'C:\Users\TestUser\.config\sendMail.yml'
+            mock_getenv.assert_called_once_with("USERPROFILE")
+            assert result == r"C:\Users\TestUser\.config\sendMail.yml"
             # assert all(w in result for w in ('Users', 'TestUser', '.config', 'sendMail.yml')) is True
 
 
 def test_get_default_config_path_unix():
-
     """Test get_default_config_path on Unix (line 72)"""
     if os.name != "nt":
-        with patch('os.name', 'posix'), \
-                patch('sendMail.getenv') as mock_getenv, \
-            patch('sendMail.exists', return_value=True):
-            mock_getenv.return_value = '/home/testuser'
+        with (
+            patch("os.name", "posix"),
+            patch("sendMail.getenv") as mock_getenv,
+            patch("sendMail.exists", return_value=True),
+        ):
+            mock_getenv.return_value = "/home/testuser"
 
             result = sendMail.get_default_config_path()
 
-            mock_getenv.assert_called_once_with('HOME')
-            assert result == '/home/testuser/.config/sendMail.yml'
+            mock_getenv.assert_called_once_with("HOME")
+            assert result == "/home/testuser/.config/sendMail.yml"
 
 
 def test_get_default_config_path_exists():
     """Test get_default_config_path when config file already exists (lines 73-74, 101)"""
     if os.name != "nt":
-        with patch('os.name', 'posix'), \
-                patch('sendMail.getenv', return_value='/home/testuser'), \
-                patch('sendMail.exists', return_value=True):
+        with (
+            patch("os.name", "posix"),
+            patch("sendMail.getenv", return_value="/home/testuser"),
+            patch("sendMail.exists", return_value=True),
+        ):
             result = sendMail.get_default_config_path()
 
-            assert result == '/home/testuser/.config/sendMail.yml'
+            assert result == "/home/testuser/.config/sendMail.yml"
 
 
 def test_get_default_config_path_creates_dir_and_file():
     """Test get_default_config_path creates .config directory and file (lines 74-100)"""
     if os.name != "nt":
-        with patch('os.name', 'posix'), \
-                patch('sendMail.getenv', return_value='/home/testuser'), \
-                patch('sendMail.exists') as mock_exists, \
-                patch('sendMail.mkdir') as mock_mkdir, \
-                patch('builtins.open', mock_open()) as mock_file, \
-                patch('sendMail.yaml.dump') as mock_yaml_dump, \
-                patch('sendMail.log.warning') as mock_log_warning, \
-                pytest.raises(SystemExit) as pytest_wrapped_e:
+        with (
+            patch("os.name", "posix"),
+            patch("sendMail.getenv", return_value="/home/testuser"),
+            patch("sendMail.exists") as mock_exists,
+            patch("sendMail.mkdir") as mock_mkdir,
+            patch("builtins.open", mock_open()) as mock_file,
+            patch("sendMail.yaml.dump") as mock_yaml_dump,
+            patch("sendMail.log.warning") as mock_log_warning,
+            pytest.raises(SystemExit) as pytest_wrapped_e,
+        ):
             # Config file doesn't exist, .config directory doesn't exist
             mock_exists.side_effect = [False, False]
 
             result = sendMail.get_default_config_path()
 
             # Verify .config directory was created (line 77)
-            mock_mkdir.assert_called_once_with('/home/testuser/.config')
+            mock_mkdir.assert_called_once_with("/home/testuser/.config")
 
             # Verify config file was opened for writing (line 98)
-            mock_file.assert_called_once_with('/home/testuser/.config/sendMail.yml', 'w')
+            mock_file.assert_called_once_with(
+                "/home/testuser/.config/sendMail.yml", "w"
+            )
 
             # Verify default config was written (line 99)
             mock_yaml_dump.assert_called_once()
             default_config = mock_yaml_dump.call_args[0][0]
-            assert default_config['username'] == 'jdoe'
-            assert default_config['sender'] == 'john.doe@example.com'
-            assert 'filter' in default_config
+            assert default_config["username"] == "jdoe"
+            assert default_config["sender"] == "john.doe@example.com"
+            assert "filter" in default_config
 
             # Verify warning was logged (line 100)
             mock_log_warning.assert_called_once()
-            assert 'Configuration file created' in mock_log_warning.call_args[0][0]
+            assert "Configuration file created" in mock_log_warning.call_args[0][0]
 
             # Verify correct path returned (line 101)
-            assert result == '/home/testuser/.config/sendMail.yml'
+            assert result == "/home/testuser/.config/sendMail.yml"
 
 
 def test_get_default_config_path_dir_exists_file_not():
     """Test get_default_config_path when .config exists but file doesn't (lines 74-77)"""
     if os.name != "nt":
-        with patch('os.name', 'posix'), \
-                patch('sendMail.getenv', return_value='/home/testuser'), \
-                patch('sendMail.exists') as mock_exists, \
-                patch('sendMail.mkdir') as mock_mkdir, \
-                patch('builtins.open', mock_open()) as mock_file, \
-                patch('sendMail.yaml.dump') as mock_yaml_dump, \
-                patch('sendMail.log.warning') as mock_log_warning, \
-                pytest.raises(SystemExit) as pytest_wrapped_e:
+        with (
+            patch("os.name", "posix"),
+            patch("sendMail.getenv", return_value="/home/testuser"),
+            patch("sendMail.exists") as mock_exists,
+            patch("sendMail.mkdir") as mock_mkdir,
+            patch("builtins.open", mock_open()) as mock_file,
+            patch("sendMail.yaml.dump") as mock_yaml_dump,
+            patch("sendMail.log.warning") as mock_log_warning,
+            pytest.raises(SystemExit) as pytest_wrapped_e,
+        ):
             # Config file doesn't exist (line 74), but .config directory exists (line 76)
             mock_exists.side_effect = [False, True]
 
@@ -1974,8 +2102,10 @@ def test_get_default_config_path_dir_exists_file_not():
             mock_mkdir.assert_not_called()
 
             # Verify config file was still created (lines 98-100)
-            mock_file.assert_called_once_with('/home/testuser/.config/sendMail.yml', 'w')
+            mock_file.assert_called_once_with(
+                "/home/testuser/.config/sendMail.yml", "w"
+            )
             mock_yaml_dump.assert_called_once()
             mock_log_warning.assert_called_once()
 
-            assert result == '/home/testuser/.config/sendMail.yml'
+            assert result == "/home/testuser/.config/sendMail.yml"

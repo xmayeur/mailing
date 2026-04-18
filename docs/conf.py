@@ -7,7 +7,8 @@ import os
 import sys
 from unittest.mock import MagicMock
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath(".."))
+
 
 # Mock modules that are not installed
 class Mock(MagicMock):
@@ -15,28 +16,29 @@ class Mock(MagicMock):
     def __getattr__(cls, name):
         return MagicMock()
 
+
 MOCK_MODULES = [
-    'gspread',
-    'yaml',
-    'bs4',
-    'certifi',
-    'getSecrets',
-    'google',
-    'google.auth',
-    'google.auth.transport',
-    'google.auth.transport.requests',
-    'google.oauth2',
-    'google.oauth2.credentials',
-    'google_auth_oauthlib',
-    'google_auth_oauthlib.flow',
-    'googleapiclient',
-    'googleapiclient.discovery',
-    'googleapiclient.errors',
-    'googleapiclient.http',
-    'oauth2client',
-    'oauth2client.service_account',
-    'PIL',
-    'markdown2'
+    "gspread",
+    "yaml",
+    "bs4",
+    "certifi",
+    "getSecrets",
+    "google",
+    "google.auth",
+    "google.auth.transport",
+    "google.auth.transport.requests",
+    "google.oauth2",
+    "google.oauth2.credentials",
+    "google_auth_oauthlib",
+    "google_auth_oauthlib.flow",
+    "googleapiclient",
+    "googleapiclient.discovery",
+    "googleapiclient.errors",
+    "googleapiclient.http",
+    "oauth2client",
+    "oauth2client.service_account",
+    "PIL",
+    "markdown2",
 ]
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
@@ -44,35 +46,35 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'sendMail'
-copyright = '2025-2026, Xavier Mayeur'
-author = 'Xavier Mayeur'
+project = "sendMail"
+copyright = "2025-2026, Xavier Mayeur"
+author = "Xavier Mayeur"
 
-version = '1.1'
-release = '1.1'
+version = "1.1"
+release = "1.1"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.todo',
-    'sphinx.ext.coverage',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.todo",
+    "sphinx.ext.coverage",
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # Autodoc settings
 autodoc_default_options = {
-    'members': True,
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'undoc-members': True,
-    'exclude-members': '__weakref__'
+    "members": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
+    "exclude-members": "__weakref__",
 }
 
 # Napoleon settings for Google/NumPy style docstrings
@@ -93,33 +95,33 @@ napoleon_attr_annotations = True
 
 # Intersphinx mapping
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'requests': ('https://requests.readthedocs.io/en/latest/', None),
+    "python": ("https://docs.python.org/3", None),
+    "requests": ("https://requests.readthedocs.io/en/latest/", None),
 }
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
 
 # ReadTheDocs theme options
 html_theme_options = {
-    'logo_only': False,
-    'prev_next_buttons_location': 'bottom',
-    'style_external_links': False,
-    'vcs_pageview_mode': '',
-    'style_nav_header_background': '#2980B9',
+    "logo_only": False,
+    "prev_next_buttons_location": "bottom",
+    "style_external_links": False,
+    "vcs_pageview_mode": "",
+    "style_nav_header_background": "#2980B9",
     # Toc options
-    'collapse_navigation': False,
-    'sticky_navigation': True,
-    'navigation_depth': 4,
-    'includehidden': True,
-    'titles_only': False
+    "collapse_navigation": False,
+    "sticky_navigation": True,
+    "navigation_depth": 4,
+    "includehidden": True,
+    "titles_only": False,
 }
 
 html_context = {
-    'display_github': False,
+    "display_github": False,
 }
 
 html_show_sourcelink = True
