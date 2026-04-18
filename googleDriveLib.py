@@ -77,9 +77,7 @@ def connect_google_driver(service_account_id="artscroisesServiceAccount"):
     creds = get_secret(service_account_id)
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-            creds, scope
-        )
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
         _log.error(e)
@@ -169,7 +167,7 @@ def download_file(service=None, files=[], folder="input"):
                 fd.write(file_retrieved)
 
         except HttpError as error:
-            _log.error(f'An error occurred: {error} with file {f["name"]}')
+            _log.error(f"An error occurred: {error} with file {f['name']}")
 
 
 def upload_file(service, file, mimetype="text/csv"):
@@ -194,4 +192,3 @@ def upload_file(service, file, mimetype="text/csv"):
         .create(body=file_metadata, media_body=media, fields="id")
         .execute()
     )
-
