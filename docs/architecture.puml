@@ -1,0 +1,104 @@
+@startuml
+title sendMail Project UML Class Diagram
+
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor Black
+}
+
+package "sendMail" {
+    class MailingSystem << (M,#FF7700) Module >> {
+        +main()
+        +process_profile(args)
+        +generate_mailing(param)
+        +process_attachments(args, config, folder)
+        +get_newsletter_name(files, args)
+        +check_mandatory_param(param)
+        +setup_argparse()
+        +init_log(log_file)
+    }
+
+    class EmailBuilder << (M,#FF7700) Module >> {
+        +build_email(param, subject, ...)
+        +format_message(template, row, header)
+        +prepare_html_for_cid(in_filepath)
+        +prepare_html_and_get_images(in_filepath, max_width)
+        +make_html_images_inline(in_filepath, out_filepath)
+        +md2html(file_path, styles, embed_styles)
+    }
+
+    class EmailSender << (M,#FF7700) Module >> {
+        +send_mail(param, message, recipients)
+        +send_gmail(service, message)
+        +get_smtp_connection(param)
+        +get_gmail_service(param)
+        +save_to_sent(param, msg)
+    }
+
+    class DataManager << (M,#FF7700) Module >> {
+        +openGoogleDBMembersSheet(sa, id)
+        +readAllSheet(wb, sheet_name)
+        +get_subscriber_reader(param)
+        +get_indices(header)
+        +filter(filter, row, indices)
+    }
+
+    class Utilities << (M,#FF7700) Module >> {
+        +guess_type(filepath)
+        +file_to_base64(filepath)
+        +get_default_config_path()
+    }
+
+    class Dict2Class {
+        +sender: str
+        +sendername: str
+        +smtp_host: str
+        +smtp_port: int
+        +username: str
+        +password: str
+        +database: str
+        +SHEETID: str
+        +SA: str
+        +styles: str
+        +filter: dict
+        +default_message: str
+        +__init__(my_dict)
+    }
+}
+
+package "googleDriveLib" {
+    class GoogleDriveOperations << (M,#FF7700) Module >> {
+        +connect_google_driver(service_account_id)
+        +get_files(service, folder_id)
+        +rename_file(service, fileId, newTitle)
+        +download_file(service, files, folder)
+        +upload_file(service, file, mimetype)
+    }
+}
+
+' Relationships
+MailingSystem --> EmailBuilder : uses
+MailingSystem --> EmailSender : uses
+MailingSystem --> DataManager : uses
+MailingSystem --> GoogleDriveOperations : uses
+MailingSystem ..> Dict2Class : creates and passes as 'param'
+
+EmailBuilder ..> Dict2Class : uses as 'param'
+EmailSender ..> Dict2Class : uses as 'param'
+DataManager ..> Dict2Class : uses as 'param'
+EmailBuilder --> Utilities : uses
+
+' External Dependencies (Conceptual)
+package "External Libraries" <<Frame>> {
+    class "smtplib.SMTP" as SMTP << (E,#FFBBBB) External >>
+    class "googleapiclient.discovery.Resource" as GoogleService << (E,#FFBBBB) External >>
+    class "gspread.Spreadsheet" as GSpreadsheet << (E,#FFBBBB) External >>
+}
+
+EmailSender --> SMTP : sends via
+EmailSender --> GoogleService : uses Gmail API
+DataManager --> GSpreadsheet : reads from
+GoogleDriveOperations --> GoogleService : uses Drive API
+
+@enduml
