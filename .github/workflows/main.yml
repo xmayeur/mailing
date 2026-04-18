@@ -10,6 +10,9 @@ on:
         description: "Enter the version (e.g., v1.0.0)"
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
