@@ -1,6 +1,5 @@
 View this page [online](https://cloud.cambristi.com/news/2026xxxx.html)
 
-
 <!-- Main top banner -->
 ![](../images/header.png)
 ---
@@ -13,19 +12,15 @@ View this page [online](https://cloud.cambristi.com/news/2026xxxx.html)
 
 ☞[_Nederlands_](#_nederlands_)
 
-
-
-###### _French_
+## _French_
 
 Ajouter du texte ici, par exemple :
 - Un texte français
 - Une autre ligne de texte
 - avec des accents comme 'éléphant'
 
-
 | <img src="../images/MusicTeapot.png" width="200"> | <h1>Atelier Hastir</h1> |
 |---------------------------------------------------|-------------------------|
-
 
 <img src="../images/fioriture.png" width="100">
 
@@ -46,7 +41,7 @@ Pour ce faire, cliquez sur le lien ci-dessous:
 Les menus [Recherche de membres](https://www.cambristi.com/recherche-de-membres)
 et les [Listes de membres](https://www.cambristi.com/member-list) contiendront dès lors cette information
 
-###### _English_
+### _English_
 
 ## Reminder: Action required on your part, for all CAMBRISTI members:
 
@@ -65,14 +60,9 @@ To do this, click on the link below:
 The menus [Search for members](https://www.cambristi.com/recherche-de-membres?lang=en)
 and [Member's lists](https://www.cambristi.com/member-list?lang=en) will afterward include this information
 
-
-
-
 <img src="../images/fioriture.png" width="100">
 
-
-
-###### _Nederlands_
+### _Nederlands_
 
 ## Herinnering: Wat u moet doen, voor alle leden van CAMBRISTI:
 
@@ -90,7 +80,6 @@ Klik hiervoor op de onderstaande link:
 
 De menus [Zoek voor leden](https://www.cambristi.com/recherche-de-membres?lang=nl)
 and [Lijst van leden](https://www.cambristi.com/member-list?lang=nl) zullen darna deze informatie bevatten.
-
 
 <br><br>
 ---
