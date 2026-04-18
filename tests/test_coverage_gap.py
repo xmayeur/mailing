@@ -14,7 +14,7 @@ sys.modules["yaml"] = MagicMock()
 # sys.modules['bs4'] = MagicMock()
 sys.modules["certifi"] = MagicMock()
 sys.modules["getSecrets"] = MagicMock()
-sys.modules["getSecrets"].get_secret = mock_get_secret
+sys.modules["getSecrets"].get_secret = mock_get_secret  # type: ignore[attr-defined]
 sys.modules["google"] = MagicMock()
 sys.modules["google.auth"] = MagicMock()
 sys.modules["google.auth.transport"] = MagicMock()
@@ -31,7 +31,7 @@ sys.modules["oauth2client"] = MagicMock()
 sys.modules["oauth2client.service_account"] = MagicMock()
 sys.modules["PIL"] = MagicMock()
 
-import sendMail
+import sendMail  # noqa: E402
 
 
 class TestCoverageGap:
@@ -72,7 +72,7 @@ class TestCoverageGap:
         with patch("sendMail.readAllSheet", return_value=[["header"], ["row"]]):
             reader, handle = sendMail.get_subscriber_reader(param)
             assert handle is None
-            assert list(reader) == [["header"], ["row"]]
+            assert list(reader) == [["header"], ["row"]]  # type: ignore[arg-type]
 
     def test_get_subscriber_reader_file_not_found(self):
         """Cover lines 235-237: FileNotFoundError in subscriber reader"""
@@ -90,7 +90,7 @@ class TestCoverageGap:
         param = Mock()
         param.smtp_host = "host"
         param.smtp_port = 587
-        mock_smtp.side_effect = Exception("Connection error")
+        mock_smtp.side_effect = OSError("Connection error")
         with patch("sendMail.log") as mock_log:
             conn = sendMail.get_smtp_connection(param)
             assert conn is None
@@ -195,7 +195,7 @@ class TestCoverageGap:
                 ctx.__enter__.return_value = mock_im1
                 ctx.__exit__.return_value = False
                 return ctx
-            raise Exception("Bad image")
+            raise OSError("Bad image")
 
         mock_img_open.side_effect = open_side_effect
 
@@ -391,7 +391,7 @@ class TestCoverageGap:
         msg = Msg()
         with patch("sendMail.log") as mock_log:
             with patch("sendMail.sleep") as mock_sleep:
-                send_res = sendMail.send_mail(param, msg, ["to@ex.com"])
+                sendMail.send_mail(param, msg, ["to@ex.com"])
                 mock_log.error.assert_called()
                 mock_sleep.assert_called_with(10)
 

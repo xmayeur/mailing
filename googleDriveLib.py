@@ -77,7 +77,7 @@ def connect_google_driver(service_account_id="artscroisesServiceAccount"):
     creds = get_secret(service_account_id)
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)  # type: ignore[arg-type]
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
         _log.error(e)
@@ -135,7 +135,7 @@ def rename_file(service=None, fileId=None, newTitle=None):
     return service.files().update(fileId=fileId, body=body).execute()
 
 
-def download_file(service=None, files=[], folder="input"):
+def download_file(service=None, files=None, folder="input"):
     """
     Downloads files from Google Drive to a local folder.
 
@@ -160,7 +160,7 @@ def download_file(service=None, files=[], folder="input"):
             done = False
             while done is False:
                 status, done = downloader.next_chunk()
-                print(f"Download {int(status.progress() * 100)}.")
+                _log.debug(f"Download {int(status.progress() * 100)}%")
 
             file_retrieved = file.getvalue()
             with open(join(folder, f["name"]), "wb") as fd:

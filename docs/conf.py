@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath(".."))
 # Mock modules that are not installed
 class Mock(MagicMock):
     @classmethod
-    def __getattr__(cls, name):
+    def __getattr__(cls, name):  # type: ignore[override]
         return MagicMock()
 
 

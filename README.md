@@ -25,15 +25,15 @@ A comprehensive email campaign management system for organizations managing mail
 
 ## Features
 
-- 📧 **Multi-profile email campaigns** with configurable settings
-- 📊 **Google Sheets integration** for dynamic subscriber lists
-- 📁 **Google Drive integration** for automatic attachment downloads
-- 🎨 **HTML email support** with automatic inline image processing
-- ⏱️ **Rate limiting** to comply with email provider restrictions
-- 🔄 **Batch processing** with pause and resume capabilities
-- 🧪 **Test mode** for safe campaign testing
-- 📝 **Detailed logging** for monitoring and debugging
-- 🔒 **Secure credential management** via secrets vault
+* 📧 **Multi-profile email campaigns** with configurable settings
+* 📊 **Google Sheets integration** for dynamic subscriber lists
+* 📁 **Google Drive integration** for automatic attachment downloads
+* 🎨 **HTML email support** with automatic inline image processing
+* ⏱️ **Rate limiting** to comply with email provider restrictions
+* 🔄 **Batch processing** with pause and resume capabilities
+* 🧪 **Test mode** for safe campaign testing
+* 📝 **Detailed logging** for monitoring and debugging
+* 🔒 **Secure credential management** via secrets vault
 
 ## Installation
 
@@ -48,19 +48,19 @@ pip install -r requirements.txt
 
 ### Dependencies
 
-- gspread
-- google-auth
-- google-auth-oauthlib
-- google-auth-httplib2
-- google-api-python-client
-- oauth2client
-- PyYAML
-- beautifulsoup4
-- Pillow
-- requests
-- certifi
-- markdown2
-- python-calamine
+* gspread
+* google-auth
+* google-auth-oauthlib
+* google-auth-httplib2
+* google-api-python-client
+* oauth2client
+* PyYAML
+* beautifulsoup4
+* Pillow
+* requests
+* certifi
+* markdown2
+* python-calamine
 
 ## Configuration
 
@@ -124,25 +124,27 @@ if all the conditions are met, the subscriber is added to the mailing list
 
 The syntax is:
 
-    filter:
-        <field_name>: <operation> <value>
-        <field_name>: <operation> <value>
+```
+filter:
+    <field_name>: <operation> <value>
+    <field_name>: <operation> <value>
 
-    where:
-    <field_name>: is a field from the subscriber database (email, first_name...)
-    <operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
-                            "is empty", "is not empty", "greater than", "less than",
-                            "greater or equal to", "less or equal to", "one of", "none of",
-                            "is equal to", "is not equal to"
-    <value>: is the value to compare with
+where:
+<field_name>: is a field from the subscriber database (email, first_name...)
+<operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
+                        "is empty", "is not empty", "greater than", "less than",
+                        "greater or equal to", "less or equal to", "one of", "none of",
+                        "is equal to", "is not equal to"
+<value>: is the value to compare with
+```
 
 ### Secrets Management
 
 Optionally, Credentials and API keys can be stored securely using the `getSecrets` module. Typical secrets:
 
-- **MAILCONFIG**: SMTP/IMAP credentials
-- **Service Account**: Google API credentials
-- **Sheet ID**: Google Sheets identifier
+* **MAILCONFIG**: SMTP/IMAP credentials
+* **Service Account**: Google API credentials
+* **Sheet ID**: Google Sheets identifier
 
 ## Command-Line Usage
 
@@ -163,7 +165,7 @@ python sendMail.py --profile <profile_name> [options] [files...]
 | `-s, --subject`  | string | Subject of the email                                                                     |
 | `-m, --message`  | string | Text message body of the email - optional if files argument given                        |
 | `file`           | list   | Files `(.html, .txt, .pdf, .md, .png, .jpg)`to attach to the email (positional argument) |
-| `--keep-html`    | flag   | Keep HTML files after conversion of `.md` Markdown files                                 | 
+| `--keep-html`    | flag   | Keep HTML files after conversion of `.md` Markdown files                                 |
 
 #### Test & Debug Options
 
@@ -301,20 +303,20 @@ python sendMail.py --profile artscroises \
 
 The subscriber database should include the following columns:
 
-- `id` - Unique subscriber ID
-- `first_name` - First name
-- `last_name` - Last name
-- `email` - Email address
-- `status` - Subscription status (active/inactive)
-- `group` - Mailing list group
-- `selected` - Selection marker (x for selected)
-- `member` - Membership status (yes/no)
-- `phone` - Phone number
-- `mobile_phone` - Mobile phone number
-- `address` - Street address
-- `city` - City
-- `zip` - Postal code
-- `Cotisation YYYY` - Cotisation payment status for year YYYY
+* `id` - Unique subscriber ID
+* `first_name` - First name
+* `last_name` - Last name
+* `email` - Email address
+* `status` - Subscription status (active/inactive)
+* `group` - Mailing list group
+* `selected` - Selection marker (x for selected)
+* `member` - Membership status (yes/no)
+* `phone` - Phone number
+* `mobile_phone` - Mobile phone number
+* `address` - Street address
+* `city` - City
+* `zip` - Postal code
+* `Cotisation YYYY` - Cotisation payment status for year YYYY
 
 ### CSV Format
 
@@ -325,10 +327,11 @@ When using a local CSV file with `-db`, use the same column structure as above w
 ### HTML Templates
 
 HTML email templates support:
-- Inline images (automatically converted to CID references)
-- Image optimization and compression
-- Responsive design elements
-- CSS styling
+
+* Inline images (automatically converted to CID references)
+* Image optimization and compression
+* Responsive design elements
+* CSS styling
 
 Place images in the same directory as the HTML file and reference them with relative paths:
 
@@ -351,10 +354,10 @@ Available variables match the column names in your database.
 
 All operations are logged to `sendMail.log` with timestamps and severity levels:
 
-- **INFO**: Normal operations
-- **WARNING**: Non-critical issues
-- **ERROR**: Failed operations
-- **CRITICAL**: Fatal errors
+* **INFO**: Normal operations
+* **WARNING**: Non-critical issues
+* **ERROR**: Failed operations
+* **CRITICAL**: Fatal errors
 
 ## Google Drive Integration
 
@@ -378,24 +381,28 @@ The system can automatically download attachments from Google Drive:
 ## Troubleshooting
 
 ### Authentication Errors
-- Verify SMTP/IMAP credentials in secrets
-- Check Google API credentials are valid
-- Ensure service account has proper permissions
+
+* Verify SMTP/IMAP credentials in secrets
+* Check Google API credentials are valid
+* Ensure service account has proper permissions
 
 ### Rate Limiting Issues
-- Reduce `max_mails_per_hour` and `max_addr_per_mail`
-- Increase `pause` duration between sends
-- Use `-w` to schedule sends during off-peak hours
+
+* Reduce `max_mails_per_hour` and `max_addr_per_mail`
+* Increase `pause` duration between sends
+* Use `-w` to schedule sends during off-peak hours
 
 ### Template Problems
-- Verify HTML syntax is valid
-- Check image paths are relative and correct
-- Test with simple text email first
+
+* Verify HTML syntax is valid
+* Check image paths are relative and correct
+* Test with simple text email first
 
 ### Database Connection Issues
-- Verify Google Sheets ID is correct
-- Check service account has access to the sheet
-- Try using local CSV with `-db` flag
+
+* Verify Google Sheets ID is correct
+* Check service account has access to the sheet
+* Try using local CSV with `-db` flag
 
 ## Testing
 
@@ -436,22 +443,22 @@ tests/
 
 The test suite covers:
 
-- ✅ **Dictionary to Class conversion** utilities
-- ✅ **File utilities** (MIME type detection, Base64 encoding)
-- ✅ **Message formatting** with variable substitution
-- ✅ **Filtering functions** for both profiles
-- ✅ **Email building** with various configurations
-- ✅ **Google Drive** connection, file listing, download, upload, and rename
-- ✅ **Argument parsing** for command-line interface
+* ✅ **Dictionary to Class conversion** utilities
+* ✅ **File utilities** (MIME type detection, Base64 encoding)
+* ✅ **Message formatting** with variable substitution
+* ✅ **Filtering functions** for both profiles
+* ✅ **Email building** with various configurations
+* ✅ **Google Drive** connection, file listing, download, upload, and rename
+* ✅ **Argument parsing** for command-line interface
 
 ### Continuous Integration
 
 Tests run automatically on every push and pull request via GitHub Actions:
 
-- ✅ Multiple Python versions (3.10, 3.11)
-- ✅ Multiple operating systems (Ubuntu, macOS, Windows)
-- ✅ Code coverage reporting via Codecov
-- ✅ Linting with flake8 and black
+* ✅ Multiple Python versions (3.10, 3.11)
+* ✅ Multiple operating systems (Ubuntu, macOS, Windows)
+* ✅ Code coverage reporting via Codecov
+* ✅ Linting with flake8 and black
 
 ### Test Status
 
@@ -522,10 +529,10 @@ For issues and questions, please contact the maintainer or file an issue in the 
 
 Contributions are welcome! Please follow the existing code style and include tests for new features.
 
-
 ## Changelog
 
 All notable changes to this project will be documented here.
 
 ### 2026-02-11
-- Added initial changelog section to README.
+
+* Added initial changelog section to README.

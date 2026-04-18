@@ -35,6 +35,7 @@ from os import getenv, mkdir
 from os.path import join, exists
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 from time import time, sleep
+from typing import Any
 from uuid import uuid4
 
 import gspread
@@ -54,6 +55,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import googleDriveLib as gd
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
+_CSP_IMG_DOMAIN = "{_CSP_IMG_DOMAIN}"
 
 
 def get_default_config_path():
@@ -70,6 +72,7 @@ def get_default_config_path():
     :rtype: Optional[str]
     """
     home = getenv("USERPROFILE") if os.name == "nt" else getenv("HOME")
+    home = home or ""
     cfg = join(home, ".config", "sendMail.yml")
     if not exists(cfg):
         dir = join(home, ".config")
@@ -78,7 +81,7 @@ def get_default_config_path():
         default = {
             "default": {
                 "username": "jdoe",
-                "password": "foobar",
+                "password": "",
                 "sender": "john.doe@example.com",
                 "sendername": "John Doe",
                 "database": "subscribers.csv",
@@ -153,9 +156,8 @@ def openGoogleDBMembersSheet(sa, id):
         "https://www.googleapis.com/auth/drive",
     ]
 
-    secr = get_secret(sa)
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)
-    gc = gspread.authorize(creds)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)  # type: ignore[arg-type]
+    gc = gspread.authorize(creds)  # type: ignore[arg-type]
 
     spreadsheet_id = get_secret(id)["ID"]
     wb = gc.open_by_key(spreadsheet_id)
@@ -178,9 +180,15 @@ class Dict2Class:
     Convert a dict to a class
     """
 
-    def __init__(self, my_dict):
+    def __init__(self, my_dict: dict) -> None:
         for key in my_dict:
-            setattr(self, key.lower(), my_dict[key])
+            object.__setattr__(self, key.lower(), my_dict[key])
+
+    def __getattr__(self, name: str) -> Any:
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        object.__setattr__(self, name, value)
 
 
 def guess_type(filepath):
@@ -195,7 +203,7 @@ def guess_type(filepath):
     :rtype: str
     """
     try:
-        import magic  # python-magic
+        import magic  # python-magic  # type: ignore[import-not-found]
 
         return magic.from_file(filepath, mime=True)
     except ImportError:
@@ -240,17 +248,17 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
     with open(in_filepath, "r") as file:
         soup = BeautifulSoup(file, "html.parser")
     for img in soup.find_all("img"):
-        if "http" in img.attrs["src"]:
-            img_path = urllib.parse.unquote(img.attrs["src"])
+        src = str(img.attrs["src"])
+        if "http" in src:
+            img_path = urllib.parse.unquote(src)
         else:
-            img_path = urllib.parse.unquote(os.path.join(basepath, img.attrs["src"]))
-        mimetype = guess_type(img_path)
-        if ";base64," not in img_path:
+            img_path = urllib.parse.unquote(os.path.join(basepath, src))
+        if re.match(r"data:[^;]+;base64,", src):
+            # Already an inline base64 data URI — keep as-is
+            pass
+        else:
+            mimetype = guess_type(img_path)
             img.attrs["src"] = f"data:{mimetype};base64,{file_to_base64(img_path)}"
-
-        else:
-            # TODO Change by a regex to ensure the string start with data:.*?;base64...
-            img.attrs["src"] = img_path[6:]
 
     if out_filepath:
         with open(out_filepath, "w") as of:
@@ -281,7 +289,7 @@ def prepare_html_for_cid(in_filepath):
 
     image_paths = []
     for img in soup.find_all("img"):
-        src = img.attrs.get("src", "")
+        src = str(img.attrs.get("src", ""))
         if "http" in src or src.startswith("data:"):
             continue
 
@@ -362,7 +370,7 @@ def get_smtp_connection(param):
     except SMTPAuthenticationError:
         log.critical("Invalid SMTP credentials")
         sys.exit(-1)
-    except Exception as e:
+    except (OSError, SMTPException) as e:
         log.error(f"Failed to connect to SMTP: {e}")
         return None
 
@@ -427,7 +435,7 @@ def save_to_sent(param, msg):
             if param.verbose:
                 log.info("stored in sent folder")
             return
-        except Exception as e:
+        except (OSError, imaplib.IMAP4.error) as e:
             if attempt < n - 1:
                 log.warning(f"Retrying IMAP storage: {e}")
                 sleep(10)
@@ -459,7 +467,7 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
     temp_dir = tempfile.mkdtemp()
 
     for img in soup.find_all("img"):
-        src = img.attrs.get("src", "")
+        src = str(img.attrs.get("src", ""))
         if not src or src.startswith("http"):
             continue
 
@@ -480,7 +488,7 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
                     f.write(img_data)
 
                 img_path = temp_img_path
-            except Exception as e:
+            except (ValueError, OSError) as e:
                 log.error(f"Impossible de traiter l'image en base64 : {e}")
                 continue
         else:
@@ -510,7 +518,7 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
 
                     img.attrs["src"] = f"cid:{cid}"
                     inline_images.append({"path": opt_img_path, "cid": cid})
-            except Exception as e:
+            except OSError as e:
                 log.error(f"Impossible de traiter l'image {img_path}: {e}")
                 # Si erreur, on peut décider de ne pas l'inclure ou de garder l'original
                 continue
@@ -540,10 +548,12 @@ def format_message(template, row, header):
     :rtype: str
     """
     try:
-        msg_txt = re.sub(r"\${(.*?)}", r"{row[header.index('\1')]}", template)
-        return eval('f"""' + msg_txt + '"""')
-    except NameError, KeyError, IndexError, SyntaxError, ValueError:
-        # log.error(f"Erreur d'évaluation du message : {e}")
+        def _replace(m: re.Match) -> str:
+            key = m.group(1)
+            return str(row[header.index(key)])
+
+        return re.sub(r"\${(.*?)}", _replace, template)
+    except (ValueError, IndexError):
         return template
 
 
@@ -648,7 +658,7 @@ def md2html(file_path, styles=None, embed_styles=False):
     <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' https://cloud.cambrsiti.com data:;">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
         <style>{default_styles}</style>
     </head>
     
@@ -660,7 +670,7 @@ def md2html(file_path, styles=None, embed_styles=False):
                 <!-- Add locale and title header -->
                 <head>
                     <meta charset="UTF-8">
-                    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' https://cloud.cambrsiti.com data:;">
+                    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
                     <style>{default_styles}</style>
                 </head>
 
@@ -670,7 +680,7 @@ def md2html(file_path, styles=None, embed_styles=False):
    <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' https://cloud.cambrsiti.com data:;">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
         <link rel="stylesheet" href="{styles}">
     </head>
 """
@@ -770,7 +780,7 @@ def build_email(
             all_inline_images.extend(found_images)
             temp_dirs.append(t_dir)
             if is_md and not hasattr(param, "keep-html"):
-                os.remove(att)
+                os.remove(att)  # type: ignore[arg-type]
         else:
             with open(att, "rb") as f:
                 content = f.read()
@@ -802,7 +812,7 @@ def build_email(
                         filename=os.path.basename(img_info["path"]),
                     )
                     msg_related.attach(img_part)
-            except Exception as e:
+            except (OSError, TypeError) as e:
                 log.error(f"Error attaching inline image {img_info['path']}: {e}")
 
         msg.attach(msg_related)
@@ -813,9 +823,37 @@ def build_email(
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
 
     # On attache la liste des dossiers temporaires à l'objet msg pour le nettoyage futur
-    msg._temp_dirs = temp_dirs
+    msg._temp_dirs = temp_dirs  # type: ignore[attr-defined]
 
     return msg, recipients
+
+
+def _build_and_send(param, addressees, row, header) -> None:
+    """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs."""
+    msg_body = format_message(param.message, row, header)
+    if param.donotsend:
+        log.info("do not sent activated")
+        return
+    msg, recipients = build_email(
+        param=param,
+        subject=param.subject,
+        message=msg_body,
+        bcc=",".join(addressees),
+        attachments=param.file,
+    )
+    try:
+        if hasattr(param, "smtp_host"):
+            send_mail(param=param, message=msg, recipients=recipients)
+        else:
+            send_gmail(get_gmail_service(param), message=msg)
+    finally:
+        for d in getattr(msg, "_temp_dirs", []):  # type: ignore[attr-defined]
+            try:
+                shutil.rmtree(d)
+                if param.verbose:
+                    log.info(f"Dossier temporaire supprimé : {d}")
+            except OSError as e:
+                log.error(f"Erreur lors du nettoyage de {d}: {e}")
 
 
 def generate_mailing(param):
@@ -864,6 +902,7 @@ def generate_mailing(param):
 
         addressees, recipient_count, mail_batch_count = [], 0, 0
         start_time = time()
+        row = None
 
         for row in reader:
             current_row_idx += 1
@@ -876,7 +915,7 @@ def generate_mailing(param):
                 continue
 
             if param.verbose:
-                print(row[indices["email"]])
+                log.debug(row[indices["email"]])
 
             addressees.append(row[indices["email"]])
             recipient_count += 1
@@ -885,34 +924,7 @@ def generate_mailing(param):
                 log.info(
                     f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})"
                 )
-                msg_body = format_message(param.message, row, header)
-                if not param.donotsend:
-                    msg, recipients = build_email(
-                        param=param,
-                        subject=param.subject,
-                        message=msg_body,
-                        bcc=",".join(addressees),
-                        attachments=param.file,
-                    )
-                    try:
-                        if hasattr(param, "smtp_host"):
-                            send_mail(param=param, message=msg, recipients=recipients)
-                        else:
-                            send_gmail(get_gmail_service(param), message=msg)
-
-                    finally:
-                        # Nettoyage des dossiers temporaires créés pour ce mail
-                        if hasattr(msg, "_temp_dirs"):
-                            for d in msg._temp_dirs:
-                                try:
-                                    shutil.rmtree(d)
-                                    if param.verbose:
-                                        log.info(f"Dossier temporaire supprimé : {d}")
-                                except Exception as e:
-                                    log.error(f"Erreur lors du nettoyage de {d}: {e}")
-
-                else:
-                    log.info("do not sent activated")
+                _build_and_send(param, addressees, row, header)
                 addressees, mail_batch_count = [], mail_batch_count + 1
                 sleep(pause)
                 if recipient_count % max_mail_per_hour == 0:
@@ -921,22 +933,7 @@ def generate_mailing(param):
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
-            msg_body = format_message(param.message, row, header)
-            if not param.donotsend:
-                msg, recipients = build_email(
-                    param=param,
-                    subject=param.subject,
-                    message=msg_body,
-                    bcc=",".join(addressees),
-                    attachments=param.file,
-                )
-                if hasattr(param, "smtp_host"):  # param.profile == 'artscroises':
-                    send_mail(param=param, message=msg, recipients=recipients)
-                else:
-                    send_gmail(get_gmail_service(param), message=msg)
-            else:
-                log.info("do not sent activated")
-
+            _build_and_send(param, addressees, row, header)
             mail_batch_count += 1
 
         log.info(
@@ -946,6 +943,91 @@ def generate_mailing(param):
     finally:
         if file_object:
             file_object.close()
+
+
+_FILTER_OPS = [
+    "is",
+    "is not",
+    "gt",
+    "lt",
+    "ge",
+    "le",
+    "in",
+    "not in",
+    "is empty",
+    "is not empty",
+    "greater than",
+    "less than",
+    "greater or equal to",
+    "less or equal to",
+    "one of",
+    "none of",
+    "is equal to",
+    "is not equal to",
+    "eq",
+    "ne",
+]
+
+
+def _parse_filter_expr(v: str, k: str) -> tuple[str, Any]:
+    """Parse operator and test value from a filter expression string.
+
+    Raises ValueError (already logged) when the operator is unrecognised.
+    """
+    try:
+        op = _FILTER_OPS[[v.find(x + " ") for x in _FILTER_OPS].index(0)]
+    except ValueError:
+        log.warning(f"Invalid filter operation for field '{k}: {v}'")
+        raise
+
+    test_value: Any = v.split(op)[1].strip()
+    if "not " in test_value:
+        op += " not"
+        test_value = test_value.split("not")[1].strip()
+    if "empty" in test_value:
+        op += " empty"
+        test_value = None
+    elif test_value and "," in test_value:
+        test_value = test_value.replace(" ", "").split(",")
+    return op, test_value
+
+
+def _evaluate_condition(field_value: str, op: str, test_value: Any, k: str) -> bool:
+    """Return True when *field_value* satisfies *op* against *test_value*."""
+    try:
+        fv = float(field_value)
+        try:
+            tv = float(test_value)  # type: ignore[arg-type]
+        except (ValueError, TypeError):
+            log.warning(f"Invalid filter value for field '{k}: {test_value}'")
+            return False
+        if op in ("ge", "greater or equal to"):
+            return fv >= tv
+        if op in ("gt", "greater than"):
+            return fv > tv
+        if op in ("le", "less or equal to"):
+            return fv <= tv
+        if op in ("lt", "less than"):
+            return fv < tv
+        if op in ("eq", "is equal to"):
+            return fv == tv
+        if op in ("ne", "is not equal to"):
+            return fv != tv
+        return True
+    except ValueError:
+        if op in ("in", "one of"):
+            return field_value in test_value  # type: ignore[operator]
+        if op in ("not in", "none of"):
+            return field_value not in test_value  # type: ignore[operator]
+        if op in ("is", "is equal to"):
+            return field_value == test_value
+        if op in ("is not", "is not equal to"):
+            return field_value != test_value
+        if op == "is not empty":
+            return field_value != "" and field_value is not None
+        if op == "is empty":
+            return field_value == "" or field_value is None
+        return True
 
 
 def filter(filter, row, indices):
@@ -1000,98 +1082,20 @@ def filter(filter, row, indices):
              otherwise.
     :rtype: bool
     """
-    if filter == {}:
+    if not filter:
         return False
 
     result = True
-
-    # Allowed operations
-    ops = [
-        "is",
-        "is not",
-        "gt",
-        "lt",
-        "ge",
-        "le",
-        "in",
-        "not in",
-        "is empty",
-        "is not empty",
-        "greater than",
-        "less than",
-        "greater or equal to",
-        "less or equal to",
-        "one of",
-        "none of",
-        "is equal to",
-        "is not equal to",
-        "eq",
-        "ne",
-    ]
-
     for k, v in filter.items():
-        res = True
-        field_value = (
-            row[indices[k]] if k in indices and indices[k] < len(row) else None
-        )
+        field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
             log.warning(f"Invalid field '{k}'")
             return True
-        # get the operator
         try:
-            op = ops[[v.find(x + " ") for x in ops].index(0)]
+            op, test_value = _parse_filter_expr(v, k)
         except ValueError:
-            log.warning(f"Invalid filter operation for field '{k}: {v}'")
             return True
-        # get the value to compare with
-        test_value = v.split(op)[1].strip()
-        # correct the operator if needed
-        if "not " in test_value:
-            op += " not"
-            test_value = test_value.split("not")[1].strip()
-        if "empty" in test_value:
-            op += " empty"
-            test_value = None
-        # find if test_value should be a list
-        if test_value and "," in test_value:
-            test_value = test_value.replace(" ", "").split(",")
-
-        try:
-            field_value = float(field_value)
-            try:
-                test_value = float(test_value)
-            except ValueError:
-                log.warning(f"Invalid filter value for field '{k}: {test_value}'")
-                return True
-            # numeric comparison
-            if op == "ge" or op == "greater than or equal to":
-                res = field_value >= test_value
-            elif op == "gt" or op == "greater than":
-                res = field_value > test_value
-            elif op == "le" or op == "less than or equal to":
-                res = field_value <= test_value
-            elif op == "lt" or op == "less than":
-                res = field_value < test_value
-            elif op == "eq" or op == "is equal to":
-                res = field_value == test_value
-            elif op == "ne" or op == "is not equal to":
-                res = field_value != test_value
-
-        except ValueError:
-            # string comparison
-            if op == "in" or op == "one of":
-                res = field_value in test_value
-            elif op == "not in" or op == "none of":
-                res = field_value not in test_value
-            elif op == "is" or op == "is equal to":
-                res = field_value == test_value
-            elif op == "is not" or op == "is not equal to":
-                res = field_value != test_value
-            elif op == "is not empty":
-                res = field_value != "" and field_value is not None
-            elif op == "is empty":
-                res = field_value == "" or field_value is None
-
+        res = _evaluate_condition(field_value, op, test_value, k)
         if not res:
             return True
         result = result and res
@@ -1113,13 +1117,13 @@ def send_gmail(service, message=None):
     :return: The sent message resource if successful, None otherwise.
     :rtype: dict or None
     """
-    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()  # type: ignore[union-attr]
 
     body = {"raw": encoded_message}
     try:
         return service.users().messages().send(userId="me", body=body).execute()
     except errors.HttpError as error:
-        log.error(f"Error sending message: {error} to {message['To']}")
+        log.error(f"Error sending message: {error} to {message['To']}")  # type: ignore[index]
         return None
 
 
@@ -1145,17 +1149,17 @@ def send_mail(param=None, message=None, recipients=None):
     :return: A boolean indicating whether the email was successfully sent.
     :rtype: bool
     """
-    if param.verbose:
+    if param.verbose:  # type: ignore[union-attr]
         log.info(f"Sending email to {recipients}")
     success = False
     for attempt in range(2):
         conn = get_smtp_connection(param)
         if conn:
             try:
-                conn.sendmail(message["From"], recipients, message.as_string())
+                conn.sendmail(message["From"], recipients, message.as_string())  # type: ignore[union-attr,index]
                 conn.quit()
                 success = True
-                if param.verbose:
+                if param.verbose:  # type: ignore[union-attr]
                     log.info("sent")
                 break
             except SMTPException as e:
@@ -1223,8 +1227,8 @@ def process_profile(args):
         if secret is None:
             log.warning("No secret configuration found")
             secret = {}
-    except Exception:
-        # log.info(f"No secret configuration used using: {e} key")
+    except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
+        log.debug(f"No secret configuration found, using config file only: {e}")
         secret = {}
 
     config = {**secret, **config}
@@ -1443,7 +1447,7 @@ def main():
         with open(args.config) as config_file:
             args.conf = yaml.safe_load(config_file)
     else:
-        print(get_default_config_path())
+        log.debug(get_default_config_path())
         with open(get_default_config_path()) as config_file:
             args.conf = yaml.safe_load(config_file)
     if args.conf is None:
