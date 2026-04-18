@@ -3,6 +3,7 @@ Unit tests for sendMail.py module
 """
 
 import email
+import email.mime.application
 import os
 import shutil
 import sys
@@ -27,7 +28,7 @@ sys.modules["yaml"] = MagicMock()
 # sys.modules['bs4'] = MagicMock()
 sys.modules["certifi"] = MagicMock()
 sys.modules["getSecrets"] = MagicMock()
-sys.modules["getSecrets"].get_secret = mock_get_secret
+sys.modules["getSecrets"].get_secret = mock_get_secret  # type: ignore[attr-defined]
 sys.modules["google"] = MagicMock()
 sys.modules["google.auth"] = MagicMock()
 sys.modules["google.auth.transport"] = MagicMock()
@@ -56,7 +57,7 @@ sys.modules["googleapiclient.discovery"] = MagicMock()
 sys.modules["googleapiclient.errors"] = mock_errors
 sys.modules["googleapiclient.http"] = MagicMock()
 
-import sendMail
+import sendMail  # noqa: E402
 
 # Use the same HttpError class in the test module's namespace and in sendMail
 errors.HttpError = MockHttpError
@@ -194,7 +195,7 @@ class TestFilterFunctions:
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
 
         result = sendMail.filter(param.filter, row, indices)
-        assert result == False  # Should NOT be filtered (passes filter)
+        assert not result  # Should NOT be filtered (passes filter)
 
     def test_filter_artscroises_inactive(self):
         """Test Arts Croisés filter with inactive member"""
@@ -207,7 +208,7 @@ class TestFilterFunctions:
         indices = {"status": 0, "group": 1, "selected": 2, "email": 3}
 
         result = sendMail.filter(param.filter, row, indices)
-        assert result == True  # Should be filtered (doesn't pass)
+        assert result  # Should be filtered (doesn't pass)
 
     def test_filter_cambristi_member(self):
         """Test Cambristi filter with member"""
@@ -222,7 +223,7 @@ class TestFilterFunctions:
         indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3, "emailBounced": 4}
 
         result = sendMail.filter(param.filter, row, indices)
-        assert result == False  # Should NOT be filtered
+        assert not result  # Should NOT be filtered
 
     def test_filter_cambristi_test_mode(self):
         """Test Cambristi filter in test mode"""
@@ -237,7 +238,7 @@ class TestFilterFunctions:
         indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
 
         result = sendMail.filter(param.filter, row, indices)
-        assert result == True  # Should NOT be filtered
+        assert result  # Should NOT be filtered
 
 
 class TestEmailBuilding:
@@ -319,13 +320,14 @@ class TestEmailBuilding:
 
         # HTML body is attached inside a multipart/related part
         related_parts = [
-            p for p in msg.get_payload() if p.get_content_subtype() == "related"
+            p for p in msg.get_payload()  # type: ignore[union-attr]
+            if not isinstance(p, str) and p.get_content_subtype() == "related"
         ]
         assert related_parts, "Expected a multipart/related part with HTML body"
         html_parts = [
             p
-            for p in related_parts[0].get_payload()
-            if p.get_content_subtype() == "html"
+            for p in related_parts[0].get_payload()  # type: ignore[union-attr]
+            if not isinstance(p, str) and p.get_content_subtype() == "html"
         ]
         assert html_parts, "Expected an HTML part in the related container"
 
@@ -344,8 +346,8 @@ class TestArgumentParser:
     def test_setup_argparse_flags(self):
         """Test flag arguments"""
         args = sendMail.setup_argparse()
-        assert args.test == True
-        assert args.verbose == True
+        assert args.test
+        assert args.verbose
 
 
 class TestHTMLProcessing:
@@ -625,7 +627,7 @@ class TestSMTPConnection:
 class TestEmailSending:
     """Tests for email sending functions"""
 
-    @patch("sendMail.imaplib.IMAP4_SSL", side_effect=Exception("fail"))
+    @patch("sendMail.imaplib.IMAP4_SSL", side_effect=OSError("fail"))
     @patch("sendMail.sleep")
     def test_save_to_sent_failure_retries_and_logs(self, mock_sleep, mock_imap):
         param = Mock()
@@ -660,7 +662,7 @@ class TestEmailSending:
 
         recipients = ["recipient@example.com"]
 
-        result = sendMail.send_mail(param=param, message=msg, recipients=recipients)
+        sendMail.send_mail(param=param, message=msg, recipients=recipients)
 
         mock_conn.sendmail.assert_called_once()
         mock_conn.quit.assert_called_once()
@@ -1214,7 +1216,7 @@ def test_get_smtp_connection_generic_exception():
     param = MagicMock()
     param.smtp_host = "smtp.example.com"
     param.smtp_port = 587
-    with patch("sendMail.SMTP", side_effect=Exception("Connection failed")):
+    with patch("sendMail.SMTP", side_effect=OSError("Connection failed")):
         conn = sendMail.get_smtp_connection(param)
         assert conn is None
 
@@ -1231,7 +1233,7 @@ def test_save_to_sent_verbose_and_retry_exhaustion():
     with patch("imaplib.IMAP4_SSL") as mock_imap:
         mock_instance = mock_imap.return_value
         # Succeed on second attempt
-        mock_instance.login.side_effect = [Exception("Fail"), None]
+        mock_instance.login.side_effect = [OSError("Fail"), None]
         with patch("sendMail.sleep"):  # Don't actually sleep
             sendMail.save_to_sent(param, msg)
             assert mock_instance.login.call_count == 2
@@ -1239,7 +1241,7 @@ def test_save_to_sent_verbose_and_retry_exhaustion():
     # Test retry exhaustion
     with patch("imaplib.IMAP4_SSL") as mock_imap:
         mock_instance = mock_imap.return_value
-        mock_instance.login.side_effect = Exception("Permanent Fail")
+        mock_instance.login.side_effect = OSError("Permanent Fail")
         with patch("sendMail.sleep"):
             sendMail.save_to_sent(param, msg)
             assert mock_instance.login.call_count == 3
@@ -1251,7 +1253,7 @@ def test_prepare_html_and_get_images_exceptions():
 
     with patch("builtins.open", mock_open(read_data=html_content)):
         with patch("os.path.exists", return_value=True):
-            with patch("sendMail.Image.open", side_effect=Exception("Corrupt image")):
+            with patch("sendMail.Image.open", side_effect=OSError("Corrupt image")):
                 html, images, temp_dir = sendMail.prepare_html_and_get_images(
                     "dummy.html"
                 )
@@ -1266,11 +1268,11 @@ def test_process_attachments_no_files_and_no_mailing_folder():
     args.file = []
     config = {"SA": "sa.json"}  # Missing mailing_folder
 
-    with patch("sendMail.gd.connect_google_driver") as mock_connect:
+    with patch("sendMail.gd.connect_google_driver"):
         with patch("sendMail.glob", return_value=[]):
             files, service, gd_files = sendMail.process_attachments(args, config)
             assert files == []
-            assert service == None
+            assert service is None
             assert gd_files == []
 
 
@@ -1284,6 +1286,7 @@ def test_md2html_default_styles():
         # Mock __file__ to point to our tmp_dir so styles.css is created there
         with patch("sendMail.__file__", os.path.join(tmp_dir, "sendMail.py")):
             html_file = sendMail.md2html(md_file)
+            assert html_file is not None
             assert os.path.exists(html_file)
             # assert os.path.exists(os.path.join(tmp_dir, "styles.css"))
 
@@ -1298,6 +1301,7 @@ def test_md2html_custom_styles():
         with open(styles_file, "w") as f:
             f.write("body { color: red; }")
         html_file = sendMail.md2html(md_file, styles=styles_file, embed_styles=True)
+        assert html_file is not None
         assert os.path.exists(html_file)
         assert os.path.exists(styles_file)
         with open(html_file, "r") as f:
@@ -1347,9 +1351,9 @@ def test_build_email_attachments_pdf_txt():
         # Verify attachments are there (basic check)
         payload = msg.get_payload()
         assert any(
-            p.get_content_subtype() == "pdf"
-            for p in payload
-            if isinstance(p, email.mime.application.MIMEApplication)
+            isinstance(p, email.mime.application.MIMEApplication)
+            and p.get_content_subtype() == "pdf"
+            for p in payload  # type: ignore[union-attr]
         )
 
 
@@ -1416,7 +1420,7 @@ def test_filter_cambristi_index_error():
     indices = {"title": 0, "nom": 1, "prenom": 2, "email": 3}
     row = ["only one col"]
 
-    assert sendMail.filter(param.filter, row, indices) == True
+    assert sendMail.filter(param.filter, row, indices)
 
 
 def test_process_artscroises_wait_and_no_config():
@@ -1526,7 +1530,7 @@ def test_main_no_profile():
                 # Should log "No profile specified"
                 with pytest.raises(SystemExit) as pytest_wrapped_e:
                     sendMail.main()
-                    assert pytest_wrapped_e.type == SystemExit
+                    assert pytest_wrapped_e.type is SystemExit
                     assert pytest_wrapped_e.value.code == 42
 
 
@@ -1646,8 +1650,8 @@ def test_process_artscroises_wait_and_cleanup():
                 "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
         ):
             with patch("sendMail.generate_mailing", return_value="OK"):
-                with patch("os.rename") as mock_rename:
-                    with patch("os.remove") as mock_remove:
+                with patch("os.rename"):
+                    with patch("os.remove"):
                         sendMail.process_profile(args)
                         # Verify cleanup/rename if applicable (though in mock it might not reach)
 
@@ -1685,16 +1689,13 @@ def test_process_artscroises():
                         "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
                 ):
                     with patch("sendMail.generate_mailing", return_value="OK"):
-                        with patch("os.rename") as mock_rename:
-                            with patch("os.remove") as mock_remove:
+                        with patch("os.rename"):
+                            with patch("os.remove"):
                                 with patch(
                                         "sendMail.check_mandatory_param", return_value=True
                                 ):
-                                    with pytest.raises(SystemExit) as pytest_wrapped_e:
+                                    with pytest.raises(SystemExit):
                                         sendMail.main()
-                                        # print(pytest_wrapped_e)
-                                        # assert pytest_wrapped_e.type == SystemExit
-                                        # assert pytest_wrapped_e.value.code == 42
 
 
 def test_filter_artscroises_branches():
@@ -1708,19 +1709,19 @@ def test_filter_artscroises_branches():
 
     # Bounced row (should be filtered -> True)
     row_bounced = ["bounced", "", "Test", "", "test@ex.com"]
-    assert sendMail.filter(param.filter, row_bounced, indices) == True
+    assert sendMail.filter(param.filter, row_bounced, indices)
 
     # Filtered out title (should be filtered -> True)
     row_inactive = ["inactive", "", "Test", "", "test@ex.com"]
-    assert sendMail.filter(param.filter, row_inactive, indices) == True
+    assert sendMail.filter(param.filter, row_inactive, indices)
 
     # Active (should NOT be filtered -> False)
     row_active = ["active", "", "Test", "", "test@ex.com"]
-    assert sendMail.filter(param.filter, row_active, indices) == False
+    assert not sendMail.filter(param.filter, row_active, indices)
 
     # No email (should be filtered -> True)
     row_no_email = ["active", "", "Test", "", ""]
-    assert sendMail.filter(param.filter, row_no_email, indices) == True
+    assert sendMail.filter(param.filter, row_no_email, indices)
 
 
 def test_get_newsletter_name_branches():
@@ -1789,7 +1790,7 @@ def test_main_missing_args():
 
         with (
             patch("sendMail.get_secret", return_value=secret_config),
-            pytest.raises(SystemExit) as pytest_wrapped_e,
+            pytest.raises(SystemExit),
             patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])),
         ):
             sendMail.main()
@@ -2050,7 +2051,7 @@ def test_get_default_config_path_creates_dir_and_file():
             patch("builtins.open", mock_open()) as mock_file,
             patch("sendMail.yaml.dump") as mock_yaml_dump,
             patch("sendMail.log.warning") as mock_log_warning,
-            pytest.raises(SystemExit) as pytest_wrapped_e,
+            pytest.raises(SystemExit),
         ):
             # Config file doesn't exist, .config directory doesn't exist
             mock_exists.side_effect = [False, False]
@@ -2091,7 +2092,7 @@ def test_get_default_config_path_dir_exists_file_not():
             patch("builtins.open", mock_open()) as mock_file,
             patch("sendMail.yaml.dump") as mock_yaml_dump,
             patch("sendMail.log.warning") as mock_log_warning,
-            pytest.raises(SystemExit) as pytest_wrapped_e,
+            pytest.raises(SystemExit),
         ):
             # Config file doesn't exist (line 74), but .config directory exists (line 76)
             mock_exists.side_effect = [False, True]

@@ -57,7 +57,7 @@ class TestCheckMandatoryParam(unittest.TestCase):
         """Test valid configuration for SMTP/IMAP mode."""
         params = self.common_valid.copy()
         params.update(
-            {
+            {  # type: ignore[arg-type]
                 "smtp_host": "smtp.example.com",
                 "smtp_port": 587,
                 "imap_host": "imap.example.com",
@@ -83,7 +83,7 @@ class TestCheckMandatoryParam(unittest.TestCase):
         for p in smtp_params:
             params = self.common_valid.copy()
             params.update(
-                {
+                {  # type: ignore[arg-type]
                     "smtp_host": "smtp.example.com",
                     "smtp_port": 587,
                     "imap_host": "imap.example.com",
@@ -104,7 +104,7 @@ class TestCheckMandatoryParam(unittest.TestCase):
         """Test valid configuration for Gmail mode."""
         params = self.common_valid.copy()
         params.update(
-            {
+            {  # type: ignore[arg-type]
                 "token_file": "token.json",
                 "scopes": ["https://www.googleapis.com/auth/gmail.send"],
                 "credentials_id": "gmail_creds",
@@ -119,7 +119,7 @@ class TestCheckMandatoryParam(unittest.TestCase):
         for p in gmail_params:
             params = self.common_valid.copy()
             params.update(
-                {
+                {  # type: ignore[arg-type]
                     "token_file": "token.json",
                     "scopes": ["scope"],
                     "credentials_id": "creds",

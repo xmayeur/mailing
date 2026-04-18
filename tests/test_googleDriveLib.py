@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # Mock external dependencies before importing
 mock_get_secret = MagicMock(return_value={"key": "value"})
 sys.modules["getSecrets"] = MagicMock()
-sys.modules["getSecrets"].get_secret = mock_get_secret
+sys.modules["getSecrets"].get_secret = mock_get_secret  # type: ignore[attr-defined]
 
 
 # Create a proper HttpError that inherits from Exception
@@ -25,12 +25,12 @@ class MockHttpError(Exception):
 sys.modules["googleapiclient"] = MagicMock()
 sys.modules["googleapiclient.discovery"] = MagicMock()
 sys.modules["googleapiclient.errors"] = MagicMock()
-sys.modules["googleapiclient.errors"].HttpError = MockHttpError
+sys.modules["googleapiclient.errors"].HttpError = MockHttpError  # type: ignore[attr-defined]
 sys.modules["googleapiclient.http"] = MagicMock()
 sys.modules["oauth2client"] = MagicMock()
 sys.modules["oauth2client.service_account"] = MagicMock()
 
-import googleDriveLib as gd
+import googleDriveLib as gd  # noqa: E402
 
 
 class TestConnectGoogleDriver:
@@ -73,7 +73,7 @@ class TestConnectGoogleDriver:
         mock_creds.from_json_keyfile_dict.return_value = Mock()
         mock_build.return_value = Mock()
 
-        result = gd.connect_google_driver()
+        gd.connect_google_driver()
 
         mock_secret.assert_called_once_with("artscroisesServiceAccount")
 
@@ -86,8 +86,6 @@ class TestGetFiles:
         mock_service = Mock()
         mock_files = Mock()
         mock_list = Mock()
-        mock_execute = Mock(return_value={"files": [{"id": "123", "name": "test.pdf"}]})
-
         mock_service.files.return_value = mock_files
         mock_files.list.return_value = mock_list
         mock_list.execute.return_value = {"files": [{"id": "123", "name": "test.pdf"}]}
@@ -218,7 +216,7 @@ class TestDownloadFile:
     def test_download_file_empty_list(self):
         """Test download_file with empty file list"""
         mock_service = Mock()
-        result = gd.download_file(service=mock_service, files=[])
+        gd.download_file(service=mock_service, files=[])
         # Should return None (nothing to process)
         # Function doesn't explicitly return but completes
 
@@ -235,7 +233,6 @@ class TestUploadFile:
             mock_service = Mock()
             mock_files = Mock()
             mock_create = Mock()
-            mock_execute = Mock(return_value={"id": "uploaded123"})
 
             mock_service.files.return_value = mock_files
             mock_files.create.return_value = mock_create
@@ -295,7 +292,7 @@ class TestInitLog:
             mock_file.return_value = Mock()
             mock_stream.return_value = Mock()
 
-            result = gd._init_log()
+            gd._init_log()
 
             # Verify logger setup
             mock_logger.setLevel.assert_called()
