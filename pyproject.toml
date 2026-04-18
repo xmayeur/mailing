@@ -14,7 +14,7 @@ dependencies = [
     "markdown2",
     "google-auth>=2.47.0",
     "google-auth-oauthlib>=1.2.2",
-    "pyasn1>=0.6.2",
+    "pyasn1>=0.6.3",
     "protobuf>=6.33.5",
     "pytest (>=9.0.3,<10.0.0)",
     "pytest-cov (>=7.1.0,<8.0.0)",
