@@ -47,10 +47,10 @@ Logging & Initialization
 Google Sheets Functions
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autofunction:: sendMail.openGoogleDBMembersSheet
+.. autofunction:: sendMail.open_google_db_members_sheet
    :no-index:
 
-.. autofunction:: sendMail.readAllSheet
+.. autofunction:: sendMail.read_all_sheet
    :no-index:
 
 File Utilities
