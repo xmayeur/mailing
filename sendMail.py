@@ -56,6 +56,11 @@ import googleDriveLib as gd
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 _CSP_IMG_DOMAIN = "{_CSP_IMG_DOMAIN}"
+_HTML_PARSER = "html.parser"
+_CID_INLINE_DOMAIN = "inline.img"
+_OP_IS_NOT_EMPTY = "is not empty"
+_OP_IS_EQUAL_TO = "is equal to"
+_OP_IS_NOT_EQUAL_TO = "is not equal to"
 
 
 def get_default_config_path():
@@ -75,9 +80,9 @@ def get_default_config_path():
     home = home or ""
     cfg = join(home, ".config", "sendMail.yml")
     if not exists(cfg):
-        dir = join(home, ".config")
-        if not exists(dir):
-            mkdir(dir)
+        config_dir = join(home, ".config")
+        if not exists(config_dir):
+            mkdir(config_dir)
         default = {
             "default": {
                 "username": "jdoe",
@@ -95,7 +100,7 @@ def get_default_config_path():
                 "default_message": "Hello",
                 "styles": "./css/styles.css",
                 "filter": {
-                    "email": "is not empty",
+                    "email": _OP_IS_NOT_EMPTY,
                     "bounced": "is not bounced",
                     "cotisation": "greater than 0",
                     "first_name": 'one of "Jean", "Xavier"',
@@ -143,7 +148,7 @@ log = init_log(log_file="sendMail.log")
 
 
 # for artscroises profile
-def openGoogleDBMembersSheet(sa, id):
+def open_google_db_members_sheet(sa, id):
     """
     Open  a Google Sheet and return it as a spreadsheet object
     :param sa: Service Account entry name in secret vault
@@ -164,7 +169,7 @@ def openGoogleDBMembersSheet(sa, id):
     return wb
 
 
-def readAllSheet(wb, sheet_name: str = ""):
+def read_all_sheet(wb, sheet_name: str = ""):
     """
     Read all ranges of a sheet
     :param wb: workbook object
@@ -246,7 +251,7 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
     with open(in_filepath, "r") as file:
-        soup = BeautifulSoup(file, "html.parser")
+        soup = BeautifulSoup(file, _HTML_PARSER)
     for img in soup.find_all("img"):
         src = str(img.attrs["src"])
         if "http" in src:
@@ -285,7 +290,7 @@ def prepare_html_for_cid(in_filepath):
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
     with open(in_filepath, "r", encoding="utf-8") as file:
-        soup = BeautifulSoup(file, "html.parser")
+        soup = BeautifulSoup(file, _HTML_PARSER)
 
     image_paths = []
     for img in soup.find_all("img"):
@@ -297,7 +302,7 @@ def prepare_html_for_cid(in_filepath):
         img_local_path = urllib.parse.unquote(os.path.join(basepath, src))
         if os.path.exists(img_local_path):
             # Créer un CID unique basé sur le nom du fichier ou un UUID
-            cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+            cid = email.utils.make_msgid(domain=_CID_INLINE_DOMAIN)[1:-1]
             img.attrs["src"] = f"cid:{cid}"
             image_paths.append((img_local_path, cid))
 
@@ -322,8 +327,8 @@ def get_subscriber_reader(param):
     :rtype: tuple(iterator | None, file | None)
     """
     if param.database is None:
-        wb = openGoogleDBMembersSheet(sa=param.sa, id=param.sheetid)
-        return iter(readAllSheet(wb)), None
+        wb = open_google_db_members_sheet(sa=param.sa, id=param.sheetid)
+        return iter(read_all_sheet(wb)), None
 
     try:
         if param.database.endswith(".csv"):
@@ -360,7 +365,10 @@ def get_smtp_connection(param):
     :param param:
     :return:
     """
-    context = ssl.create_default_context()
+
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
         conn.starttls(context=context)
@@ -404,7 +412,6 @@ def get_gmail_service(param):
             creds.refresh(Request())
         else:
             credentials = get_secret(param.credentials_id)
-            # flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_ID, SCOPES)
             flow = InstalledAppFlow.from_client_config(credentials, param.scopes)
             creds = flow.run_local_server(port=0)
         with open(param.token_file, "w") as token:
@@ -443,6 +450,44 @@ def save_to_sent(param, msg):
                 log.error(f"Error copying to sent folder: {e}")
 
 
+def _decode_base64_image(src: str, temp_dir: str) -> str | None:
+    """Decode a base64-encoded ``data:`` image src and save it to *temp_dir*.
+
+    :return: The path of the saved temp file, or None on error.
+    """
+    try:
+        header, encoded = src.split(",", 1)
+        img_data = base64.b64decode(encoded)
+        ext = header.split("image/")[1].split(";")[0] if "image/" in header else "png"
+        temp_name = email.utils.make_msgid(domain=_CID_INLINE_DOMAIN)[1:-1]
+        temp_path = os.path.join(temp_dir, f"embedded_{temp_name}.{ext}")
+        with open(temp_path, "wb") as f:
+            f.write(img_data)
+        return temp_path
+    except (ValueError, OSError) as e:
+        log.error(f"Impossible de traiter l'image en base64 : {e}")
+        return None
+
+
+def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: int) -> str | None:
+    """Resize *img_path* to *max_width* and save as a JPEG in *temp_dir*.
+
+    :return: Path of the optimised file, or None on error.
+    """
+    try:
+        with Image.open(img_path) as im:
+            if im.width > max_width:
+                ratio = max_width / float(im.width)
+                new_height = int(float(im.height) * float(ratio))
+                im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)  # type: ignore[assignment]
+            opt_img_path = os.path.join(temp_dir, f"{cid}.jpg")
+            im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
+        return opt_img_path
+    except OSError as e:
+        log.error(f"Impossible de traiter l'image {img_path}: {e}")
+        return None
+
+
 def prepare_html_and_get_images(in_filepath, max_width=800):
     """
     Processes an HTML file to embed inline images and resize them for optimized usage.
@@ -457,13 +502,11 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
              to the temporary directory used for storing the optimized images.
     :rtype: tuple[str, list[dict[str, str]], str]
     """
-
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
     with open(in_filepath, "r", encoding="utf-8") as file:
-        soup = BeautifulSoup(file, "html.parser")
+        soup = BeautifulSoup(file, _HTML_PARSER)
 
     inline_images = []
-    # Créer un dossier temporaire pour les images optimisées
     temp_dir = tempfile.mkdtemp()
 
     for img in soup.find_all("img"):
@@ -472,56 +515,20 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
             continue
 
         if src.startswith("data:"):
-            # Traitement des images intégrées en base64
-            try:
-                # Format attendu : data:image/[type];base64,[data]
-                header, encoded = src.split(",", 1)
-                img_data = base64.b64decode(encoded)
-                # On essaie de deviner l'extension à partir du header
-                ext = "png"  # par défaut
-                if "image/" in header:
-                    ext = header.split("image/")[1].split(";")[0]
-
-                cid = email.utils.make_msgid(domain="inline.img")[1:-1]
-                temp_img_path = os.path.join(temp_dir, f"embedded_{cid}.{ext}")
-                with open(temp_img_path, "wb") as f:
-                    f.write(img_data)
-
-                img_path = temp_img_path
-            except (ValueError, OSError) as e:
-                log.error(f"Impossible de traiter l'image en base64 : {e}")
+            img_path = _decode_base64_image(src, temp_dir)
+            if img_path is None:
                 continue
         else:
             img_path = urllib.parse.unquote(os.path.join(basepath, src))
 
-        if os.path.exists(img_path):
-            cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+        if not os.path.exists(img_path):
+            continue
 
-            # --- Logique de redimensionnement ---
-            try:
-                with Image.open(img_path) as im:
-                    # On ne redimensionne que si l'image est plus large que max_width
-                    if im.width > max_width:
-                        ratio = max_width / float(im.width)
-                        new_height = int(float(im.height) * float(ratio))
-                        im = im.resize(
-                            (max_width, new_height), Image.Resampling.LANCZOS
-                        )
-
-                    # Sauvegarde dans le dossier temporaire en JPEG compressé
-                    opt_img_name = f"{cid}.jpg"
-                    opt_img_path = os.path.join(temp_dir, opt_img_name)
-                    # On convertit en RGB pour le JPEG (au cas où c'est un PNG avec alpha)
-                    im.convert("RGB").save(
-                        opt_img_path, "JPEG", quality=75, optimize=True
-                    )
-
-                    img.attrs["src"] = f"cid:{cid}"
-                    inline_images.append({"path": opt_img_path, "cid": cid})
-            except OSError as e:
-                log.error(f"Impossible de traiter l'image {img_path}: {e}")
-                # Si erreur, on peut décider de ne pas l'inclure ou de garder l'original
-                continue
+        cid = email.utils.make_msgid(domain=_CID_INLINE_DOMAIN)[1:-1]
+        opt_img_path = _resize_and_save_image(img_path, cid, temp_dir, max_width)
+        if opt_img_path:
+            img.attrs["src"] = f"cid:{cid}"
+            inline_images.append({"path": opt_img_path, "cid": cid})
 
     return str(soup), inline_images, temp_dir
 
@@ -647,10 +654,6 @@ def md2html(file_path, styles=None, embed_styles=False):
         with open(file_path, "r") as f:
             data = f.read()
 
-    # if not styles is None and not os.path.exists(styles):
-    #     log.warning(f"Le fichier CSS {styles} n'existe pas. Default styles used instead.")
-    #     styles = None
-
     converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
 
     if styles is None:
@@ -692,6 +695,74 @@ def md2html(file_path, styles=None, embed_styles=False):
     return file_path
 
 
+def _set_email_headers(msg, param, subject, to, cc, bcc):
+    """Populate standard headers on *msg* and return the (possibly swapped) to/bcc pair."""
+    msg["Subject"] = subject
+    msg["From"] = formataddr((param.sendername, param.sender))
+    unsubscribe_mail = f"mailto:{param.sender}?subject=unsubscribe"
+    msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"
+    msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    if param.max_addr_per_mail == 1:
+        to = bcc
+        bcc = None
+        msg["To"] = to
+    else:
+        msg["To"] = f"{to},{formataddr((param.sendername, param.sender))}"
+    if cc:
+        msg["Cc"] = cc
+    if bcc:
+        msg["Bcc"] = bcc
+    msg["Date"] = email.utils.formatdate(localtime=True)
+    if hasattr(param, "domain"):
+        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain=param.domain)
+    return to, bcc
+
+
+def _process_html_attachment(att, param, all_inline_images, temp_dirs):
+    """Convert Markdown to HTML if needed, then extract inline images. Returns the HTML body."""
+    is_md = att.endswith("md")
+    if is_md:
+        att = md2html(att, styles=param.styles if hasattr(param, "styles") else None, embed_styles=True)
+    html_content, found_images, t_dir = prepare_html_and_get_images(att)
+    all_inline_images.extend(found_images)
+    temp_dirs.append(t_dir)
+    if is_md and not hasattr(param, "keep-html"):
+        os.remove(att)  # type: ignore[arg-type]
+    return html_content
+
+
+def _process_binary_attachment(att, msg):
+    """Attach a PDF or TXT file directly to *msg*."""
+    with open(att, "rb") as f:
+        content = f.read()
+    if att.endswith("pdf"):
+        part = MIMEApplication(content, _subtype="pdf")
+        part.add_header("Content-Disposition", "attachment", filename=os.path.basename(att))
+        msg.attach(part)
+    elif att.endswith("txt"):
+        msg.attach(MIMEText(content.decode()))
+
+
+def _attach_body(msg, msg_related, message, all_inline_images):
+    """Attach the message body and any inline images to *msg*."""
+    if not message:
+        return
+    if "<html" in message:
+        msg_related.attach(MIMEText(message, "html"))
+        for img_info in all_inline_images:
+            try:
+                with open(img_info["path"], "rb") as f:
+                    img_part = MIMEImage(f.read())
+                img_part.add_header("Content-ID", f"<{img_info['cid']}>")
+                img_part.add_header("Content-Disposition", "inline", filename=os.path.basename(img_info["path"]))
+                msg_related.attach(img_part)
+            except (OSError, TypeError) as e:
+                log.error(f"Error attaching inline image {img_info['path']}: {e}")
+        msg.attach(msg_related)
+    else:
+        msg.attach(MIMEText(message, "plain"))
+
+
 def build_email(
         param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None
 ):
@@ -719,121 +790,42 @@ def build_email(
     :return: A tuple containing the constructed email message (MIMEMultipart object) and list of recipient email addresses.
     :rtype: Tuple[MIMEMultipart, list[str]]
     """
-    # 1. Build Message
     msg = MIMEMultipart("mixed")
-    msg["Subject"] = subject
-    msg["From"] = formataddr((param.sendername, param.sender))
+    to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)
 
-    # Ajout de l'en-tête List-Unsubscribe
-    # Il est recommandé de fournir à la fois une URL (http) et une adresse mail (mailto)
-    # unsubscribe_url = "https://www.votre-site.be/unsubscribe" # À adapter selon vos paramètres
-    unsubscribe_mail = f"mailto:{param.sender}?subject=unsubscribe"
-
-    msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"  # , <{unsubscribe_url}>"
-    msg["List-Unsubscribe-Post"] = (
-        "List-Unsubscribe=One-Click"  # Recommandé par les nouveaux standards Gmail/Yahoo 2024
-    )
-
-    if param.max_addr_per_mail == 1:
-        to = bcc
-        bcc = None
-        msg["To"] = to
-    else:
-        msg["To"] = f"{to},{formataddr((param.sendername, param.sender))}"
-    if cc:
-        msg["Cc"] = cc
-    if bcc:
-        msg["Bcc"] = bcc
-    msg["Date"] = email.utils.formatdate(localtime=True)
-
-    if hasattr(param, "domain"):
-        msg["Message-ID"] = email.utils.make_msgid(
-            idstring=str(uuid4()), domain=param.domain
-        )
-    # elif param.profile == 'cambristi':
-    #    msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain="gmail.com")
-
-    # Conteneur pour le corps du mail et ses images liées
     msg_related = MIMEMultipart("related")
     all_inline_images = []
-    temp_dirs = []  # Liste pour suivre les dossiers à nettoyer
+    temp_dirs = []
 
-    # 2. Add Content & Attachments
-    # Gestion des images passées explicitement en argument (si elles ne sont pas dans le HTML)
     for img_path in [images] if isinstance(images, str) else (images or []):
         if os.path.exists(img_path):
-            cid = email.utils.make_msgid(domain="inline.img")[1:-1]
+            cid = email.utils.make_msgid(domain=_CID_INLINE_DOMAIN)[1:-1]
             all_inline_images.append({"path": img_path, "cid": cid})
 
     for att in [attachments] if isinstance(attachments, str) else (attachments or []):
         if att.endswith(("htm", "html", "md")):
-            is_md = att.endswith("md")
-            if is_md:
-                att = md2html(
-                    att,
-                    styles=param.styles if hasattr(param, "styles") else None,
-                    embed_styles=True,
-                )
-            # C'est ici que la magie opère pour le HTML
-            html_content, found_images, t_dir = prepare_html_and_get_images(att)
-            message = html_content
-            all_inline_images.extend(found_images)
-            temp_dirs.append(t_dir)
-            if is_md and not hasattr(param, "keep-html"):
-                os.remove(att)  # type: ignore[arg-type]
+            message = _process_html_attachment(att, param, all_inline_images, temp_dirs)
         else:
-            with open(att, "rb") as f:
-                content = f.read()
-                # ... existing code for other attachment types (pdf, txt, mhtml) ...
-                if att.endswith("pdf"):
-                    part = MIMEApplication(content, _subtype="pdf")
-                    part.add_header(
-                        "Content-Disposition",
-                        "attachment",
-                        filename=os.path.basename(att),
-                    )
-                    msg.attach(part)
-                elif att.endswith("txt"):
-                    msg.attach(MIMEText(content.decode()))
+            _process_binary_attachment(att, msg)
 
-    # Construction de la partie HTML avec images intégrées
-    if message and "<html" in message:
-        part_html = MIMEText(message, "html")
-        msg_related.attach(part_html)
+    _attach_body(msg, msg_related, message, all_inline_images)
 
-        for img_info in all_inline_images:
-            try:
-                with open(img_info["path"], "rb") as f:
-                    img_part = MIMEImage(f.read())
-                    img_part.add_header("Content-ID", f"<{img_info['cid']}>")
-                    img_part.add_header(
-                        "Content-Disposition",
-                        "inline",
-                        filename=os.path.basename(img_info["path"]),
-                    )
-                    msg_related.attach(img_part)
-            except (OSError, TypeError) as e:
-                log.error(f"Error attaching inline image {img_info['path']}: {e}")
-
-        msg.attach(msg_related)
-    elif message:
-        msg.attach(MIMEText(message, "plain"))
-
-    # 3. Recipients
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
-
-    # On attache la liste des dossiers temporaires à l'objet msg pour le nettoyage futur
     msg._temp_dirs = temp_dirs  # type: ignore[attr-defined]
 
     return msg, recipients
 
 
-def _build_and_send(param, addressees, row, header) -> None:
-    """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs."""
+def _build_and_send(param, addressees, row, header) -> bool:
+    """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs.
+
+    :return: True if the message was sent, False if sending was skipped or failed.
+    :rtype: bool
+    """
     msg_body = format_message(param.message, row, header)
     if param.donotsend:
         log.info("do not sent activated")
-        return
+        return False
     msg, recipients = build_email(
         param=param,
         subject=param.subject,
@@ -843,9 +835,9 @@ def _build_and_send(param, addressees, row, header) -> None:
     )
     try:
         if hasattr(param, "smtp_host"):
-            send_mail(param=param, message=msg, recipients=recipients)
+            return send_mail(param=param, message=msg, recipients=recipients)
         else:
-            send_gmail(get_gmail_service(param), message=msg)
+            return send_gmail(get_gmail_service(param), message=msg) is not None
     finally:
         for d in getattr(msg, "_temp_dirs", []):  # type: ignore[attr-defined]
             try:
@@ -854,6 +846,25 @@ def _build_and_send(param, addressees, row, header) -> None:
                     log.info(f"Dossier temporaire supprimé : {d}")
             except OSError as e:
                 log.error(f"Erreur lors du nettoyage de {d}: {e}")
+
+
+def _skip_to_index(reader, from_index: int) -> int:
+    """Advance *reader* past records before *from_index* and return the updated row index."""
+    log.info(f"Reprise à l'index {from_index}")
+    idx = 1
+    for _ in range(2, from_index):
+        next(reader, None)
+        idx += 1
+    return idx
+
+
+def _flush_batch(param, addressees, row, header, pause, recipient_count, max_mail_per_hour):
+    """Dispatch the current addressee batch and enforce rate limiting."""
+    _build_and_send(param, addressees, row, header)
+    sleep(pause)
+    if recipient_count % max_mail_per_hour == 0:
+        log.info("Limite horaire atteinte. Pause d'une heure...")
+        sleep(3600)
 
 
 def generate_mailing(param):
@@ -880,11 +891,11 @@ def generate_mailing(param):
         max_mail_per_hour = param.max_mails_per_hour
     except AttributeError as e:
         log.critical(f"Clé de configuration manquante : {e}")
-        return "Error"
+        return "Config Key Error"
 
     reader, file_object = get_subscriber_reader(param)
     if not reader:
-        return "Error"
+        return "Reader Error"
 
     try:
         header = next(reader, None)
@@ -892,13 +903,9 @@ def generate_mailing(param):
             return "Error"
         indices = get_indices(header)
 
-        # Skip initial records if requested
         current_row_idx = 1
         if param.from_index:
-            log.info(f"Reprise à l'index {param.from_index}")
-            for _ in range(2, int(param.from_index)):
-                next(reader, None)
-                current_row_idx += 1
+            current_row_idx = _skip_to_index(reader, int(param.from_index))
 
         addressees, recipient_count, mail_batch_count = [], 0, 0
         start_time = time()
@@ -906,30 +913,18 @@ def generate_mailing(param):
 
         for row in reader:
             current_row_idx += 1
-
-            # stop is requested last record is reached
             if param.to_index and current_row_idx > int(param.to_index):
                 break
-
             if filter(param.filter, row, indices):
                 continue
-
             if param.verbose:
                 log.debug(row[indices["email"]])
-
             addressees.append(row[indices["email"]])
             recipient_count += 1
-
             if len(addressees) >= max_add:
-                log.info(
-                    f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})"
-                )
-                _build_and_send(param, addressees, row, header)
+                log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
+                _flush_batch(param, addressees, row, header, pause, recipient_count, max_mail_per_hour)
                 addressees, mail_batch_count = [], mail_batch_count + 1
-                sleep(pause)
-                if recipient_count % max_mail_per_hour == 0:
-                    log.info("Limite horaire atteinte. Pause d'une heure...")
-                    sleep(3600)
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
@@ -955,15 +950,15 @@ _FILTER_OPS = [
     "in",
     "not in",
     "is empty",
-    "is not empty",
+    _OP_IS_NOT_EMPTY,
     "greater than",
     "less than",
     "greater or equal to",
     "less or equal to",
     "one of",
     "none of",
-    "is equal to",
-    "is not equal to",
+    _OP_IS_EQUAL_TO,
+    _OP_IS_NOT_EQUAL_TO,
     "eq",
     "ne",
 ]
@@ -992,42 +987,51 @@ def _parse_filter_expr(v: str, k: str) -> tuple[str, Any]:
     return op, test_value
 
 
+def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
+    """Evaluate a numeric comparison between *fv* and *tv_raw* using *op*."""
+    try:
+        tv = float(tv_raw)
+    except (ValueError, TypeError):
+        log.warning(f"Invalid filter value for field '{k}: {tv_raw}'")
+        return False
+    if op in ("ge", "greater or equal to"):
+        return fv >= tv
+    if op in ("gt", "greater than"):
+        return fv > tv
+    if op in ("le", "less or equal to"):
+        return fv <= tv
+    if op in ("lt", "less than"):
+        return fv < tv
+    if op in ("eq", _OP_IS_EQUAL_TO):
+        return fv == tv
+    if op in ("ne", _OP_IS_NOT_EQUAL_TO):
+        return fv != tv
+    return True
+
+
+def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
+    """Evaluate a string/membership comparison."""
+    if op in ("in", "one of"):
+        return field_value in test_value  # type: ignore[operator]
+    if op in ("not in", "none of"):
+        return field_value not in test_value  # type: ignore[operator]
+    if op in ("is", _OP_IS_EQUAL_TO):
+        return field_value == test_value
+    if op in ("is not", _OP_IS_NOT_EQUAL_TO):
+        return field_value != test_value
+    if op == _OP_IS_NOT_EMPTY:
+        return field_value != "" and field_value is not None
+    if op == "is empty":
+        return field_value == "" or field_value is None
+    return True
+
+
 def _evaluate_condition(field_value: str, op: str, test_value: Any, k: str) -> bool:
     """Return True when *field_value* satisfies *op* against *test_value*."""
     try:
-        fv = float(field_value)
-        try:
-            tv = float(test_value)  # type: ignore[arg-type]
-        except (ValueError, TypeError):
-            log.warning(f"Invalid filter value for field '{k}: {test_value}'")
-            return False
-        if op in ("ge", "greater or equal to"):
-            return fv >= tv
-        if op in ("gt", "greater than"):
-            return fv > tv
-        if op in ("le", "less or equal to"):
-            return fv <= tv
-        if op in ("lt", "less than"):
-            return fv < tv
-        if op in ("eq", "is equal to"):
-            return fv == tv
-        if op in ("ne", "is not equal to"):
-            return fv != tv
-        return True
+        return _eval_numeric(float(field_value), test_value, op, k)
     except ValueError:
-        if op in ("in", "one of"):
-            return field_value in test_value  # type: ignore[operator]
-        if op in ("not in", "none of"):
-            return field_value not in test_value  # type: ignore[operator]
-        if op in ("is", "is equal to"):
-            return field_value == test_value
-        if op in ("is not", "is not equal to"):
-            return field_value != test_value
-        if op == "is not empty":
-            return field_value != "" and field_value is not None
-        if op == "is empty":
-            return field_value == "" or field_value is None
-        return True
+        return _eval_string(field_value, test_value, op)
 
 
 def filter(filter, row, indices):
@@ -1207,6 +1211,44 @@ def get_newsletter_name(files, args):
     return args
 
 
+def _load_config_with_secrets(args) -> dict:
+    """Merge the profile config with any vault secrets and CLI overrides."""
+    config = args.conf[args.profile]
+    try:
+        secret = get_secret(config["MAILCONFIG"])
+        if secret is None:
+            log.warning("No secret configuration found")
+            secret = {}
+    except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
+        log.debug(f"No secret configuration found, using config file only: {e}")
+        secret = {}
+    config = {**secret, **config}
+    for k, v in vars(args).items():
+        if v is not None or k not in config:
+            config.update({k: v})
+    return config
+
+
+def _prepare_message_body(param, config, files):
+    """Populate param.message from the default template when not already set."""
+    body_txt = param.body if param.body else ""
+    param.newsletter_name = ""
+    param = get_newsletter_name(files, param)
+    if not param.message:
+        param.message = config["default_message"]
+        param.message = param.message.replace("${newsletter_name}", param.newsletter_name)
+        param.message = param.message.replace("${body}", body_txt)
+    return param
+
+
+def _post_send_cleanup(service, google_drive_files):
+    """Mark processed Google Drive files as published and clear the local input folder."""
+    for f in google_drive_files:
+        gd.rename_file(service, f["id"], f"published_{f['name']}")
+    for f in glob("input/*.*"):
+        os.remove(f)
+
+
 def process_profile(args):
     """
     Processes the user profile to configure and send a mailing task with attachments. The function
@@ -1218,42 +1260,15 @@ def process_profile(args):
     :return: A string indicating the success or failure of the process. Returns "OK" if the
         mailing was successfully sent; otherwise, returns "Error".
     """
-    config = args.conf[args.profile]
-    # Secret retrieval is optional (but more secure)
-    # if secret vault or file is not accessible, just ignore and assume everything is in the config file
-    # config data overrides secret data
-    try:
-        secret = get_secret(config["MAILCONFIG"])
-        if secret is None:
-            log.warning("No secret configuration found")
-            secret = {}
-    except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
-        log.debug(f"No secret configuration found, using config file only: {e}")
-        secret = {}
-
-    config = {**secret, **config}
-    # zz = [{arg: v} for arg ,v in vars(args).items() if getattr(args, arg)]
-    for k, v in vars(args).items():
-        if v is not None or k not in config:
-            config.update({k: v})
-
+    config = _load_config_with_secrets(args)
     param = Dict2Class(config)
 
     if not check_mandatory_param(param):
         return "Error"
 
     files, service, google_drive_files = process_attachments(param, config)
-    param.file = files  # Mise à jour explicite des fichiers filtrés
-    body_txt = param.body if param.body else ""
-    param.newsletter_name = ""
-
-    param = get_newsletter_name(files, param)
-    if not param.message:
-        param.message = config["default_message"]
-        param.message = param.message.replace(
-            "${newsletter_name}", param.newsletter_name
-        )
-        param.message = param.message.replace("${body}", body_txt)
+    param.file = files
+    param = _prepare_message_body(param, config, files)
 
     if not param.subject:
         log.error("No subject given - use -s 'some subject' argument")
@@ -1266,13 +1281,50 @@ def process_profile(args):
         param.filter = param.filter_test
 
     if generate_mailing(param) == "OK" and not param.test:
-        for f in google_drive_files:
-            gd.rename_file(service, f["id"], f"published_{f['name']}")
-        for f in glob("input/*.*"):
-            os.remove(f)
+        _post_send_cleanup(service, google_drive_files)
         return "OK"
-    else:
-        return "Error"
+    return "Error"
+
+
+def _check_common_params(param) -> bool:
+    """Return False and log errors for any missing common mandatory parameters."""
+    ret = True
+    for p in ("sender", "sendername"):
+        if not hasattr(param, p) or getattr(param, p) is None:
+            log.error(f"{p.replace('_', ' ').capitalize()} is mandatory")
+            ret = False
+    return ret
+
+
+def _check_data_source(param) -> bool:
+    """Return False if neither a database path nor a (SA + sheetid) pair is configured."""
+    if not hasattr(param, "database") and not (
+            hasattr(param, "sa") and hasattr(param, "sheetid")
+    ):
+        log.error("Database path or (Service Account (SA) and SheetID) is mandatory")
+        return False
+    return True
+
+
+def _check_smtp_imap_params(param) -> bool:
+    """Return False and log errors for missing SMTP/IMAP mandatory parameters."""
+    required = ["smtp_port", "imap_host", "imap_port", "username", "password", "sent_folder"]
+    ret = True
+    for p in required:
+        if not hasattr(param, p) or getattr(param, p) is None:
+            log.error(f"{p.replace('_', ' ').upper()} is mandatory for SMTP/IMAP mode")
+            ret = False
+    return ret
+
+
+def _check_gmail_params(param) -> bool:
+    """Return False and log errors for missing Gmail mandatory parameters."""
+    ret = True
+    for p in ("token_file", "scopes", "credentials_id"):
+        if not hasattr(param, p) or getattr(param, p) is None:
+            log.error(f"{p.replace('_', ' ').capitalize()} is mandatory for Gmail mode")
+            ret = False
+    return ret
 
 
 def check_mandatory_param(param):
@@ -1293,49 +1345,10 @@ def check_mandatory_param(param):
     :return: True if all mandatory parameters are present, False otherwise.
     :rtype: bool
     """
-    ret = True
-
-    # Parameters mandatory for ALL modes
-    common_params = ["sender", "sendername"]
-    for p in common_params:
-        if not hasattr(param, p) or getattr(param, p) is None:
-            log.error(f"{p.replace('_', ' ').capitalize()} is mandatory")
-            ret = False
-
-    # Data source check
-    if not hasattr(param, "database") and not (
-            hasattr(param, "sa") and hasattr(param, "sheetid")
-    ):
-        log.error("Database path or (Service Account (SA) and SheetID) is mandatory")
-        ret = False
-
-    # Mailing method specific checks
-    if hasattr(param, "smtp_host"):
-        # SMTP/IMAP mode
-        smtp_imap_params = [
-            "smtp_port",
-            "smtp_port",
-            "imap_host",
-            "imap_port",
-            "username",
-            "password",
-            "sent_folder",
-        ]
-        for p in smtp_imap_params:
-            if not hasattr(param, p) or getattr(param, p) is None:
-                log.error(
-                    f"{p.replace('_', ' ').upper()} is mandatory for SMTP/IMAP mode"
-                )
-                ret = False
-    else:
-        # Gmail mode
-        gmail_params = ["token_file", "scopes", "credentials_id"]
-        for p in gmail_params:
-            if not hasattr(param, p) or getattr(param, p) is None:
-                log.error(
-                    f"{p.replace('_', ' ').capitalize()} is mandatory for Gmail mode"
-                )
-                ret = False
+    common_ok = _check_common_params(param)
+    data_ok = _check_data_source(param)
+    method_ok = _check_smtp_imap_params(param) if hasattr(param, "smtp_host") else _check_gmail_params(param)
+    ret = common_ok and data_ok and method_ok
 
     if not ret:
         log.critical("Please check and update your configuration file")
@@ -1438,8 +1451,6 @@ def main():
     else:
         application_path = os.path.dirname(__file__)
 
-    # config_path = os.path.join(application_path, config_name)
-    # os.chdir(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(os.path.abspath(application_path))
     args = setup_argparse()
     args.conf = None
@@ -1459,10 +1470,6 @@ def main():
         file = args.file[0].replace(".md", ".html")
         make_html_images_inline(file, file)
         sys.exit(0)
-
-    # if not (args.message or args.body or args.file) and not args.subject:
-    # print("Missing subject and message text or file")
-    # sys.exit(-1)
 
     if args.profile:
         sys.exit(0 if process_profile(args) == "OK" else -1)

@@ -540,7 +540,7 @@ class TestHTMLProcessing:
 
         mock_bs.return_value = mock_soup
 
-        html, images, temp_dir = sendMail.prepare_html_and_get_images(
+        _, images, _ = sendMail.prepare_html_and_get_images(
             "/basepath/test.html"
         )
 
@@ -808,8 +808,8 @@ class TestGmailFunctions:
 class TestGetSubscriberReader:
     """Tests for subscriber reader function"""
 
-    @patch("sendMail.openGoogleDBMembersSheet")
-    @patch("sendMail.readAllSheet")
+    @patch("sendMail.open_google_db_members_sheet")
+    @patch("sendMail.read_all_sheet")
     def test_get_subscriber_reader_google_sheets(self, mock_read, mock_open):
         """Test getting subscriber reader from Google Sheets"""
         param = Mock()
@@ -941,7 +941,7 @@ class TestMailingGeneration:
         param = Mock(spec=[])  # No attributes
 
         result = sendMail.generate_mailing(param)
-        assert result == "Error"
+        assert result == "Config Key Error"
 
     @patch("sendMail.get_subscriber_reader")
     def test_generate_mailing_no_reader(self, mock_reader_func):
@@ -954,7 +954,7 @@ class TestMailingGeneration:
         mock_reader_func.return_value = (None, None)
 
         result = sendMail.generate_mailing(param)
-        assert result == "Error"
+        assert result == "Reader Error"
 
 
 class TestGoogleSheetHelpers:
@@ -987,7 +987,7 @@ class TestGoogleSheetHelpers:
         mock_gc.open_by_key.return_value = wb
         mock_gspread.authorize.return_value = mock_gc
 
-        result = sendMail.openGoogleDBMembersSheet(sa_key, id_key)
+        result = sendMail.open_google_db_members_sheet(sa_key, id_key)
         assert result == wb
         mock_gspread.authorize.assert_called_once_with(creds)
         mock_gc.open_by_key.assert_called_once_with("SHEET_ID")
@@ -997,7 +997,7 @@ class TestGoogleSheetHelpers:
         ws.get_all_values.return_value = [["h1", "h2"], ["a", "b"]]
         wb = Mock()
         wb.sheet1 = ws
-        result = sendMail.readAllSheet(wb)
+        result = sendMail.read_all_sheet(wb)
         assert result == [["h1", "h2"], ["a", "b"]]
         ws.get_all_values.assert_called_once()
 
@@ -1006,7 +1006,7 @@ class TestGoogleSheetHelpers:
         ws.get_all_values.return_value = [["x"]]
         wb = Mock()
         wb.worksheet.return_value = ws
-        result = sendMail.readAllSheet(wb, sheet_name="Sheet2")
+        result = sendMail.read_all_sheet(wb, sheet_name="Sheet2")
         assert result == [["x"]]
         wb.worksheet.assert_called_once_with("Sheet2")
 
@@ -1254,7 +1254,7 @@ def test_prepare_html_and_get_images_exceptions():
     with patch("builtins.open", mock_open(read_data=html_content)):
         with patch("os.path.exists", return_value=True):
             with patch("sendMail.Image.open", side_effect=OSError("Corrupt image")):
-                html, images, temp_dir = sendMail.prepare_html_and_get_images(
+                _, images, temp_dir = sendMail.prepare_html_and_get_images(
                     "dummy.html"
                 )
                 assert len(images) == 0
@@ -1322,7 +1322,7 @@ def test_build_email_max_addr_1():
     param.sender = "sender@example.com"
     param.profile = "other"
 
-    msg, recipients = sendMail.build_email(
+    msg, _ = sendMail.build_email(
         param, subject="Sub", bcc="bcc@example.com", message="Hi"
     )
     assert msg["To"] == "bcc@example.com"
@@ -1669,7 +1669,6 @@ def test_process_artscroises():
         mock_args.return_value.subject = "subject"
         mock_args.return_value.test = False
         mock_args.return_value.donotsend = False
-        # mock_args.return_value.conf = {"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}}
 
         secret_config = {
             "max_mails_per_hour": 100,
@@ -2008,7 +2007,6 @@ def test_get_default_config_path_windows():
 
             mock_getenv.assert_called_once_with("USERPROFILE")
             assert result == r"C:\Users\TestUser\.config\sendMail.yml"
-            # assert all(w in result for w in ('Users', 'TestUser', '.config', 'sendMail.yml')) is True
 
 
 def test_get_default_config_path_unix():

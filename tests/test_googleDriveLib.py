@@ -136,7 +136,7 @@ class TestRenameFile:
         mock_files.update.return_value = mock_update
 
         result = gd.rename_file(
-            service=mock_service, fileId="file123", newTitle="new_name.pdf"
+            service=mock_service, file_id="file123", new_title="new_name.pdf"
         )
 
         assert result is not None
@@ -146,19 +146,19 @@ class TestRenameFile:
 
     def test_rename_file_no_service(self):
         """Test rename_file with no service"""
-        result = gd.rename_file(service=None, fileId="123", newTitle="new.pdf")
+        result = gd.rename_file(service=None, file_id="123", new_title="new.pdf")
         assert result is None
 
     def test_rename_file_no_file_id(self):
         """Test rename_file with no file ID"""
         mock_service = Mock()
-        result = gd.rename_file(service=mock_service, fileId=None, newTitle="new.pdf")
+        result = gd.rename_file(service=mock_service, file_id=None, new_title="new.pdf")
         assert result is None
 
     def test_rename_file_no_title(self):
         """Test rename_file with no new title"""
         mock_service = Mock()
-        result = gd.rename_file(service=mock_service, fileId="123", newTitle=None)
+        result = gd.rename_file(service=mock_service, file_id="123", new_title=None)
         assert result is None
 
 

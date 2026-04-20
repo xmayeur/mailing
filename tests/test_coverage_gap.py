@@ -59,7 +59,7 @@ class TestCoverageGap:
         html, paths = sendMail.prepare_html_for_cid("test.html")
         assert len(paths) == 0
 
-    @patch("sendMail.openGoogleDBMembersSheet")
+    @patch("sendMail.open_google_db_members_sheet")
     def test_get_subscriber_reader_google_success(self, mock_open_sheet):
         """Cover line 230: Google Sheets reader"""
         param = Mock()
@@ -69,7 +69,7 @@ class TestCoverageGap:
         mock_wb = Mock()
         mock_open_sheet.return_value = mock_wb
 
-        with patch("sendMail.readAllSheet", return_value=[["header"], ["row"]]):
+        with patch("sendMail.read_all_sheet", return_value=[["header"], ["row"]]):
             reader, handle = sendMail.get_subscriber_reader(param)
             assert handle is None
             assert list(reader) == [["header"], ["row"]]  # type: ignore[arg-type]
@@ -256,7 +256,7 @@ class TestCoverageGap:
         del param.max_addr_per_mail
         with patch("sendMail.log") as mock_log:
             res = sendMail.generate_mailing(param)
-            assert res == "Error"
+            assert res == "Config Key Error"
             mock_log.critical.assert_called_once()
 
     @patch("sendMail.get_subscriber_reader")
