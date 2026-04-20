@@ -37,8 +37,8 @@ package "sendMail" {
     }
 
     class DataManager << (M,#FF7700) Module >> {
-        +openGoogleDBMembersSheet(sa, id)
-        +readAllSheet(wb, sheet_name)
+        +open_google_db_members_sheet(sa, id)
+        +read_all_sheet(wb, sheet_name)
         +get_subscriber_reader(param)
         +get_indices(header)
         +filter(filter, row, indices)
