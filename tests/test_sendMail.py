@@ -25,7 +25,6 @@ mock_get_secret = MagicMock(return_value={"key": "value"})
 
 sys.modules["gspread"] = MagicMock()
 sys.modules["yaml"] = MagicMock()
-# sys.modules['bs4'] = MagicMock()
 sys.modules["certifi"] = MagicMock()
 sys.modules["getSecrets"] = MagicMock()
 sys.modules["getSecrets"].get_secret = mock_get_secret  # type: ignore[attr-defined]
@@ -117,7 +116,7 @@ class TestFileUtilities:
         mock_response.content = b"test content"
         mock_get.return_value = mock_response
 
-        result = sendMail.file_to_base64("http://example.com/file.txt")
+        result = sendMail.file_to_base64("https://example.com/file.txt")
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -128,7 +127,7 @@ class TestFileUtilities:
         mock_response.status_code = 404
         mock_get.return_value = mock_response
 
-        result = sendMail.file_to_base64("http://example.com/missing.txt")
+        result = sendMail.file_to_base64("https://example.com/missing.txt")
         assert result == ""
 
 
@@ -273,7 +272,7 @@ class TestEmailBuilding:
         param.max_addr_per_mail = 50
         param.profile = "test"
 
-        msg, recipients = sendMail.build_email(
+        _, recipients = sendMail.build_email(
             param=param,
             subject="Test Subject",
             to="to@example.com",
@@ -395,7 +394,7 @@ class TestHTMLProcessing:
         """Test HTML CID preparation skips external images"""
         mock_exists.return_value = True
 
-        html, images = sendMail.prepare_html_for_cid("/basepath/test.html")
+        _, images = sendMail.prepare_html_for_cid("/basepath/test.html")
 
         assert len(images) == 0  # External images should be skipped
 
@@ -411,10 +410,11 @@ class TestHTMLProcessing:
     def test_prepare_html_and_get_images(
             self, mock_bs, mock_image, mock_temp, mock_join, mock_exists
     ):
+        _dir = tempfile.TemporaryDirectory(dir="./tests")
         """Test HTML processing with image optimization"""
         mock_exists.return_value = True
         mock_join.return_value = "/basepath/test.jpg"
-        mock_temp.return_value = "/tmp/test_dir"
+        mock_temp.return_value = _dir
 
         # Mock PIL Image
         mock_img = Mock()
@@ -443,7 +443,7 @@ class TestHTMLProcessing:
 
         assert "cid:" in html
         assert len(images) > 0
-        assert temp_dir == "/tmp/test_dir"
+        assert temp_dir == _dir
 
     @patch(
         "sendMail.open",
@@ -458,9 +458,10 @@ class TestHTMLProcessing:
     def test_prepare_html_and_get_images_base64(
             self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open
     ):
+        _dir = tempfile.TemporaryDirectory(dir="./tests").name
         """Test HTML processing with base64 image"""
         mock_exists.return_value = True
-        mock_temp.return_value = "/tmp/test_dir"
+        mock_temp.return_value = _dir
         # make_msgid returns with brackets, [1:-1] removes them.
         mock_msgid.side_effect = ["<cid1@inline.img>", "<cid2@inline.img>"]
 
@@ -497,7 +498,7 @@ class TestHTMLProcessing:
 
         assert "cid:" in html
         assert len(images) > 0
-        assert temp_dir == "/tmp/test_dir"
+        assert temp_dir == _dir
 
         # The base64 image is first saved to embedded_<cid1>.<ext>
         m_open.assert_any_call(
@@ -507,7 +508,7 @@ class TestHTMLProcessing:
         # The optimized image is saved by PIL.Image.save
         mock_img.save.assert_called()
         # Verify the path passed to save()
-        args, kwargs = mock_img.save.call_args
+        args, _ = mock_img.save.call_args
         assert args[0] == os.path.join(temp_dir, "cid2@inline.img.jpg")
 
     @patch(
@@ -524,8 +525,9 @@ class TestHTMLProcessing:
             self, mock_log, mock_bs, mock_temp, mock_exists
     ):
         """Test HTML processing with invalid base64 image"""
+        _dir = tempfile.TemporaryDirectory(dir="./tests")
         mock_exists.return_value = True
-        mock_temp.return_value = "/tmp/test_dir"
+        mock_temp.return_value = _dir
 
         # Create a mock img tag
         mock_img_tag = Mock()
@@ -1192,12 +1194,11 @@ def test_prepare_html_for_cid_with_invalid_src():
             ) as mock_bs:
                 # Force the mock to NOT be a MagicMock if it's already one?
                 # Actually, patch should work if called correctly.
-                html, images = sendMail.prepare_html_for_cid(html_file)
+                _, images = sendMail.prepare_html_for_cid(html_file)
 
                 # If it still fails, it means str(html) is not what we expect because of previous mocks.
                 # Let's just check images length and hope for the best, or use a more robust way.
                 assert len(images) == 0
-                # assert 'src="http://example.com/img.png"' in str(html)
             mock_bs.stop()
 
 
@@ -1288,7 +1289,6 @@ def test_md2html_default_styles():
             html_file = sendMail.md2html(md_file)
             assert html_file is not None
             assert os.path.exists(html_file)
-            # assert os.path.exists(os.path.join(tmp_dir, "styles.css"))
 
 
 def test_md2html_custom_styles():
@@ -1345,7 +1345,7 @@ def test_build_email_attachments_pdf_txt():
         with open(txt_path, "w") as f:
             f.write("plain text")
 
-        msg, recipients = sendMail.build_email(param, attachments=[pdf_path, txt_path])
+        msg, _ = sendMail.build_email(param, attachments=[pdf_path, txt_path])
         # Check that we have multiple parts
         assert msg.is_multipart()
         # Verify attachments are there (basic check)
@@ -1505,12 +1505,8 @@ def test_process_artscroises_wait_and_no_secret_file():
     args.subject = "subject"
     args.test = False
 
-    def my_side_effect():
-        raise Exception("Secret file not found")
-
     # Reset mock and give it value
     with patch("sendMail.get_secret") as mock_gs:
-        # mock_gs.return_value = secret_config
         with patch("sendMail.process_attachments", return_value=([], None, [])):
             with patch("sendMail.sleep"):
                 with patch("sendMail.generate_mailing", return_value="OK"):
@@ -1526,12 +1522,8 @@ def test_main_no_profile():
     with patch("sendMail.setup_argparse") as mock_args:
         mock_args.return_value.profile = None
         with patch("builtins.open", mock_open(read_data="{}")):
-            with patch("yaml.safe_load", return_value={}):
-                # Should log "No profile specified"
-                with pytest.raises(SystemExit) as pytest_wrapped_e:
-                    sendMail.main()
-                    assert pytest_wrapped_e.type is SystemExit
-                    assert pytest_wrapped_e.value.code == 42
+            ret = sendMail.main()
+            assert ret == -1
 
 
 def test_send_gmail_error():
@@ -1574,17 +1566,17 @@ def test_build_email_image_error():
     param.sender = "sender@example.com"
     param.profile = "other"
     param.max_addr_per_mail = 50
-
+    tmp = tempfile.TemporaryFile(dir="./tests/tmp", mode="w+")
     with patch(
             "sendMail.prepare_html_and_get_images",
             return_value=(
                     "html",
                     [{"path": "nonexistent.png", "cid": "cid1"}],
-                    "/tmp/dummy",
+                    tmp.name,
             ),
     ):
         with patch("builtins.open", side_effect=FileNotFoundError):
-            msg, recipients = sendMail.build_email(param, message="dummy.html")
+            msg, _ = sendMail.build_email(param, message="dummy.html")
             # Should continue even if image is not found
             assert "html" in str(msg)
 
@@ -1693,8 +1685,8 @@ def test_process_artscroises():
                                 with patch(
                                         "sendMail.check_mandatory_param", return_value=True
                                 ):
-                                    with pytest.raises(SystemExit):
-                                        sendMail.main()
+                                    ret = sendMail.main()
+                                    assert ret == 0
 
 
 def test_filter_artscroises_branches():
@@ -1789,10 +1781,10 @@ def test_main_missing_args():
 
         with (
             patch("sendMail.get_secret", return_value=secret_config),
-            pytest.raises(SystemExit),
             patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])),
         ):
-            sendMail.main()
+            ret = sendMail.main()
+            assert ret == -1
 
 
 def test_main_using_default_config():
@@ -1809,8 +1801,8 @@ def test_main_using_default_config():
         mock_args.return_value.config = None
         with patch("sendMail.get_default_config_path", return_value="./config.yml"):
             with patch("sendMail.process_profile", return_value="OK"):
-                with pytest.raises(SystemExit):
-                    sendMail.main()
+                ret = sendMail.main()
+        assert ret == 0
 
 
 def test_main_with_frozen_program():
@@ -1849,8 +1841,9 @@ def test_main_missing_profile():
         mock_args.return_value.config = None
         with patch("sendMail.get_default_config_path", return_value="./config.yml"):
             with patch("sendMail.process_profile", return_value="OK"):
-                with pytest.raises(SystemExit):
-                    sendMail.main()
+                ret = sendMail.main()
+                assert ret == -1
+
 
 
 def test_make_html_images_inline():
@@ -2049,12 +2042,12 @@ def test_get_default_config_path_creates_dir_and_file():
             patch("builtins.open", mock_open()) as mock_file,
             patch("sendMail.yaml.dump") as mock_yaml_dump,
             patch("sendMail.log.warning") as mock_log_warning,
-            pytest.raises(SystemExit),
         ):
             # Config file doesn't exist, .config directory doesn't exist
             mock_exists.side_effect = [False, False]
 
             result = sendMail.get_default_config_path()
+            assert result == -1
 
             # Verify .config directory was created (line 77)
             mock_mkdir.assert_called_once_with("/home/testuser/.config")
@@ -2066,7 +2059,7 @@ def test_get_default_config_path_creates_dir_and_file():
 
             # Verify default config was written (line 99)
             mock_yaml_dump.assert_called_once()
-            default_config = mock_yaml_dump.call_args[0][0]
+            default_config = mock_yaml_dump.call_args[0][0]['default']
             assert default_config["username"] == "jdoe"
             assert default_config["sender"] == "john.doe@example.com"
             assert "filter" in default_config
@@ -2074,9 +2067,6 @@ def test_get_default_config_path_creates_dir_and_file():
             # Verify warning was logged (line 100)
             mock_log_warning.assert_called_once()
             assert "Configuration file created" in mock_log_warning.call_args[0][0]
-
-            # Verify correct path returned (line 101)
-            assert result == "/home/testuser/.config/sendMail.yml"
 
 
 def test_get_default_config_path_dir_exists_file_not():
@@ -2090,12 +2080,14 @@ def test_get_default_config_path_dir_exists_file_not():
             patch("builtins.open", mock_open()) as mock_file,
             patch("sendMail.yaml.dump") as mock_yaml_dump,
             patch("sendMail.log.warning") as mock_log_warning,
-            pytest.raises(SystemExit),
+
         ):
             # Config file doesn't exist (line 74), but .config directory exists (line 76)
             mock_exists.side_effect = [False, True]
 
-            result = sendMail.get_default_config_path()
+            ret = sendMail.get_default_config_path()
+
+            assert ret == -1
 
             # Verify .config directory was NOT created since it exists (line 76-77)
             mock_mkdir.assert_not_called()
@@ -2107,4 +2099,3 @@ def test_get_default_config_path_dir_exists_file_not():
             mock_yaml_dump.assert_called_once()
             mock_log_warning.assert_called_once()
 
-            assert result == "/home/testuser/.config/sendMail.yml"

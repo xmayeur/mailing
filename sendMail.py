@@ -9,6 +9,7 @@ such as those for invoicing with a third-party service. It also includes utiliti
 HTML content and converting data structures.
 
 """
+from __future__ import annotations
 
 import argparse
 import base64
@@ -113,7 +114,7 @@ def get_default_config_path():
         log.warning(
             f"Configuration file created at '{cfg}' with default values - Please configure your default parameters"
         )
-        sys.exit(1)
+        return -1
     return cfg
 
 
@@ -900,7 +901,7 @@ def generate_mailing(param):
     try:
         header = next(reader, None)
         if not header:
-            return "Error"
+            return "Header Error"
         indices = get_indices(header)
 
         current_row_idx = 1
@@ -917,8 +918,7 @@ def generate_mailing(param):
                 break
             if filter(param.filter, row, indices):
                 continue
-            if param.verbose:
-                log.debug(row[indices["email"]])
+
             addressees.append(row[indices["email"]])
             recipient_count += 1
             if len(addressees) >= max_add:
@@ -1463,20 +1463,20 @@ def main():
             args.conf = yaml.safe_load(config_file)
     if args.conf is None:
         log.critical("No configuration file found")
-        sys.exit(-1)
+        return -1
 
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
         file = args.file[0].replace(".md", ".html")
         make_html_images_inline(file, file)
-        sys.exit(0)
+        return -1
 
     if args.profile:
-        sys.exit(0 if process_profile(args) == "OK" else -1)
+        return 0 if process_profile(args) == "OK" else -1
     else:
         log.critical("No profile specified")
-        sys.exit(-1)
+        return -1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
