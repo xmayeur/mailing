@@ -116,23 +116,23 @@ def get_files(service=None, folder_id=None):
         return None
 
 
-def rename_file(service=None, fileId=None, newTitle=None):
+def rename_file(service=None, file_id=None, new_title=None):
     """
     Renames a file in Google Drive.
 
     :param service: Google Drive API service object.
     :type service: googleapiclient.discovery.Resource
-    :param fileId: The ID of the file to rename.
-    :type fileId: str
-    :param newTitle: The new name for the file.
-    :type newTitle: str
+    :param file_id: The ID of the file to rename.
+    :type file_id: str
+    :param new_title: The new name for the file.
+    :type new_title: str
     :return: Updated file metadata, or None if parameters are invalid.
     :rtype: dict or None
     """
-    if service is None or fileId is None or newTitle is None:
+    if service is None or file_id is None or new_title is None:
         return
-    body = {"name": newTitle}
-    return service.files().update(fileId=fileId, body=body).execute()
+    body = {"name": new_title}
+    return service.files().update(fileId=file_id, body=body).execute()
 
 
 def download_file(service=None, files=None, folder="input"):
@@ -187,8 +187,4 @@ def upload_file(service, file, mimetype="text/csv"):
     file_metadata = {"name": fb}
     media = MediaFileUpload(file, mimetype)
 
-    file = (
-        service.files()
-        .create(body=file_metadata, media_body=media, fields="id")
-        .execute()
-    )
+    service.files().create(body=file_metadata, media_body=media, fields="id").execute()
