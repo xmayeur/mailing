@@ -8,7 +8,7 @@ Usage:
     python editor.py data/template.md      # open existing markdown file
     python editor.py data/newsletter.html  # open existing HTML file
 
-The editor saves output as both .md and .html, ready for sendMail:
+The editor saves output as .html, ready for sendMail:
     python sendMail.py --profile cambristi data/newsletter.html
 """
 
@@ -17,6 +17,9 @@ import logging
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import yaml
 
 # ---------------------------------------------------------------------------
 # PyInstaller-safe asset path resolution
@@ -28,6 +31,15 @@ else:
 
 ASSETS_DIR = _BASE / "editor_assets"
 
+FONT_CHOICES = [
+    "Arial",
+    "Courier New",
+    "Georgia",
+    "Times New Roman",
+    "Trebuchet MS",
+    "Verdana",
+]
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -37,22 +49,31 @@ log = logging.getLogger("editor")
 # ---------------------------------------------------------------------------
 # Qt imports
 # ---------------------------------------------------------------------------
-from PyQt6.QtCore import QByteArray, QObject, QUrl, pyqtSignal, pyqtSlot  # noqa: E402
+from PyQt6.QtCore import QByteArray, QObject, QUrl, QSize, pyqtSignal, pyqtSlot  # noqa: E402
 from PyQt6.QtGui import QIcon, QPixmap  # noqa: E402
 from PyQt6.QtWebChannel import QWebChannel  # noqa: E402
 from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
 from PyQt6.QtWidgets import (  # noqa: E402
+    QCheckBox,
     QApplication,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QComboBox,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QStyle,
+    QToolBar,
     QSpinBox,
     QStatusBar,
+    QHBoxLayout,
+    QVBoxLayout,
+    QWidget,
 )
 
 # ---------------------------------------------------------------------------
@@ -79,6 +100,14 @@ _SVG_INSERT_TABLE = (
     '<line x1="1" y1="10.5" x2="15" y2="10.5" stroke="#1565C0" stroke-width="0.9"/>'
     '</svg>'
 )
+
+_SVG_SEND = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">'
+    '<path d="M1.5 8l12-5-3.2 5 3.2 5-12-5z" fill="#1565C0"/>'
+    '<path d="M1.8 8h7.2" stroke="#fff" stroke-width="1" stroke-linecap="round"/>'
+    '</svg>'
+)
+
 def _svg_icon(svg: str) -> QIcon:
     """Create a QIcon from an SVG string; returns an empty icon if the SVG plugin is unavailable."""
     pix = QPixmap()
@@ -207,6 +236,227 @@ class _TableDialog(QDialog):
 
 
 # ---------------------------------------------------------------------------
+# Send dialog
+# ---------------------------------------------------------------------------
+class _SendDialog(QDialog):
+    """Dialog for selecting sendMail options before sending the edited file."""
+
+    def __init__(
+        self,
+        parent=None,
+        *,
+        attachment_path: str,
+        config_path: str,
+        config_data: dict[str, dict] | None = None,
+        initial_profile: str = "default",
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Send Newsletter")
+        self.setMinimumWidth(720)
+
+        self._config_data: dict[str, dict] = config_data or {}
+        self._attachment_path = attachment_path
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 12)
+        root.setSpacing(10)
+
+        form = QFormLayout()
+        form.setLabelAlignment(form.labelAlignment())
+        root.addLayout(form)
+
+        self.config_input = QLineEdit(config_path, self)
+        self.config_input.setReadOnly(True)
+        config_row = QWidget(self)
+        config_row_layout = QHBoxLayout(config_row)
+        config_row_layout.setContentsMargins(0, 0, 0, 0)
+        config_row_layout.addWidget(self.config_input, 1)
+        config_browse = QPushButton("Browse", config_row)
+        config_browse.clicked.connect(self._browse_config)
+        config_row_layout.addWidget(config_browse)
+        form.addRow("Config", config_row)
+
+        self.profile_combo = QComboBox(self)
+        self.profile_combo.currentTextChanged.connect(self._load_profile_defaults)
+        form.addRow("Profile", self.profile_combo)
+
+        attachment_label = QLabel(Path(attachment_path).name, self)
+        attachment_label.setToolTip(attachment_path)
+        form.addRow("Attachment", attachment_label)
+
+        self.subject_input = QLineEdit(self)
+        form.addRow("Subject", self.subject_input)
+
+        self.message_input = QPlainTextEdit(self)
+        self.message_input.setPlaceholderText("Mail body / template text")
+        self.message_input.setMinimumHeight(110)
+        form.addRow("Message", self.message_input)
+
+        self.body_input = QLineEdit(self)
+        self.body_input.setPlaceholderText("Optional ${body} replacement text")
+        form.addRow("Body", self.body_input)
+
+        self.database_input = QLineEdit(self)
+        database_row = QWidget(self)
+        database_row_layout = QHBoxLayout(database_row)
+        database_row_layout.setContentsMargins(0, 0, 0, 0)
+        database_row_layout.addWidget(self.database_input, 1)
+        database_browse = QPushButton("Browse", database_row)
+        database_browse.clicked.connect(self._browse_database)
+        database_row_layout.addWidget(database_browse)
+        form.addRow("Database", database_row)
+
+        self.password_input = QLineEdit(self)
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        form.addRow("Password", self.password_input)
+
+        self.from_index_input = QSpinBox(self)
+        self.from_index_input.setRange(0, 1_000_000)
+        form.addRow("From index", self.from_index_input)
+
+        self.to_index_input = QSpinBox(self)
+        self.to_index_input.setRange(0, 1_000_000)
+        form.addRow("To index", self.to_index_input)
+
+        self.wait_input = QSpinBox(self)
+        self.wait_input.setRange(0, 1_000_000)
+        form.addRow("Wait (min)", self.wait_input)
+
+        self.max_mails_input = QSpinBox(self)
+        self.max_mails_input.setRange(1, 1_000_000)
+        form.addRow("Max mails/hour", self.max_mails_input)
+
+        self.max_addr_input = QSpinBox(self)
+        self.max_addr_input.setRange(1, 1_000_000)
+        form.addRow("Max addr/mail", self.max_addr_input)
+
+        self.pause_input = QSpinBox(self)
+        self.pause_input.setRange(0, 3600)
+        form.addRow("Pause (sec)", self.pause_input)
+
+        flag_row = QWidget(self)
+        flag_layout = QHBoxLayout(flag_row)
+        flag_layout.setContentsMargins(0, 0, 0, 0)
+        flag_layout.setSpacing(10)
+        self.test_check = QCheckBox("Test", flag_row)
+        self.verbose_check = QCheckBox("Verbose", flag_row)
+        self.do_not_send_check = QCheckBox("Do not send", flag_row)
+        self.selected_check = QCheckBox("Selected only", flag_row)
+        for widget in (self.test_check, self.verbose_check, self.do_not_send_check, self.selected_check):
+            flag_layout.addWidget(widget)
+        flag_layout.addStretch(1)
+        form.addRow("Flags", flag_row)
+
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            parent=self,
+        )
+        self._buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Send")
+        self._buttons.accepted.connect(self.accept)
+        self._buttons.rejected.connect(self.reject)
+        root.addWidget(self._buttons)
+
+        self._reload_profiles()
+        if self.profile_combo.count():
+            idx = self.profile_combo.findText(initial_profile)
+            self.profile_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        else:
+            self._load_profile_defaults("")
+
+    def _browse_config(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select sendMail config",
+            str(Path(self.config_input.text()).parent) if self.config_input.text() else str(Path.home()),
+            "YAML Files (*.yml *.yaml);;All Files (*)",
+        )
+        if path:
+            self.config_input.setText(path)
+            self._reload_profiles()
+
+    def _browse_database(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select database",
+            str(Path(self.database_input.text()).parent) if self.database_input.text() else str(Path.home()),
+            "Data Files (*.csv *.xlsx *.xlsm *.xls *.ods);;All Files (*)",
+        )
+        if path:
+            self.database_input.setText(path)
+
+    def _reload_profiles(self) -> None:
+        path = self.config_input.text().strip()
+        self._config_data = {}
+        self.profile_combo.blockSignals(True)
+        self.profile_combo.clear()
+        try:
+            if path and os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                if isinstance(data, dict):
+                    self._config_data = data
+                    self.profile_combo.addItems(sorted(data.keys()))
+        except Exception as exc:
+            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+        finally:
+            self.profile_combo.blockSignals(False)
+        if self.profile_combo.count() == 0:
+            self.profile_combo.addItem("default")
+        self._load_profile_defaults(self.profile_combo.currentText())
+
+    def _load_profile_defaults(self, profile: str) -> None:
+        profile_cfg = self._config_data.get(profile, {}) if isinstance(self._config_data, dict) else {}
+        if not isinstance(profile_cfg, dict):
+            profile_cfg = {}
+
+        def _int_or_zero(value: object) -> int:
+            try:
+                return int(value)
+            except Exception:
+                return 0
+
+        self.subject_input.setText(Path(self._attachment_path).stem)
+        self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
+        self.body_input.setText("")
+        self.database_input.setText(str(profile_cfg.get("database", "")))
+        self.password_input.setText(str(profile_cfg.get("password", "")))
+
+        self.from_index_input.setValue(_int_or_zero(profile_cfg.get("from_index")))
+        self.to_index_input.setValue(_int_or_zero(profile_cfg.get("to_index")))
+        self.wait_input.setValue(_int_or_zero(profile_cfg.get("wait")))
+        self.max_mails_input.setValue(max(1, _int_or_zero(profile_cfg.get("max_mails_per_hour", 1000)) or 1000))
+        self.max_addr_input.setValue(max(1, _int_or_zero(profile_cfg.get("max_addr_per_mail", 50)) or 50))
+        self.pause_input.setValue(max(0, _int_or_zero(profile_cfg.get("pause", 3))))
+        self.test_check.setChecked(bool(profile_cfg.get("test", False)))
+        self.verbose_check.setChecked(bool(profile_cfg.get("verbose", False)))
+        self.do_not_send_check.setChecked(bool(profile_cfg.get("doNotSend", False)))
+        self.selected_check.setChecked(bool(profile_cfg.get("selected", False)))
+
+    def build_args(self, config_data: dict[str, dict]) -> SimpleNamespace:
+        profile = self.profile_combo.currentText().strip() or "default"
+        namespace = SimpleNamespace()
+        namespace.config = self.config_input.text().strip() or None
+        namespace.conf = config_data
+        namespace.profile = profile
+        namespace.subject = self.subject_input.text().strip() or None
+        namespace.message = self.message_input.toPlainText().strip()
+        namespace.body = self.body_input.text().strip() or None
+        namespace.file = [self._attachment_path]
+        namespace.test = self.test_check.isChecked()
+        namespace.verbose = self.verbose_check.isChecked()
+        namespace.doNotSend = self.do_not_send_check.isChecked()
+        namespace.database = self.database_input.text().strip() or None
+        namespace.from_index = str(self.from_index_input.value()) if self.from_index_input.value() else None
+        namespace.to_index = str(self.to_index_input.value()) if self.to_index_input.value() else None
+        namespace.wait = self.wait_input.value() or None
+        namespace.selected = self.selected_check.isChecked()
+        namespace.max_mails_per_hour = self.max_mails_input.value()
+        namespace.max_addr_per_mail = self.max_addr_input.value()
+        namespace.pause = self.pause_input.value()
+        return namespace
+
+
+# ---------------------------------------------------------------------------
 # JS ↔ Python bridge
 # ---------------------------------------------------------------------------
 class EditorBridge(QObject):
@@ -329,6 +579,7 @@ class EditorWindow(QMainWindow):
         self._file_path: str | None = None
         self._css_path: str | None = None   # user-selected CSS stylesheet
         self._load_finished_connected = False
+        self._send_in_progress = False
 
         # Web engine view
         self._view = QWebEngineView(self)
@@ -346,6 +597,7 @@ class EditorWindow(QMainWindow):
 
         # Build menus and status bar
         self._build_menus()
+        self._build_toolbars()
         self.setStatusBar(QStatusBar(self))
         self._css_status_label = QLabel("")
         self.statusBar().addPermanentWidget(self._css_status_label)
@@ -471,6 +723,7 @@ class EditorWindow(QMainWindow):
             soup = BeautifulSoup(content, "html.parser")
             body = soup.find("body")
             result = body.decode_contents() if body else content
+            result = self._normalize_table_cells(result)
             result = self._collapse_blank_paragraphs(result)
             result = self._anchors_to_spans(result)
             return result
@@ -492,7 +745,10 @@ class EditorWindow(QMainWindow):
 
     @staticmethod
     def _anchors_to_spans(html: str) -> str:
-        """Convert bare <a id="name"> tags (no href) to ql-anchor spans for Quill."""
+        """Convert bare <a id="name"> tags (no href) to editor-anchor spans for Quill.
+
+        Uses "editor-anchor" (not "ql-anchor") to avoid Quill stripping the ql-* namespace.
+        """
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(html, "html.parser")
         for a in soup.find_all("a"):
@@ -503,7 +759,7 @@ class EditorWindow(QMainWindow):
                 continue
             span = soup.new_tag(
                 "span",
-                **{"class": "ql-anchor", "data-anchor-id": anchor_id,
+                **{"class": "editor-anchor", "data-anchor-id": anchor_id,
                    "title": f"Anchor: {anchor_id}"},
             )
             span.string = "⚓"  # ⚓
@@ -514,16 +770,59 @@ class EditorWindow(QMainWindow):
 
     @staticmethod
     def _spans_to_anchors(html: str) -> str:
-        """Convert ql-anchor spans back to <a id> tags before saving."""
+        """Convert editor-anchor spans back to <a id> tags before saving."""
         import re
         def _replace(m: re.Match) -> str:
             aid = m.group(1)
             return f'<a id="{aid}" name="{aid}"></a>'
         return re.sub(
-            r'<span[^>]+class="ql-anchor"[^>]+data-anchor-id="([^"]+)"[^>]*>⚓</span>',
+            r'<span[^>]+class="editor-anchor"[^>]+data-anchor-id="([^"]+)"[^>]*>⚓</span>',
             _replace,
             html,
         )
+
+    @staticmethod
+    def _normalize_table_cells(html: str) -> str:
+        """Normalize <table> structure for Quill v2's native table format.
+
+        Quill v2 represents each <td>/<th> as a Block-scope blot identified by a
+        ``data-row`` attribute (same value for every cell on the same row). Cells
+        contain INLINE content directly — any <p> or other block element inside
+        a cell is hoisted out during normalisation, breaking the table.
+
+        This method:
+          - Assigns a row id ("row-XXXX") to every <td>/<th>, shared per row.
+          - Unwraps every block-level descendant of each cell, inserting a <br>
+            between successive blocks so multi-paragraph cells keep their line
+            separation.
+        """
+        from bs4 import BeautifulSoup
+        import secrets
+
+        soup = BeautifulSoup(html, "html.parser")
+        block_tags = ("p", "h1", "h2", "h3", "h4", "h5", "h6",
+                      "div", "blockquote", "pre")
+
+        for tr in soup.find_all("tr"):
+            row_id = "row-" + secrets.token_hex(2)  # matches Quill's nt() format
+            for cell in tr.find_all(["td", "th"], recursive=False):
+                cell["data-row"] = row_id
+                # Iteratively unwrap block-level children, keeping line breaks.
+                # Repeats until the cell holds only inline content.
+                while True:
+                    direct_blocks = [
+                        c for c in list(cell.children)
+                        if getattr(c, "name", None) in block_tags
+                    ]
+                    if not direct_blocks:
+                        break
+                    for i, block in enumerate(direct_blocks):
+                        if i > 0:
+                            block.insert_before(soup.new_tag("br"))
+                        block.unwrap()
+
+        body = soup.find("body")
+        return body.decode_contents() if body else str(soup)
 
     def _inline_images_fallback(self, html_path: str) -> str:
         """Inline local <img src> as base64 data URIs without the sendMail module."""
@@ -561,23 +860,22 @@ class EditorWindow(QMainWindow):
         self._load_editor_page("")
 
     def _save(self) -> bool:
-        """Save current content as both .md and .html. Returns True on success."""
+        """Save current content as HTML. Returns True on success."""
         if not self._file_path:
             return self._save_as()
 
         body_html = self._spans_to_anchors(self._bridge.get_current_html())
         stem = Path(self._file_path).with_suffix("")
         html_path = str(stem) + ".html"
-        md_path = str(stem) + ".md"
 
         try:
             self._write_html_file(html_path, body_html)
-            self._write_md_file(md_path, body_html)
+            self._file_path = html_path
             self._bridge.reset(body_html)
             self._update_title()
             self._view.page().runJavaScript("markSaved()")
-            self.statusBar().showMessage(f"Saved: {html_path}  +  {md_path}", 4000)
-            log.info("Saved HTML: %s  MD: %s", html_path, md_path)
+            self.statusBar().showMessage(f"Saved: {html_path}", 4000)
+            log.info("Saved HTML: %s", html_path)
             return True
         except Exception as exc:
             QMessageBox.critical(self, "Save Error", f"Failed to save:\n{exc}")
@@ -585,18 +883,17 @@ class EditorWindow(QMainWindow):
             return False
 
     def _save_as(self) -> bool:
-        """Prompt for a filename then save. Returns True on success."""
+        """Prompt for an HTML filename then save. Returns True on success."""
         initial_dir = str(Path(self._file_path).parent) if self._file_path else "data"
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save As",
             initial_dir,
-            "Markdown (*.md);;HTML (*.html);;All Files (*)",
+            "HTML (*.html);;All Files (*)",
         )
         if not path:
             return False
-        # Normalize to .md stem — we always save both formats
-        self._file_path = str(Path(path).with_suffix(".md"))
+        self._file_path = str(Path(path).with_suffix(".html"))
         return self._save()
 
     def _write_html_file(self, path: str, body_html: str) -> None:
@@ -632,20 +929,6 @@ class EditorWindow(QMainWindow):
         with open(path, "w", encoding="utf-8") as f:
             f.write(html_document)
 
-    def _write_md_file(self, path: str, body_html: str) -> None:
-        """Convert body HTML to Markdown and write to file."""
-        import html2text
-
-        h = html2text.HTML2Text()
-        h.body_width = 0          # no line-wrapping (breaks tables and long URLs)
-        h.protect_links = True
-        h.wrap_links = False
-        h.unicode_snob = True     # keep Unicode chars like ☞ verbatim
-        h.images_as_html = False  # use Markdown image syntax ![alt](src)
-        markdown_str = h.handle(body_html)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(markdown_str)
-
     # ------------------------------------------------------------------
     # Menus
     # ------------------------------------------------------------------
@@ -676,6 +959,12 @@ class EditorWindow(QMainWindow):
         save_as_action = file_menu.addAction("Save &As...")
         save_as_action.setShortcut("Ctrl+Shift+S")
         save_as_action.triggered.connect(self._save_as)
+
+        file_menu.addSeparator()
+
+        send_action = file_menu.addAction("&Send...")
+        send_action.setShortcut("Ctrl+Enter")
+        send_action.triggered.connect(self._menu_send)
 
         file_menu.addSeparator()
 
@@ -724,6 +1013,17 @@ class EditorWindow(QMainWindow):
 
         clean_action = fmt_menu.addAction("&Clear Formatting")
         clean_action.triggered.connect(lambda: self._run_js("quill.format('clean')"))
+
+        fmt_menu.addSeparator()
+
+        font_menu = fmt_menu.addMenu("&Font Family")
+        font_menu.addAction("&Default").triggered.connect(
+            lambda checked=False: self._set_font_family(None)
+        )
+        for font_name in FONT_CHOICES:
+            font_menu.addAction(font_name).triggered.connect(
+                lambda checked=False, family=font_name: self._set_font_family(family)
+            )
 
         fmt_menu.addSeparator()
 
@@ -827,6 +1127,23 @@ class EditorWindow(QMainWindow):
         code_action = ins_menu.addAction("&Code Block")
         code_action.triggered.connect(lambda: self._run_js("quill.format('code-block', true)"))
 
+    def _build_toolbars(self) -> None:
+        toolbar = QToolBar("Main", self)
+        toolbar.setMovable(False)
+        toolbar.setIconSize(QSize(20, 20))
+        self.addToolBar(toolbar)
+
+        save_action = toolbar.addAction(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton),
+            "Save",
+        )
+        save_action.setToolTip("Save the current HTML")
+        save_action.triggered.connect(self._save)
+
+        send_action = toolbar.addAction(_svg_icon(_SVG_SEND), "Send")
+        send_action.setToolTip("Save and send the edited file")
+        send_action.triggered.connect(self._menu_send)
+
     # ------------------------------------------------------------------
     # Menu action handlers
     # ------------------------------------------------------------------
@@ -889,6 +1206,108 @@ class EditorWindow(QMainWindow):
         if name:
             self._run_js(f"insertAnchor({json.dumps(name)})")
 
+    def _resolve_send_config_path(self) -> str:
+        """Return the default sendMail config path, falling back to ~/.config/sendMail.yml."""
+        if _SM_AVAILABLE and hasattr(sm, "get_default_config_path"):
+            try:
+                cfg = sm.get_default_config_path()
+                if cfg == -1:
+                    cfg = sm.get_default_config_path()
+                if cfg != -1:
+                    return str(cfg)
+            except Exception as exc:
+                log.debug("Could not resolve sendMail config path: %s", exc)
+        return str(Path.home() / ".config" / "sendMail.yml")
+
+    def _load_send_config(self, config_path: str) -> dict[str, dict]:
+        """Load the sendMail YAML config file."""
+        if not config_path or not os.path.exists(config_path):
+            return {}
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            return data if isinstance(data, dict) else {}
+        except Exception as exc:
+            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            return {}
+
+    def _send_with_sendmail(self, dialog: _SendDialog) -> str:
+        """Run sendMail with the options selected in the dialog."""
+        args = dialog.build_args(dialog._config_data)
+        if args.profile not in args.conf:
+            raise ValueError(f"Profile '{args.profile}' not found in config")
+
+        dialog_password = dialog.password_input.text().strip()
+        if dialog_password:
+            args.conf[args.profile]["password"] = dialog_password
+
+        sendmail_dir = Path(sm.__file__).resolve().parent if hasattr(sm, "__file__") else Path.cwd()
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(sendmail_dir)
+            return sm.process_profile(args)
+        finally:
+            os.chdir(old_cwd)
+
+    @staticmethod
+    def _send_result_is_success(result: object) -> bool:
+        """Interpret sendMail results without depending on one exact return spelling."""
+        if result is None:
+            return False
+        if isinstance(result, str):
+            status = result.strip()
+            if status.upper() in {"OK", "OK_TEST"}:
+                return True
+            lowered = status.lower()
+            if "error" in lowered or "fail" in lowered:
+                return False
+            return True
+        return bool(result)
+
+    def _menu_send(self) -> None:
+        """Open the send dialog and send the current HTML file if confirmed."""
+        if self._send_in_progress:
+            return
+        if not _SM_AVAILABLE:
+            QMessageBox.warning(self, "sendMail Not Available", "Cannot import sendMail module — sending is disabled.")
+            return
+        if not self._ask_save_if_dirty():
+            return
+        if not self._file_path or not os.path.exists(self._file_path):
+            if not self._save():
+                return
+
+        config_path = self._resolve_send_config_path()
+        config_data = self._load_send_config(config_path)
+        dialog = _SendDialog(
+            self,
+            attachment_path=str(self._file_path),
+            config_path=config_path,
+            config_data=config_data,
+            initial_profile="default",
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        self._send_in_progress = True
+        try:
+            result = self._send_with_sendmail(dialog)
+        except Exception as exc:
+            QMessageBox.critical(self, "Send Error", f"Failed to send:\n{exc}")
+            log.error("Send failed: %s", exc)
+            return
+        finally:
+            self._send_in_progress = False
+
+        if self._send_result_is_success(result):
+            if isinstance(result, str) and result.strip().upper() == "OK_TEST":
+                QMessageBox.information(self, "Send", "Message sent successfully in test mode.")
+            else:
+                QMessageBox.information(self, "Send", "Message sent successfully.")
+        else:
+            log.warning("sendMail returned non-success status after send attempt: %r", result)
+            QMessageBox.warning(self, "Send", "Sending failed. Check the log for details.")
+
     def _menu_table_insert(self) -> None:
         """Open the table dimensions dialog and insert a table."""
         json_str = self._bridge.request_table_insert()
@@ -907,6 +1326,13 @@ class EditorWindow(QMainWindow):
         )
         if path:
             self._bridge.css_changed.emit(os.path.abspath(path))
+
+    def _set_font_family(self, family: str | None) -> None:
+        """Apply a font family to the current selection."""
+        if family:
+            self._run_js(f"quill.format('font', {json.dumps(family)})")
+        else:
+            self._run_js("quill.format('font', false)")
 
     def _on_css_changed(self, css_path: str) -> None:
         """Apply a new CSS file to the editor canvas and store for save-time use."""

@@ -1258,7 +1258,8 @@ def process_profile(args):
     :param args: The argparse.Namespace object containing the configurations and command-line
         arguments required for the mailing process.
     :return: A string indicating the success or failure of the process. Returns "OK" if the
-        mailing was successfully sent; otherwise, returns "Error".
+        mailing was successfully sent in normal mode, "OK_TEST" if it was successfully sent
+        in test mode, and "Error" otherwise.
     """
     config = _load_config_with_secrets(args)
     param = Dict2Class(config)
@@ -1280,7 +1281,10 @@ def process_profile(args):
     if param.test:
         param.filter = param.filter_test
 
-    if generate_mailing(param) == "OK" and not param.test:
+    if generate_mailing(param) == "OK":
+        if param.test:
+            log.info("Test mode: mailing sent successfully.")
+            return "OK_TEST"
         _post_send_cleanup(service, google_drive_files)
         return "OK"
     return "Error"
@@ -1472,7 +1476,7 @@ def main():
         return -1
 
     if args.profile:
-        return 0 if process_profile(args) == "OK" else -1
+        return 0 if process_profile(args) in ("OK", "OK_TEST") else -1
     else:
         log.critical("No profile specified")
         return -1

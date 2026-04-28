@@ -124,23 +124,60 @@
     }
     #btn-insert-hr:hover { background: #e0e0e0; }
 
-    /* Vertical alignment select (sits next to ql-align in the same ql-formats span) */
-    #sel-valign {
-      height: 24px;
-      border: 1px solid transparent;
-      border-radius: 2px;
-      background: transparent;
-      font-size: 12px;
-      color: #444;
-      cursor: pointer;
-      vertical-align: middle;
-      padding: 0 2px;
-      margin-left: 2px;
+    /* Vertical alignment dropdown */
+    #valign-group {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 4px;
+      border-left: 1px solid #ddd;
     }
-    #sel-valign:hover { border-color: #ccc; color: #06c; }
+    #btn-valign-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 3px 6px;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: #444;
+      line-height: 1;
+    }
+    #btn-valign-toggle:hover { background: #e0e0e0; color: #06c; }
+    #btn-valign-toggle svg { width: 14px; height: 14px; display: block; }
+    #valign-menu {
+      display: none;
+      position: absolute;
+      left: 4px;
+      top: calc(100% + 4px);
+      z-index: 200;
+      min-width: 132px;
+      padding: 4px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+    }
+    #valign-menu button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 5px 7px;
+      border-radius: 3px;
+      color: #444;
+      text-align: left;
+      line-height: 1;
+    }
+    #valign-menu button:hover { background: #e0e0e0; color: #06c; }
+    #valign-menu svg { width: 16px; height: 16px; flex: 0 0 auto; display: block; }
 
-    /* Named anchor markers */
-    .ql-editor .ql-anchor {
+    /* Named anchor markers — uses editor-anchor (not ql-anchor) to avoid Quill's ql-* namespace) */
+    .ql-editor .editor-anchor {
       display: inline-block;
       background: #E8F5E9;
       border: 1px solid #4CAF50;
@@ -195,6 +232,18 @@
         <option value="36px">36</option>
       </select>
     </span>
+    <!-- Font family -->
+    <span class="ql-formats">
+      <select class="ql-font" title="Font family">
+        <option value="" selected>Default</option>
+        <option value="Arial">Arial</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Trebuchet MS">Trebuchet MS</option>
+        <option value="Verdana">Verdana</option>
+      </select>
+    </span>
     <!-- Character formatting -->
     <span class="ql-formats">
       <button class="ql-bold"      title="Bold (Ctrl+B)"></button>
@@ -207,7 +256,7 @@
       <select class="ql-color"      title="Text color"></select>
       <select class="ql-background" title="Background color"></select>
     </span>
-    <!-- Alignment (horizontal + vertical) -->
+    <!-- Horizontal alignment (Quill-managed) -->
     <span class="ql-formats">
       <select class="ql-align" title="Horizontal Alignment">
         <option selected></option>
@@ -215,12 +264,46 @@
         <option value="right"></option>
         <option value="justify"></option>
       </select>
-      <select id="sel-valign" title="Vertical Alignment">
-        <option value="" selected>↕</option>
-        <option value="top">▲ Top</option>
-        <option value="middle">■ Middle</option>
-        <option value="bottom">▼ Bottom</option>
-      </select>
+    </span>
+    <!-- Vertical alignment -->
+    <span id="valign-group">
+      <button id="btn-valign-toggle" type="button" title="Vertical Alignment">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/>
+          <line x1="4" y1="3.75" x2="12" y2="3.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="4" y1="12.25" x2="12" y2="12.25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div id="valign-menu" role="menu" aria-label="Vertical alignment">
+        <button type="button" data-valign="top" role="menuitem" title="Align Top">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/>
+            <line x1="4" y1="3.75" x2="12" y2="3.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            <line x1="4" y1="8" x2="10" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+            <line x1="4" y1="12.25" x2="10" y2="12.25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+          </svg>
+          <span>Top</span>
+        </button>
+        <button type="button" data-valign="middle" role="menuitem" title="Align Middle">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/>
+            <line x1="4" y1="3.75" x2="10" y2="3.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+            <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            <line x1="4" y1="12.25" x2="10" y2="12.25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+          </svg>
+          <span>Middle</span>
+        </button>
+        <button type="button" data-valign="bottom" role="menuitem" title="Align Bottom">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/>
+            <line x1="4" y1="3.75" x2="10" y2="3.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+            <line x1="4" y1="8" x2="10" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+            <line x1="4" y1="12.25" x2="12" y2="12.25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+          <span>Bottom</span>
+        </button>
+      </div>
     </span>
     <!-- Lists & indent -->
     <span class="ql-formats">
@@ -291,6 +374,41 @@
       // Quill initialization
       // ----------------------------------------------------------------
       // Use inline px values for the size format so saved HTML is self-contained
+      const Delta = Quill.import('delta');
+      try {
+        const FontStyle = Quill.import('attributors/style/font');
+        FontStyle.whitelist = ['Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Trebuchet MS', 'Verdana'];
+        Quill.register(FontStyle, true);
+      } catch(e) {
+        console.warn('Font style registration failed:', e);
+      }
+
+      // Preserve fragment-only and relative links instead of converting them to about:blank.
+      // Quill's built-in link blot sanitizes non-whitelisted URLs, which breaks local anchors
+      // like #_english_. This custom blot keeps same-document anchors intact while still
+      // sanitizing normal external URLs through Quill's built-in rules.
+      try {
+        const BaseLink = Quill.import('formats/link');
+        class LocalLink extends BaseLink {
+          static sanitize(url) {
+            if (typeof url !== 'string') {
+              return this.SANITIZED_URL;
+            }
+            const value = url.trim();
+            if (!value) {
+              return this.SANITIZED_URL;
+            }
+            if (value.startsWith('#') || value.startsWith('./') || value.startsWith('../')) {
+              return value;
+            }
+            return super.sanitize(value);
+          }
+        }
+        Quill.register(LocalLink, true);
+      } catch (e) {
+        console.warn('Local link blot registration failed:', e);
+      }
+
       const SizeStyle = Quill.import('attributors/style/size');
       SizeStyle.whitelist = ['10px','12px','14px','16px','18px','20px','24px','28px','32px','36px'];
       Quill.register(SizeStyle, true);
@@ -309,26 +427,34 @@
         console.warn('HR blot registration failed:', e);
       }
 
-      // Register inline anchor blot as <span class="ql-anchor"> to avoid conflicting
-      // with the link blot which already owns <a>. Anchors are converted to/from
-      // <a id="name"> by Python on save/load.
+      // Register the anchor as an inline EMBED (atomic leaf, no children).
+      // Inline blots wrap content — that path was unreliable for imported
+      // <span class="editor-anchor">⚓</span> markers because the ⚓ text
+      // becomes a separate child blot and was disappearing on normalisation.
+      // An Embed treats the whole <span> (including its ⚓ glyph) as one opaque
+      // unit, so the marker survives load/save and round-trips cleanly.
+      // Class "editor-anchor" is used (NOT "ql-anchor") so Quill's ql-* namespace
+      // doesn't interfere. Anchors are converted to/from <a id="name"> by Python.
       try {
-        const Inline = Quill.import('blots/inline');
-        class AnchorBlot extends Inline {
+        const Embed = Quill.import('blots/embed');
+        class AnchorBlot extends Embed {
           static create(value) {
-            const node = super.create();
-            node.setAttribute('data-anchor-id', value);
-            node.setAttribute('title', 'Anchor: ' + value);
+            const node = super.create(value);
+            const id = typeof value === 'string' && value ? value : '';
+            if (id) {
+              node.setAttribute('data-anchor-id', id);
+              node.setAttribute('title', 'Anchor: ' + id);
+            }
             node.textContent = '⚓';  // ⚓
             return node;
           }
-          static formats(node) {
-            return node.getAttribute('data-anchor-id') || true;
+          static value(node) {
+            return node.getAttribute('data-anchor-id') || '';
           }
         }
-        AnchorBlot.blotName = 'anchor';
-        AnchorBlot.tagName  = 'span';
-        AnchorBlot.className = 'ql-anchor';
+        AnchorBlot.blotName  = 'anchor';
+        AnchorBlot.tagName   = 'span';
+        AnchorBlot.className = 'editor-anchor';
         Quill.register(AnchorBlot);
       } catch(e) {
         console.warn('Anchor blot registration failed:', e);
@@ -350,15 +476,83 @@
         placeholder: 'Start writing your newsletter...'
       });
 
+      // Ensure clipboard imports preserve images even when they are nested in tables.
+      // Quill's default HTML import is more reliable than assigning root.innerHTML directly
+      // because it builds the editor model and keeps embed nodes alive through normalization.
+      quill.clipboard.addMatcher('IMG', function(node) {
+        const src = node.getAttribute('src') || '';
+        const attrs = {};
+        const alt = node.getAttribute('alt');
+        if (alt) attrs.alt = alt;
+        return new Delta().insert({ image: src }, attrs);
+      });
+
+      function _copyAttributes(sourceNode, targetNode) {
+        Array.from(targetNode.attributes).forEach(function(attr) {
+          targetNode.removeAttribute(attr.name);
+        });
+        Array.from(sourceNode.attributes).forEach(function(attr) {
+          targetNode.setAttribute(attr.name, attr.value);
+        });
+      }
+
+      function _restoreImportedState(sourceBody) {
+        if (!sourceBody) return;
+
+        // Preserve resized images by copying their original attributes back onto
+        // the rendered DOM after Quill has rebuilt the document model.
+        const sourceImages = sourceBody.querySelectorAll('img');
+        const renderedImages = quill.root.querySelectorAll('img');
+        const imageCount = Math.min(sourceImages.length, renderedImages.length);
+        for (let i = 0; i < imageCount; i += 1) {
+          _copyAttributes(sourceImages[i], renderedImages[i]);
+        }
+
+        // Preserve cell formatting, including alignment/vertical alignment, by
+        // restoring table-related attributes after the clipboard import.
+        const sourceTables = sourceBody.querySelectorAll('table');
+        const renderedTables = quill.root.querySelectorAll('table');
+        const tableCount = Math.min(sourceTables.length, renderedTables.length);
+        for (let i = 0; i < tableCount; i += 1) {
+          const sourceTable = sourceTables[i];
+          const renderedTable = renderedTables[i];
+          _copyAttributes(sourceTable, renderedTable);
+
+          const sourceRows = sourceTable.querySelectorAll('tr');
+          const renderedRows = renderedTable.querySelectorAll('tr');
+          const rowCount = Math.min(sourceRows.length, renderedRows.length);
+          for (let r = 0; r < rowCount; r += 1) {
+            const sourceCells = sourceRows[r].querySelectorAll('td, th');
+            const renderedCells = renderedRows[r].querySelectorAll('td, th');
+            const cellCount = Math.min(sourceCells.length, renderedCells.length);
+            for (let c = 0; c < cellCount; c += 1) {
+              const sourceCell = sourceCells[c];
+              const renderedCell = renderedCells[c];
+              _copyAttributes(sourceCell, renderedCell);
+
+              const sourceBlocks = sourceCell.querySelectorAll('p, div, blockquote, h1, h2, h3, h4, h5, h6');
+              const renderedBlocks = renderedCell.querySelectorAll('p, div, blockquote, h1, h2, h3, h4, h5, h6');
+              const blockCount = Math.min(sourceBlocks.length, renderedBlocks.length);
+              for (let b = 0; b < blockCount; b += 1) {
+                _copyAttributes(sourceBlocks[b], renderedBlocks[b]);
+              }
+            }
+          }
+        }
+      }
+
       // ----------------------------------------------------------------
       // Content sync (debounced 500ms)
       // ----------------------------------------------------------------
       let _debounceTimer;
+      function _syncEditorHtml() {
+        const html = quill.root.innerHTML;
+        bridge.on_content_changed(html === '<p><br></p>' ? '' : html);
+      }
       quill.on('text-change', function() {
         clearTimeout(_debounceTimer);
         _debounceTimer = setTimeout(function() {
-          const html = quill.root.innerHTML;
-          bridge.on_content_changed(html === '<p><br></p>' ? '' : html);
+          _syncEditorHtml();
           document.getElementById('status').textContent = 'Modified';
         }, 500);
       });
@@ -369,7 +563,16 @@
 
       // Load content into the editor
       window.setContent = function(html) {
-        quill.root.innerHTML = html || '';
+        const content = html || '';
+        const sourceDoc = new DOMParser().parseFromString(
+          '<!doctype html><html><body>' + content + '</body></html>',
+          'text/html'
+        );
+        quill.setContents(new Delta().insert('\n'), Quill.sources.SILENT);
+        if (content) {
+          quill.clipboard.dangerouslyPasteHTML(0, content, Quill.sources.SILENT);
+          _restoreImportedState(sourceDoc.body);
+        }
         quill.setSelection(0, 0, Quill.sources.SILENT);
         document.getElementById('status').textContent = 'Ready';
       };
@@ -398,11 +601,19 @@
         quill.setSelection(r.index + 1, Quill.sources.SILENT);
       };
 
+      function _showVAlignMenu() {
+        document.getElementById('valign-menu').style.display = 'block';
+      }
+
+      function _hideVAlignMenu() {
+        document.getElementById('valign-menu').style.display = 'none';
+      }
+
       // Set vertical alignment via direct DOM mutation (no Parchment registration needed).
       // Walks up from the cursor leaf to find the nearest block element (TD/TH/P/LI/…)
       // and sets its style.verticalAlign, then notifies Quill to sync content.
       window.setVAlign = function(align) {
-        const sel = quill.getSelection();
+        const sel = quill.getSelection(true);
         if (!sel) return;
         const leafPair = quill.getLeaf(sel.index);
         let node = leafPair && leafPair[0] ? leafPair[0].domNode : null;
@@ -411,6 +622,8 @@
           if (BLOCK_TAGS.includes(node.tagName)) {
             node.style.verticalAlign = align;
             quill.update(Quill.sources.USER);
+            _syncEditorHtml();
+            document.getElementById('status').textContent = 'Modified';
             return;
           }
           node = node.parentNode;
@@ -452,11 +665,24 @@
         insertHR();
       });
 
-      // Wire vertical alignment select
-      document.getElementById('sel-valign').addEventListener('change', function() {
-        if (this.value) {
-          setVAlign(this.value);
-          this.value = '';  // reset to placeholder so re-selection works
+      // Wire vertical alignment dropdown
+      document.getElementById('btn-valign-toggle').addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const menu = document.getElementById('valign-menu');
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      });
+      document.getElementById('valign-menu').querySelectorAll('button[data-valign]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          setVAlign(this.getAttribute('data-valign'));
+          _hideVAlignMenu();
+        });
+      });
+      document.addEventListener('click', function(e) {
+        if (!document.getElementById('valign-group').contains(e.target)) {
+          _hideVAlignMenu();
         }
       });
 
@@ -510,6 +736,8 @@
         } catch(e) {
           quill.root.dispatchEvent(new Event('input', { bubbles: true }));
         }
+        _syncEditorHtml();
+        document.getElementById('status').textContent = 'Modified';
       }
 
       // Show resize toolbar when an image is selected via Quill selection

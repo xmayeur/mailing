@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Spec ID | SPEC-001 |
-| Status | Implemented (rev 3) |
+| Status | Implemented (rev 6) |
 | Feature | WYSIWYG Newsletter Editor |
 | Module | `editor.py` |
 | Author | xmayeur |
@@ -12,6 +12,8 @@
 | Rev 2 | 2026-04-26 — Added table management, image resizing, CSS stylesheet |
 | Rev 3 | 2026-04-27 — Inline local images on open; background CSS fix; HR blot; vertical alignment |
 | Rev 4 | 2026-04-27 — Valign as select dropdown; images in table cells; blank paragraph collapse; named anchors |
+| Rev 5 | 2026-04-27 — Fix valign dropdown hidden by Quill CSS; fix anchor class (ql- → editor-); wrap td images in p on load |
+| Rev 6 | 2026-04-28 — Preserve fragment-only and relative hyperlinks for local anchors; local anchor URLs no longer normalize to about:blank |
 
 ---
 
@@ -19,7 +21,7 @@
 
 sendMail is a CLI bulk-email tool that consumes `.md` and `.html` files to compose newsletter campaigns. Prior to this feature, users had to write those source files in an external text editor with no WYSIWYG preview.
 
-This spec describes the design, analysis, and implementation of a dedicated WYSIWYG editor that lets users compose or edit newsletters visually, then save them as both `.md` and `.html` ready for immediate use with sendMail.
+This spec describes the design, analysis, and implementation of a dedicated WYSIWYG editor that lets users compose or edit newsletters visually, then save them as `.html` ready for immediate use with sendMail.
 
 ---
 
@@ -40,9 +42,9 @@ This spec describes the design, analysis, and implementation of a dedicated WYSI
 | FR-09 | The editor shall support inserting local images embedded as base64 data URIs |
 | FR-10 | The editor shall support inserting hyperlinks with a URL and display text |
 | FR-11 | The editor shall support inserting horizontal rules |
-| FR-12 | The editor shall save output as `.md` (Markdown) |
-| FR-13 | The editor shall save output as `.html` (full HTML document) |
-| FR-14 | FR-12 and FR-13 shall execute simultaneously on every Save action |
+| FR-12 | The editor shall save output as `.html` (full HTML document) |
+| FR-13 | The saved HTML shall contain the current editor content, embedded styles, and sendMail-ready markup |
+| FR-14 | The editor shall clear the dirty state after a successful save |
 | FR-15 | The editor shall warn about unsaved changes before closing, opening, or starting a new document |
 | FR-16 | The editor shall be launchable as a standalone script with an optional file argument |
 | FR-17 | The editor shall support inserting tables via a rows × columns dialog |
@@ -60,7 +62,7 @@ This spec describes the design, analysis, and implementation of a dedicated WYSI
 | FR-29 | Images inside table cells shall be displayed correctly in the editor canvas |
 | FR-30 | On file open, runs of more than 2 consecutive empty paragraphs shall be collapsed to exactly 2 |
 | FR-31 | The editor shall support inserting named anchors (bookmarks) via Insert → Insert Anchor; existing anchors (`<a id="...">`) in opened files shall be preserved and shown as ⚓ markers |
-| FR-32 | Links to named anchors (`#anchor-name`) shall be creatable via the existing hyperlink dialog |
+| FR-32 | Links to named anchors (`#anchor-name`) and other local relative targets shall be creatable via the existing hyperlink dialog and preserved in saved HTML |
 
 ### 2.2 Non-functional requirements
 
@@ -71,7 +73,7 @@ This spec describes the design, analysis, and implementation of a dedicated WYSI
 | NFR-03 | Unit tests must run headlessly without a Qt display server |
 | NFR-04 | Bundled JS/CSS assets must work offline (no CDN dependency at runtime) |
 | NFR-05 | The saved HTML must not contain the unfilled `{_CSP_IMG_DOMAIN}` placeholder present in `sendMail.md2html()` |
-| NFR-06 | Unicode characters (e.g. `☞`) must be preserved verbatim in saved Markdown output |
+| NFR-06 | Unicode characters (e.g. `☞`) must be preserved verbatim in saved HTML output |
 
 ### 2.3 Out of scope
 
@@ -110,13 +112,9 @@ This spec describes the design, analysis, and implementation of a dedicated WYSI
 
 **Decision rationale**: Quill v2 is MIT-licensed, small (~210 KB), has a clean JS API for setting/getting HTML content (`quill.root.innerHTML`), and supports all required formatting including tables (via optional module). It requires no build toolchain — the distribution bundle is a single JS file.
 
-### 3.3 HTML → Markdown conversion
+### 3.3 HTML saving
 
-The existing `markdown2` library handles **MD → HTML** (already in project). For the reverse direction (**HTML → MD**, needed for saving), the `html2text` library was selected:
-
-- Pure Python, no binary dependencies
-- Configurable: `body_width=0` (no line-wrapping), `unicode_snob=True` (Unicode preservation), `protect_links=True`
-- Well-maintained, handles standard HTML constructs
+The editor persists the current HTML body directly as the source of truth for saved newsletters. The save path emits a full HTML document suitable for sendMail, while Markdown conversion remains part of the separate CLI conversion workflow in `sendMail.py`.
 
 ### 3.4 Quill table module
 
@@ -224,7 +222,6 @@ open_file("data/newsletter.md")
 _save()
   → bridge.get_current_html()               retrieve cached body HTML
   → _write_html_file("{stem}.html", html)   full document + CSS + charset
-  → _write_md_file("{stem}.md", html)       html2text conversion
   → bridge.reset(html)                      clear dirty flag
   → page().runJavaScript("markSaved()")     update JS status indicator
 ```
@@ -368,7 +365,9 @@ _save()
 | **Custom HR blot registered before Quill init** | Quill v2 has no built-in `'hr'` blot. A `BlockEmbed` subclass named `'hr'` with `tagName = 'hr'` is registered so `insertEmbed('hr', true)` produces a real `<hr>` element. The matching CSS (`.ql-editor hr`) gives it visible styling inside the canvas. |
 | **Vertical alignment via direct DOM mutation** | `setVAlign(align)` walks from the cursor leaf to the nearest block element (`TD`, `TH`, `P`, `LI`, headings, `BLOCKQUOTE`) and sets `style.verticalAlign` directly, then calls `quill.update(USER)`. No Parchment registration needed; avoids the Parchment API variability across Quill v2 builds. |
 | **Vertical alignment select next to horizontal** | The valign control is a plain `<select id="sel-valign">` placed inside the same `ql-formats` span as `ql-align`. After applying, the select resets to the placeholder so the same value can be re-applied. |
-| **Named anchors stored as `<span class="ql-anchor">` in the editor** | Quill's link blot already owns `<a>`. A second blot for `<a>` would override it and break links. The anchor blot uses `<span class="ql-anchor" data-anchor-id="name">⚓</span>` so it coexists with links. Python converts `<a id="name">` → anchor spans on load and back on save. |
+| **Named anchors stored as `<span class="editor-anchor">` in the editor** | Quill's link blot already owns `<a>`. A second blot for `<a>` would override it and break links. The anchor blot uses `<span class="editor-anchor" data-anchor-id="name">⚓</span>` using the `editor-anchor` class (not `ql-anchor` — Quill owns the `ql-*` namespace and may strip those classes). Python converts `<a id="name">` → anchor spans on load and back on save. |
+| **Valign select must be outside `ql-formats`** | Quill's Snow toolbar init hides ALL `<select>` elements inside `.ql-formats` (replacing them with custom pickers). `#sel-valign` is in its own plain `<span id="valign-group">` immediately after the alignment span to avoid being hidden. |
+| **Images in `<td>` wrapped in `<p>` before sending to Quill** | Quill's table module expects block-level content (paragraphs) inside cells. A bare `<img>` directly in `<td>` is dropped during Quill's DOM normalisation. `_wrap_td_images()` pre-processes the body HTML to wrap such images in `<p>` tags. |
 | **Blank paragraph collapse on open** | `_collapse_blank_paragraphs()` uses a regex to reduce runs of 3+ consecutive empty `<p>` tags to exactly 2, preventing oversized gaps from pasted or generated content. |
 
 ---
@@ -389,7 +388,7 @@ Expected bundle size: **80–150 MB** (dominated by Chromium engine).
 
 ## 8. Testing strategy
 
-All 43 unit tests in `tests/test_editor.py` run headlessly. Qt is fully mocked before the `editor` module is imported:
+All 47 unit tests in `tests/test_editor.py` run headlessly. Qt is fully mocked before the `editor` module is imported:
 
 ```python
 for mod in ["PyQt6", "PyQt6.QtCore", "PyQt6.QtWidgets",
@@ -418,6 +417,7 @@ for mod in ["PyQt6", "PyQt6.QtCore", "PyQt6.QtWidgets",
 | `TestVerticalAlignment` | 3 | `setVAlign('top'/'middle'/'bottom')` fired via `_run_js` |
 | `TestBlankParagraphCollapse` | 5 | 3/5 empty paragraphs collapsed; 2 preserved; content paragraphs unaffected; mixed content |
 | `TestAnchorHandling` | 5 | `<a id>` → span on load; href links not affected; span → `<a id>` on save; multiple anchors; round-trip |
+| `TestTdImageWrapping` | 4 | bare img in td wrapped; already-wrapped not doubled; text unaffected; multiple cells |
 
 GUI integration tests (requiring a real display) are excluded from CI via `@pytest.mark.gui` and `pytest -m "not gui"`.
 
