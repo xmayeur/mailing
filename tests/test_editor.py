@@ -5,6 +5,10 @@ All PyQt6 modules are mocked before import so these tests run headlessly
 on CI without a display server, following the same pattern used in test_sendMail.py.
 """
 
+# ---------------------------------------------------------------------------
+# Mock all Qt modules BEFORE importing editor
+# ---------------------------------------------------------------------------
+import inspect as _inspect
 import json
 import os
 import sys
@@ -12,11 +16,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
-# ---------------------------------------------------------------------------
-# Mock all Qt modules BEFORE importing editor
-# ---------------------------------------------------------------------------
-import inspect as _inspect
+import pytest
+import yaml as real_yaml
 
 _qt_mocks = [
     "PyQt6",
@@ -69,6 +70,12 @@ class _FakeQMainWindow(_FakeQObject):
     """Stand-in for QMainWindow."""
     def menuBar(self):
         return MagicMock()
+
+    def addToolBar(self, toolbar):
+        pass
+
+    def style(self):
+        return MagicMock(standardIcon=MagicMock(return_value="icon"))
 
     def setStatusBar(self, bar):
         pass
@@ -719,3 +726,652 @@ class TestTableCellNormalization:
         assert '<div>' not in result
         assert '<p>' not in result
         assert 'x' in result
+
+
+# ---------------------------------------------------------------------------
+# Config dialog and window behavior tests
+# ---------------------------------------------------------------------------
+
+class _LineEditLike:
+    def __init__(self, text=""):
+        self._text = text
+
+    def text(self):
+        return self._text
+
+    def setText(self, value):
+        self._text = value
+
+
+class _SpinBoxLike:
+    def __init__(self, value=0):
+        self._value = value
+
+    def value(self):
+        return self._value
+
+    def setValue(self, value):
+        self._value = value
+
+
+class _CheckBoxLike:
+    def __init__(self, checked=False):
+        self._checked = checked
+
+    def isChecked(self):
+        return self._checked
+
+    def setChecked(self, value):
+        self._checked = bool(value)
+
+
+class _PlainTextLike:
+    def __init__(self, text=""):
+        self._text = text
+
+    def toPlainText(self):
+        return self._text
+
+    def setPlainText(self, value):
+        self._text = value
+
+
+class _FakePage:
+    def __init__(self):
+        self.runJavaScript = MagicMock()
+
+
+class _FakeView:
+    def __init__(self):
+        self._page = _FakePage()
+
+    def page(self):
+        return self._page
+
+
+class _FakeStatusBar:
+    def __init__(self):
+        self.showMessage = MagicMock()
+
+
+class _FakeBridge:
+    def __init__(self, dirty=False, html=""):
+        self.is_dirty = dirty
+        self._html = html
+        self.dirty_changed = MagicMock()
+        self.dirty_changed.emit = MagicMock()
+        self.css_changed = MagicMock()
+
+    def get_current_html(self):
+        return self._html
+
+    def reset(self, html=""):
+        self._html = html
+        self.is_dirty = False
+
+
+class _FakeCombo:
+    def __init__(self):
+        self.items = []
+        self.current = ""
+        self.blocked = False
+        self.index = -1
+
+    def blockSignals(self, value):
+        self.blocked = value
+
+    def clear(self):
+        self.items = []
+
+    def addItems(self, items):
+        self.items.extend(items)
+
+    def findText(self, text):
+        try:
+            return self.items.index(text)
+        except ValueError:
+            return -1
+
+    def setCurrentIndex(self, index):
+        self.index = index
+        if 0 <= index < len(self.items):
+            self.current = self.items[index]
+
+    def currentText(self):
+        return self.current
+
+    def count(self):
+        return len(self.items)
+
+
+class _FakeTabs:
+    def __init__(self, title="Identity"):
+        self._title = title
+        self._index = 0
+
+    def currentIndex(self):
+        return self._index
+
+    def tabText(self, index):
+        return self._title
+
+
+def _make_config_dialog_stub():
+    dlg = object.__new__(editor._ConfigDialog)
+    dlg._config_data = {
+        "alpha": {
+            "MAILCONFIG": "secret",
+            "sender": "alpha@example.com",
+            "sendername": "Alpha",
+            "username": "alpha-user",
+            "password": "pw",
+            "domain": "alpha.test",
+            "smtp_host": "smtp.alpha.test",
+            "imap_host": "imap.alpha.test",
+            "sent_folder": "Sent",
+            "database": "alpha.csv",
+            "sa": "sa-secret",
+            "sheetid": "sheet-secret",
+            "token_file": "token.json",
+            "credentials_id": "cred-secret",
+            "subject": "Hello",
+            "message": "Body",
+            "default_message": "Fallback",
+            "body": "Injected",
+            "styles": "styles.css",
+            "pause": 2,
+            "from_index": 1,
+            "to_index": 5,
+            "wait": 3,
+            "max_mails_per_hour": 42,
+            "max_addr_per_mail": 7,
+            "test": True,
+            "verbose": True,
+            "doNotSend": False,
+            "selected": True,
+            "md2html": True,
+            "keep-html": False,
+            "scopes": ["scope-1", "scope-2"],
+            "filter": {"email": "is not empty"},
+            "filter_test": {"email": "is alpha@example.com"},
+        }
+    }
+    dlg._current_profile = "alpha"
+    dlg._widgets = {
+        "MAILCONFIG": _LineEditLike("secret"),
+        "sender": _LineEditLike("alpha@example.com"),
+        "sendername": _LineEditLike("Alpha"),
+        "username": _LineEditLike("alpha-user"),
+        "password": _LineEditLike("pw"),
+        "domain": _LineEditLike("alpha.test"),
+        "smtp_host": _LineEditLike("smtp.alpha.test"),
+        "imap_host": _LineEditLike("imap.alpha.test"),
+        "sent_folder": _LineEditLike("Sent"),
+        "database": _LineEditLike("alpha.csv"),
+        "sa": _LineEditLike("sa-secret"),
+        "sheetid": _LineEditLike("sheet-secret"),
+        "token_file": _LineEditLike("token.json"),
+        "credentials_id": _LineEditLike("cred-secret"),
+        "subject": _LineEditLike("Hello"),
+        "message": _PlainTextLike("Body"),
+        "default_message": _PlainTextLike("Fallback"),
+        "body": _LineEditLike("Injected"),
+        "styles": _LineEditLike("styles.css"),
+        "pause": _SpinBoxLike(2),
+        "from_index": _SpinBoxLike(1),
+        "to_index": _SpinBoxLike(5),
+        "wait": _SpinBoxLike(3),
+        "max_mails_per_hour": _SpinBoxLike(42),
+        "max_addr_per_mail": _SpinBoxLike(7),
+        "test": _CheckBoxLike(True),
+        "verbose": _CheckBoxLike(True),
+        "doNotSend": _CheckBoxLike(False),
+        "selected": _CheckBoxLike(True),
+        "md2html": _CheckBoxLike(True),
+        "keep-html": _CheckBoxLike(False),
+        "scopes": _PlainTextLike("scope-1\nscope-2"),
+        "filter": _PlainTextLike("email: is not empty"),
+        "filter_test": _PlainTextLike("email: is alpha@example.com"),
+    }
+    dlg._yaml_keys = {"filter", "filter_test"}
+    dlg._list_keys = {"scopes"}
+    dlg.tabs = _FakeTabs()
+    dlg.help_view = MagicMock()
+    dlg.config_input = _LineEditLike("")
+    dlg.profile_combo = _FakeCombo()
+    return dlg
+
+
+class TestConfigDialogHelpers:
+    def test_profile_data_helpers_and_round_trip(self, monkeypatch):
+        monkeypatch.setattr(editor, "QLineEdit", _LineEditLike)
+        monkeypatch.setattr(editor, "QSpinBox", _SpinBoxLike)
+        monkeypatch.setattr(editor, "QCheckBox", _CheckBoxLike)
+        monkeypatch.setattr(editor, "QPlainTextEdit", _PlainTextLike)
+        monkeypatch.setitem(editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(editor._ConfigDialog._load_yaml_block.__globals__, "yaml", real_yaml)
+        dlg = _make_config_dialog_stub()
+
+        normalized = dlg._normalize_config_data({"alpha": {"x": 1}, "skip": "nope"})
+        assert normalized == {"alpha": {"x": 1}}
+        defaults = dlg._default_profile_data()
+        assert defaults["sender"] == "john.doe@example.com"
+        assert dlg._profile_names() == ["alpha"]
+        assert dlg._profile_value("missing") == {}
+        assert dlg._dump_yaml_block({"email": "is not empty"})
+        assert dlg._dump_yaml_block(None) == ""
+        with pytest.raises(ValueError):
+            dlg._load_yaml_block("email: is not empty", "filter")
+        assert dlg._load_yaml_block("scope-a, scope-b", "scopes") == ["scope-a", "scope-b"]
+        with pytest.raises(ValueError):
+            dlg._load_yaml_block("[]", "filter")
+
+        dlg._load_profile("alpha")
+        assert dlg._widgets["sender"].text() == "alpha@example.com"
+        assert dlg._widgets["pause"].value() == 2
+        assert dlg._widgets["test"].isChecked() is True
+        assert dlg._widgets["scopes"].toPlainText() == "scope-1\nscope-2"
+
+        dlg._widgets["filter"].setPlainText("")
+        dlg._widgets["filter_test"].setPlainText("")
+        dlg._widgets["sender"].setText("new@example.com")
+        dlg._widgets["pause"].setValue(9)
+        dlg._widgets["test"].setChecked(False)
+        collected = dlg._collect_profile_data()
+        assert collected["sender"] == "new@example.com"
+        assert collected["pause"] == 9
+        assert collected["test"] is False
+
+        dlg._persist_current_profile()
+        assert dlg._config_data["alpha"]["sender"] == "new@example.com"
+
+    def test_read_reload_save_and_profile_management(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(editor, "QLineEdit", _LineEditLike)
+        monkeypatch.setattr(editor, "QSpinBox", _SpinBoxLike)
+        monkeypatch.setattr(editor, "QCheckBox", _CheckBoxLike)
+        monkeypatch.setattr(editor, "QPlainTextEdit", _PlainTextLike)
+        monkeypatch.setitem(editor._ConfigDialog._read_config_file.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(editor._ConfigDialog._save_config.__globals__, "yaml", real_yaml)
+        dlg = _make_config_dialog_stub()
+
+        cfg_path = tmp_path / "config.yml"
+        cfg_path.write_text("alpha:\n  sender: alpha@example.com\n", encoding="utf-8")
+        assert isinstance(dlg._read_config_file(str(cfg_path)), dict)
+        assert dlg._read_config_file(str(tmp_path / "missing.yml")) == {}
+
+        bad_path = tmp_path / "bad.yml"
+        bad_path.write_text("alpha: [", encoding="utf-8")
+        assert dlg._read_config_file(str(bad_path)) == {}
+
+        dlg._config_data = {}
+        dlg._ensure_profiles()
+        assert "default" in dlg._config_data
+
+        dlg._current_profile = "alpha"
+        dlg._widgets["filter"].setPlainText("")
+        dlg._widgets["filter_test"].setPlainText("")
+        dlg._widgets["sender"].setText("alpha2@example.com")
+        dlg.config_input.setText(str(cfg_path))
+        dlg._save_config()
+        assert cfg_path.exists()
+
+        dlg.profile_combo = _FakeCombo()
+        dlg.profile_combo.current = "alpha"
+        dlg._load_profile = MagicMock()
+        dlg._read_config_file = MagicMock(return_value={"alpha": {"sender": "loaded@example.com"}})
+        dlg._reload_profiles("alpha")
+        assert dlg.profile_combo.items[0] == "alpha"
+        assert "default" in dlg.profile_combo.items
+        dlg._load_profile.assert_called_with("alpha")
+
+        with patch.object(editor.QInputDialog, "getText", return_value=("beta", True)):
+            assert dlg._new_profile_name("Add", "beta") == "beta"
+
+        with patch.object(editor.QInputDialog, "getText", return_value=("gamma", True)):
+            dlg._persist_current_profile = MagicMock()
+            dlg._reload_profiles = MagicMock()
+            dlg._add_profile()
+            assert "gamma" in dlg._config_data
+
+        dlg._current_profile = "alpha"
+        dlg._collect_profile_data = MagicMock(return_value={"sender": "copy@example.com"})
+        dlg._reload_profiles = MagicMock()
+        with patch.object(editor.QInputDialog, "getText", return_value=("alpha-copy", True)):
+            dlg._duplicate_profile()
+            assert dlg._config_data["alpha-copy"]["sender"] == "copy@example.com"
+
+        dlg._current_profile = "alpha-copy"
+        dlg._reload_profiles = MagicMock()
+        with patch.object(editor.QMessageBox, "question", return_value=editor.QMessageBox.StandardButton.Yes):
+            dlg._delete_profile()
+        assert "alpha-copy" not in dlg._config_data
+
+        dlg.tabs = _FakeTabs("Templates")
+        dlg._update_help(0)
+        dlg.help_view.setHtml.assert_called_once()
+
+        with patch.object(editor.QMessageBox, "information") as mock_info:
+            dlg._show_help()
+            mock_info.assert_called_once()
+
+
+class TestEditorWindowHelpers:
+    def _make_window(self):
+        win = object.__new__(editor.EditorWindow)
+        win._view = _FakeView()
+        win._bridge = _FakeBridge()
+        win._css_status_label = MagicMock()
+        win._css_status_label.setText = MagicMock()
+        win._file_path = None
+        win._css_path = None
+        win._load_finished_connected = False
+        win._send_in_progress = False
+        win._save = MagicMock(return_value=True)
+        win._load_editor_page = MagicMock()
+        win.open_file = MagicMock()
+        win.statusBar = MagicMock(return_value=_FakeStatusBar())
+        win.setWindowTitle = MagicMock()
+        win.style = MagicMock(return_value=MagicMock(standardIcon=MagicMock(return_value="icon")))
+        return win
+
+    def test_editor_window_init_paths(self, monkeypatch):
+        with patch.object(editor.EditorWindow, "_load_editor_page", autospec=True) as mock_load, patch.object(
+                editor.EditorWindow, "open_file", autospec=True
+        ) as mock_open:
+            window = editor.EditorWindow()
+            assert window._file_path is None
+            mock_load.assert_called_once_with(window, "")
+            mock_open.assert_not_called()
+
+        with patch.object(editor.EditorWindow, "_load_editor_page", autospec=True) as mock_load, patch.object(
+                editor.EditorWindow, "open_file", autospec=True
+        ) as mock_open:
+            window = editor.EditorWindow(file_path="sample.md")
+            mock_open.assert_called_once_with(window, "sample.md")
+            mock_load.assert_not_called()
+
+    def test_resolve_load_and_format_helpers(self, monkeypatch, tmp_path):
+        win = self._make_window()
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
+        monkeypatch.setattr(editor.sm, "get_default_config_path", lambda: str(tmp_path / "cfg.yml"))
+        monkeypatch.setitem(editor.EditorWindow._load_send_config.__globals__, "yaml", real_yaml)
+        assert win._resolve_send_config_path() == str(tmp_path / "cfg.yml")
+
+        monkeypatch.setattr(editor.sm, "get_default_config_path", lambda: -1)
+        expected = str(Path.home() / ".config" / "sendMail.yml")
+        assert win._resolve_send_config_path() == expected
+
+        cfg = tmp_path / "config.yml"
+        cfg.write_text("alpha:\n  sender: test@example.com\n", encoding="utf-8")
+        assert isinstance(win._load_send_config(str(cfg)), dict)
+        assert win._load_send_config(str(tmp_path / "missing.yml")) == {}
+        bad = tmp_path / "bad.yml"
+        bad.write_text("alpha: [", encoding="utf-8")
+        assert win._load_send_config(str(bad)) == {}
+
+        assert win._send_result_is_success("OK") is True
+        assert win._send_result_is_success("OK_TEST") is True
+        assert win._send_result_is_success("error: boom") is False
+        assert win._send_result_is_success(None) is False
+        assert win._send_result_is_success(1) is True
+
+        win._file_path = str(tmp_path / "doc.html")
+        win._bridge.is_dirty = True
+        win._update_title()
+        win.setWindowTitle.assert_called_with("sendMail Editor — doc.html *")
+
+        win._file_path = None
+        win._bridge.is_dirty = False
+        win._update_title()
+        win.setWindowTitle.assert_called_with("sendMail Editor — New Document")
+
+        win._run_js("quill.format('font', 'Arial')")
+        assert "Arial" in win._view.page().runJavaScript.call_args.args[0]
+        win._set_font_family(None)
+        assert "false" in win._view.page().runJavaScript.call_args.args[0]
+
+    def test_menu_open_template_insert_and_css(self, monkeypatch, tmp_path):
+        win = self._make_window()
+        monkeypatch.setattr(editor, "_BASE", tmp_path)
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
+
+        with patch.object(win, "_ask_save_if_dirty", return_value=False):
+            win._menu_open()
+        win.open_file.assert_not_called()
+
+        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(editor.QFileDialog,
+                                                                                      "getOpenFileName", return_value=(
+                        str(tmp_path / "doc.md"), "")):
+            win._menu_open()
+        win.open_file.assert_called_with(str(tmp_path / "doc.md"))
+
+        template_dir = tmp_path / "data"
+        template_dir.mkdir()
+        (template_dir / "template.md").write_text("# t", encoding="utf-8")
+        with patch.object(win, "_ask_save_if_dirty", return_value=True):
+            win._open_template()
+        win.open_file.assert_called_with(str(template_dir / "template.md"))
+
+        (template_dir / "template.md").unlink()
+        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(editor.QFileDialog,
+                                                                                      "getOpenFileName", return_value=(
+                        str(tmp_path / "fallback.md"), "")):
+            win._open_template()
+        win.open_file.assert_called_with(str(tmp_path / "fallback.md"))
+
+        win._run_js = MagicMock()
+        win._bridge.request_image_insert = MagicMock(return_value="data:image/png;base64,abc")
+        win._menu_insert_image()
+        assert "insertEmbed" in win._run_js.call_args.args[0]
+
+        win._bridge.request_link_insert = MagicMock(return_value=json.dumps({"url": "#anchor", "text": "Anchor"}))
+        win._menu_insert_link()
+        assert "quill.insertText" in win._run_js.call_args.args[0]
+
+        with patch.object(editor.QFileDialog, "getOpenFileName", return_value=(str(tmp_path / "style.css"), "")):
+            win._menu_apply_css()
+        win._bridge.css_changed.emit.assert_called_once()
+
+    def test_send_menu_and_dirty_flow(self, monkeypatch, tmp_path):
+        win = self._make_window()
+        win._file_path = str(tmp_path / "doc.html")
+        Path(win._file_path).write_text("<html></html>", encoding="utf-8")
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
+
+        with patch.object(editor, "_SendDialog") as mock_dialog, patch.object(win, "_resolve_send_config_path",
+                                                                              return_value="cfg.yml"), patch.object(win,
+                                                                                                                    "_load_send_config",
+                                                                                                                    return_value={
+                                                                                                                        "default": {}}), patch.object(
+                win, "_send_with_sendmail", return_value="OK") as mock_send, patch.object(editor.QMessageBox,
+                                                                                          "information") as mock_info:
+            dialog = mock_dialog.return_value
+            dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
+            win._menu_send()
+            mock_send.assert_called_once()
+            mock_info.assert_called_once()
+
+        with patch.object(editor, "_SendDialog") as mock_dialog, patch.object(win, "_resolve_send_config_path",
+                                                                              return_value="cfg.yml"), patch.object(win,
+                                                                                                                    "_load_send_config",
+                                                                                                                    return_value={
+                                                                                                                        "default": {}}), patch.object(
+                win, "_send_with_sendmail", return_value="error"), patch.object(editor.QMessageBox,
+                                                                                "warning") as mock_warning:
+            dialog = mock_dialog.return_value
+            dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
+            win._menu_send()
+            mock_warning.assert_called_once()
+
+        win._send_in_progress = True
+        with patch.object(editor.QMessageBox, "warning") as mock_warning:
+            win._menu_send()
+            mock_warning.assert_not_called()
+
+        win._send_in_progress = False
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
+        with patch.object(editor.QMessageBox, "warning") as mock_warning:
+            win._menu_send()
+            mock_warning.assert_called_once()
+
+    def test_css_change_and_prompt_paths(self, monkeypatch, tmp_path):
+        win = self._make_window()
+        css_path = tmp_path / "style.css"
+        css_path.write_text("body { color: red; }", encoding="utf-8")
+        win._run_js = MagicMock()
+        win._on_css_changed(str(css_path))
+        assert win._css_path == str(css_path)
+        win._css_status_label.setText.assert_called_with("CSS: style.css")
+        assert "applyCSS" in win._run_js.call_args.args[0]
+
+        bad = tmp_path / "missing.css"
+        with patch.object(editor.QMessageBox, "warning") as mock_warning:
+            win._on_css_changed(str(bad))
+            mock_warning.assert_called_once()
+
+        win._bridge.is_dirty = False
+        assert win._ask_save_if_dirty() is True
+
+        win._bridge.is_dirty = True
+        with patch.object(editor.QMessageBox, "question",
+                          return_value=editor.QMessageBox.StandardButton.Save), patch.object(win, "_save",
+                                                                                             return_value=True) as mock_save:
+            assert win._ask_save_if_dirty() is True
+            mock_save.assert_called_once()
+
+        with patch.object(editor.QMessageBox, "question", return_value=editor.QMessageBox.StandardButton.Discard):
+            assert win._ask_save_if_dirty() is True
+
+        with patch.object(editor.QMessageBox, "question", return_value=editor.QMessageBox.StandardButton.Cancel):
+            assert win._ask_save_if_dirty() is False
+
+        event = MagicMock()
+        win._bridge.is_dirty = False
+        win.closeEvent(event)
+        event.accept.assert_called_once()
+
+        event = MagicMock()
+        win._ask_save_if_dirty = MagicMock(return_value=False)
+        win.closeEvent(event)
+        event.ignore.assert_called_once()
+
+    def test_window_load_save_toolbar_and_dialog_paths(self, monkeypatch, tmp_path):
+        win = self._make_window()
+
+        class _FakeSignal:
+            def __init__(self):
+                self.connected = []
+
+            def connect(self, fn):
+                self.connected.append(fn)
+
+            def disconnect(self, fn=None):
+                if fn is None:
+                    self.connected.clear()
+                elif fn in self.connected:
+                    self.connected.remove(fn)
+
+        class _LoadView(_FakeView):
+            def __init__(self):
+                super().__init__()
+                self.loadFinished = _FakeSignal()
+                self.load = MagicMock()
+
+        win._view = _LoadView()
+        win._inject_initial_content = MagicMock()
+        editor.EditorWindow._load_editor_page(win, "<p>hello</p>")
+        assert win._view.load.called
+        assert win._view.loadFinished.connected
+        win._view.loadFinished.connected[0](True)
+        win._inject_initial_content.assert_called_once_with("<p>hello</p>")
+
+        css_path = tmp_path / "style.css"
+        css_path.write_text("body { color: blue; }", encoding="utf-8")
+        win._css_path = str(css_path)
+        win._run_js = MagicMock()
+        win._inject_initial_content.reset_mock()
+        editor.EditorWindow._inject_initial_content(win, "<p>body</p>")
+        assert "setContent" in win._view.page().runJavaScript.call_args.args[0]
+        assert "applyCSS" in win._run_js.call_args.args[0]
+
+        win._css_path = None
+        win._file_path = str(tmp_path / "doc.html")
+        win._bridge._html = "<p>saved</p>"
+        win._bridge.get_current_html = MagicMock(return_value="<p>saved</p>")
+        win._bridge.reset = MagicMock()
+        win._write_html_file = MagicMock()
+        win._update_title = MagicMock()
+        status_bar = win.statusBar.return_value
+        editor.EditorWindow._save(win)
+        assert win._write_html_file.called
+        assert win._file_path.endswith(".html")
+        win._bridge.reset.assert_called_once()
+        status_bar.showMessage.assert_called_once()
+
+        with patch.object(editor.QFileDialog, "getSaveFileName", return_value=(str(tmp_path / "custom.html"), "")):
+            win._file_path = None
+            win._save = MagicMock(return_value=True)
+            assert editor.EditorWindow._save_as(win) is True
+
+        win._bridge.request_table_insert = MagicMock(return_value=json.dumps({"rows": 2, "cols": 3}))
+        win._run_js = MagicMock()
+        win._menu_table_insert()
+        assert "insertTable" in win._run_js.call_args.args[0]
+
+        mock_anchor_dialog = MagicMock()
+        mock_anchor_dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
+        mock_anchor_dialog.get_name.return_value = "intro"
+        with patch("editor._AnchorDialog", return_value=mock_anchor_dialog):
+            win._menu_insert_anchor()
+        assert "insertAnchor" in win._run_js.call_args.args[0]
+
+        mock_cfg_dialog = MagicMock()
+        mock_cfg_dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
+        with (
+            patch.object(win, "_resolve_send_config_path", return_value="cfg.yml"),
+            patch.object(win, "_load_send_config", return_value={"default": {}}),
+            patch("editor._ConfigDialog", return_value=mock_cfg_dialog),
+        ):
+            win._menu_edit_config()
+        mock_cfg_dialog.exec.assert_called_once()
+
+        added = []
+
+        def _add_toolbar(toolbar):
+            added.append(toolbar)
+
+        win.addToolBar = MagicMock(side_effect=_add_toolbar)
+        win._build_toolbars()
+        assert added
+        win.style.assert_called_once()
+
+    def test_md_and_html_conversion_paths(self, monkeypatch, tmp_path):
+        win = self._make_window()
+        md_path = tmp_path / "input.md"
+        md_path.write_text("# title", encoding="utf-8")
+        html_path = tmp_path / "input.html"
+        html_path.write_text("<html><body><p>hello</p></body></html>", encoding="utf-8")
+
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
+        output_html = tmp_path / "output.html"
+        output_html.write_text("<html><body><p>ok</p></body></html>", encoding="utf-8")
+        monkeypatch.setattr(editor.sm, "md2html", lambda *_args, **_kwargs: str(output_html))
+        with patch.object(editor.EditorWindow, "_html_to_body_html", return_value="<p>ok</p>") as mock_convert:
+            output = win._md_to_body_html(str(md_path))
+            assert output == "<p>ok</p>"
+            assert not output_html.exists()
+            mock_convert.assert_called_once()
+
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
+        with patch.object(editor.QMessageBox, "warning") as mock_warning:
+            assert win._md_to_body_html(str(md_path)) == ""
+            mock_warning.assert_called_once()
+
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
+        monkeypatch.setattr(editor.sm, "make_html_images_inline",
+                            lambda path: f'<html><body><img src="{path}"/></body></html>')
+        body = win._html_to_body_html(str(html_path))
+        assert "img" in body
+
+        with patch.object(editor.sm, "make_html_images_inline", side_effect=RuntimeError("boom")):
+            assert win._html_to_body_html(str(html_path)) == ""
