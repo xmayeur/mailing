@@ -1,3 +1,9 @@
+## 1.3.0 (2026-04-28)
+
+### Feat
+
+- **editor**: add settings dialog for managing sendMail YAML config profiles
+
 ## 1.2.0 (2026-04-28)
 
 ### Feat
