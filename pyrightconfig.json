@@ -2,7 +2,7 @@
   "pythonVersion": "3.12",
   "typeCheckingMode": "basic",
   "ignore": [
-    "editor.py",
+    "src/editor.py",
     "tests/test_editor.py"
   ]
 }

@@ -4,12 +4,12 @@
 WYSIWYG HTML editor for composing sendMail newsletters.
 
 Usage:
-    python editor.py                       # blank editor
-    python editor.py data/template.md      # open existing markdown file
-    python editor.py data/newsletter.html  # open existing HTML file
+    python src/editor.py                       # blank editor
+    python src/editor.py data/template.md      # open existing markdown file
+    python src/editor.py data/newsletter.html  # open existing HTML file
 
 The editor saves output as .html, ready for sendMail:
-    python sendMail.py --profile cambristi data/newsletter.html
+    python src/sendMail.py --profile cambristi data/newsletter.html
 """
 
 import json

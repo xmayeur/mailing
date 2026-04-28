@@ -23,6 +23,9 @@ A comprehensive email campaign management system for organizations managing mail
 * **SMTP and Gmail API** support for sending emails
 * **Flexible filtering** based on subscriber attributes
 
+It also includes a standalone **WYSIWYG newsletter editor** for composing and refining HTML newsletters before sending
+them through `sendMail`.
+
 ## Features
 
 * 📧 **Multi-profile email campaigns** with configurable settings
@@ -34,6 +37,34 @@ A comprehensive email campaign management system for organizations managing mail
 * 🧪 **Test mode** for safe campaign testing
 * 📝 **Detailed logging** for monitoring and debugging
 * 🔒 **Secure credential management** via secrets vault
+* ✍️ **Standalone newsletter editor** with live HTML preview and sendMail-compatible output
+
+## Editor
+
+The editor is a separate desktop app for creating and editing newsletter content visually.
+
+### Main Features
+
+* Open blank documents or existing `.md` and `.html` files
+* Edit content with Quill-based rich text formatting
+* Insert inline images from local files
+* Insert links, tables, horizontal rules, and named anchors
+* Apply custom CSS to preview and exported HTML
+* Preserve sendMail-ready HTML output for direct campaign use
+
+### Launching the Editor
+
+```bash
+python src/editor.py
+python src/editor.py data/template.md
+python src/editor.py data/newsletter.html
+```
+
+The editor also has its own packaged build:
+
+```bash
+pyinstaller editor.spec
+```
 
 ## Installation
 
@@ -151,7 +182,7 @@ Optionally, Credentials and API keys can be stored securely using the `getSecret
 ### Basic Syntax
 
 ```bash
-python sendMail.py --profile <profile_name> [options] [files...]
+python src/sendMail.py --profile <profile_name> [options] [files...]
 ```
 
 ### Arguments
@@ -206,7 +237,7 @@ python sendMail.py --profile <profile_name> [options] [files...]
 Send a newsletter to all active members with a PDF attachment:
 
 ```bash
-python sendMail.py --profile artscroises \
+python src/sendMail.py --profile artscroises \
     -s "Newsletter January 2026" \
     newsletter.pdf logo.png
 ```
@@ -216,7 +247,7 @@ python sendMail.py --profile artscroises \
 Test email sending with a custom message to the test group only:
 
 ```bash
-python sendMail.py --profile artscroises \
+python src/sendMail.py --profile artscroises \
     -s "Test Newsletter" \
     -m "This is a test message" \
     -t \
@@ -229,7 +260,7 @@ python sendMail.py --profile artscroises \
 Send HTML email from converted mardonx file with controlled rate limiting:
 
 ```bash
-python sendMail.py --profile cambristi \
+python src/sendMail.py --profile cambristi \
     -s "Event Announcement" \
     -mh 500 \
     -na 25 \
@@ -245,7 +276,7 @@ email_template.html will be created in the same directory and can be published t
 Process only records 100 to 200 from the database:
 
 ```bash
-python sendMail.py --profile artscroises \
+python src/sendMail.py --profile artscroises \
     -s "Newsletter" \
     -f 100 \
     -to 200 \
@@ -257,7 +288,7 @@ python sendMail.py --profile artscroises \
 Preview what would be sent without actually sending emails:
 
 ```bash
-python sendMail.py --profile artscroises \
+python src/sendMail.py --profile artscroises \
     -s "Newsletter Test" \
     -x \
     -v \
@@ -269,7 +300,7 @@ python sendMail.py --profile artscroises \
 Send only to recipients marked as "selected" in the database:
 
 ```bash
-python sendMail.py --profile artscroises \
+python src/sendMail.py --profile artscroises \
     -s "Special Announcement" \
     --selected \
     announcement.pdf
@@ -280,7 +311,7 @@ python sendMail.py --profile artscroises \
 Use a local CSV file instead of Google Sheets:
 
 ```bash
-python sendMail.py --profile artscroises \
+python src/sendMail.py --profile artscroises \
     -s "Newsletter" \
     -db subscribers.csv \
     newsletter.pdf
@@ -291,7 +322,7 @@ python sendMail.py --profile artscroises \
 Wait 30 minutes before starting the mail campaign:
 
 ```bash
-python sendMail.py --profile artscroises \
+python src/sendMail.py --profile artscroises \
     -s "Scheduled Newsletter" \
     -w 30 \
     newsletter.pdf
@@ -435,8 +466,8 @@ pytest tests/test_sendMail.py::TestDict2Class::test_dict_to_class_conversion -v
 ```
 tests/
 ├── __init__.py
-├── test_sendMail.py       # Tests for sendMail.py
-└── test_googleDriveLib.py # Tests for googleDriveLib.py
+├── test_sendMail.py       # Tests for src/sendMail.py
+└── test_googleDriveLib.py # Tests for src/googleDriveLib.py
 ```
 
 ### Test Coverage
@@ -462,10 +493,10 @@ Tests run automatically on every push and pull request via GitHub Actions:
 
 ### Test Status
 
-| Component         | Status                                                               | Coverage                                                                 |
-|-------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------|
-| sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg) |
-| googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg) |
+| Component             | Status                                                               | Coverage                                                                 |
+|-----------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------|
+| src/sendMail.py       | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg) |
+| src/googleDriveLib.py | ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg) | ![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg) |
 
 ### Writing New Tests
 

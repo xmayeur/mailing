@@ -2,8 +2,6 @@ import os
 import sys
 from unittest.mock import MagicMock
 
-import sendMail
-
 # Mock external dependencies before importing sendMail
 mock_get_secret = MagicMock(return_value={"key": "value"})
 sys.modules["gspread"] = MagicMock()
@@ -28,8 +26,10 @@ sys.modules["oauth2client"] = MagicMock()
 sys.modules["oauth2client.service_account"] = MagicMock()
 sys.modules["PIL"] = MagicMock()
 
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add source directory to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
+import sendMail
 
 
 def test_filter():
