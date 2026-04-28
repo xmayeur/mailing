@@ -1854,9 +1854,9 @@ def test_make_html_images_inline():
         html_file = os.path.join(tmp_dir, "test.html")
         with open(html_file, "w", encoding="utf-8") as f:
             f.write(html_content)
-        """Test make_html_images_inline with a real HTML file"""
-
-        sendMail.make_html_images_inline(html_file, html_file)
+        with patch("sendMail.file_to_base64", return_value="YWJj"), patch("sendMail.guess_type",
+                                                                          return_value="image/png"):
+            sendMail.make_html_images_inline(html_file, html_file)
         with open(html_file, "r", encoding="utf-8") as f:
             html_content = f.read()
             assert "data:image/png;base64," in html_content
