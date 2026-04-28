@@ -21,3 +21,7 @@ pytest-cov>=4.1.0
 pytest-mock>=3.11.0
 
 pyinstaller
+# Editor GUI dependencies
+PyQt6>=6.7.0
+PyQt6-WebEngine>=6.7.0
+html2text>=2024.2.26

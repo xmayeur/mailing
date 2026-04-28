@@ -3,6 +3,7 @@ input/
 test_data/
 *.log
 *.json
+!pyrightconfig.json
 
 ### Python template
 # Byte-compiled / optimized / DLL files
