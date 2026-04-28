@@ -1945,9 +1945,9 @@ def test_process_profile_test_filter():
         assert called_param.test is True
         assert called_param.filter == {"title": "Test Filter"}
 
-        # When args.test is True, process_profile returns "Error"
-        # because of "and not args.test" in "if generate_mailing(param) == "OK" and not args.test:"
-        assert result == "Error"
+        # Test mode now reports success explicitly so callers do not treat a sent
+        # message as a failure.
+        assert result == "OK_TEST"
 
 
 def test_process_profile_test_nosubject():
@@ -2098,4 +2098,3 @@ def test_get_default_config_path_dir_exists_file_not():
             )
             mock_yaml_dump.assert_called_once()
             mock_log_warning.assert_called_once()
-
