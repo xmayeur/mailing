@@ -1559,20 +1559,19 @@ def test_send_gmail_error():
         assert mock_log.error.called
 
 
-def test_build_email_image_error():
+def test_build_email_image_error(tmp_path):
     """Test build_email with image processing error (line 639-647)"""
     param = MagicMock()
     param.sendername = "Sender"
     param.sender = "sender@example.com"
     param.profile = "other"
     param.max_addr_per_mail = 50
-    tmp = tempfile.TemporaryFile(dir="./tests/tmp", mode="w+")
     with patch(
             "sendMail.prepare_html_and_get_images",
             return_value=(
                     "html",
                     [{"path": "nonexistent.png", "cid": "cid1"}],
-                    tmp.name,
+                    str(tmp_path),
             ),
     ):
         with patch("builtins.open", side_effect=FileNotFoundError):
