@@ -7,35 +7,35 @@ Bulk email campaign management tool for organizations (mailing lists, newsletter
 ## Entry point
 
 ```bash
-python sendMail.py --profile <profile_name> -s "Subject" [options] [files...]
+python src/sendMail.py --profile <profile_name> -s "Subject" [options] [files...]
 ```
 
 Key flags: `-t` (test mode), `-x` (dry run), `-db` (CSV database), `-f/-to` (index range), `-mh` (rate limit), `-md2html` (markdown→HTML).
 
 ## Key files
 
-| File | Role |
-|---|---|
-| `sendMail.py` | Main application — email logic, subscriber filtering, templating, HTML processing |
-| `editor.py` | WYSIWYG HTML editor GUI (PyQt6 + Quill.js) — compose/edit newsletters |
-| `googleDriveLib.py` | Google Drive integration (download/upload/rename) |
-| `config.yml` | Email profiles — SMTP/IMAP settings, rate limits, filtering rules |
+| File                    | Role                                                                              |
+|-------------------------|-----------------------------------------------------------------------------------|
+| `src/sendMail.py`       | Main application — email logic, subscriber filtering, templating, HTML processing |
+| `src/editor.py`         | WYSIWYG HTML editor GUI (PyQt6 + Quill.js) — compose/edit newsletters             |
+| `src/googleDriveLib.py` | Google Drive integration (download/upload/rename)                                 |
+| `config.yml`            | Email profiles — SMTP/IMAP settings, rate limits, filtering rules                 |
 
 ## WYSIWYG Editor
 
-Launch the editor independently (never imported by sendMail.py — keeps CLI lightweight):
+Launch the editor independently (never imported by `src/sendMail.py` — keeps CLI lightweight):
 
 ```bash
-python editor.py                      # blank document
-python editor.py data/template.md     # open the newsletter template
-python editor.py data/20260420.md     # edit an existing newsletter
+python src/editor.py                      # blank document
+python src/editor.py data/template.md     # open the newsletter template
+python src/editor.py data/20260420.md     # edit an existing newsletter
 ```
 
 The editor saves **both** `.md` and `.html` simultaneously.  
 Then pass the HTML to sendMail:
 
 ```bash
-python sendMail.py --profile cambristi data/20260420.html
+python src/sendMail.py --profile cambristi data/20260420.html
 ```
 
 ### Editor assets (`editor_assets/`)

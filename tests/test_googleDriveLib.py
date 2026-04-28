@@ -1,5 +1,5 @@
 """
-Unit tests for googleDriveLib.py module
+Unit tests for src/googleDriveLib.py module
 """
 
 import os
@@ -8,8 +8,8 @@ from unittest.mock import Mock, MagicMock, patch
 
 import pytest
 
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add source directory to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 # Mock external dependencies before importing
 mock_get_secret = MagicMock(return_value={"key": "value"})
