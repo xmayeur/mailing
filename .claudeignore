@@ -1,0 +1,11 @@
+.venv/
+*.zip
+dist/
+*.lock
+__pychache__/
+.idea/
+*.min.js
+*.pyc
+.DS_Store
+.env/
+

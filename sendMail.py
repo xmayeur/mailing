@@ -9,6 +9,7 @@ such as those for invoicing with a third-party service. It also includes utiliti
 HTML content and converting data structures.
 
 """
+from __future__ import annotations
 
 import argparse
 import base64
@@ -113,7 +114,7 @@ def get_default_config_path():
         log.warning(
             f"Configuration file created at '{cfg}' with default values - Please configure your default parameters"
         )
-        sys.exit(1)
+        return -1
     return cfg
 
 
@@ -900,7 +901,7 @@ def generate_mailing(param):
     try:
         header = next(reader, None)
         if not header:
-            return "Error"
+            return "Header Error"
         indices = get_indices(header)
 
         current_row_idx = 1
@@ -917,8 +918,7 @@ def generate_mailing(param):
                 break
             if filter(param.filter, row, indices):
                 continue
-            if param.verbose:
-                log.debug(row[indices["email"]])
+
             addressees.append(row[indices["email"]])
             recipient_count += 1
             if len(addressees) >= max_add:
@@ -1258,7 +1258,8 @@ def process_profile(args):
     :param args: The argparse.Namespace object containing the configurations and command-line
         arguments required for the mailing process.
     :return: A string indicating the success or failure of the process. Returns "OK" if the
-        mailing was successfully sent; otherwise, returns "Error".
+        mailing was successfully sent in normal mode, "OK_TEST" if it was successfully sent
+        in test mode, and "Error" otherwise.
     """
     config = _load_config_with_secrets(args)
     param = Dict2Class(config)
@@ -1280,7 +1281,10 @@ def process_profile(args):
     if param.test:
         param.filter = param.filter_test
 
-    if generate_mailing(param) == "OK" and not param.test:
+    if generate_mailing(param) == "OK":
+        if param.test:
+            log.info("Test mode: mailing sent successfully.")
+            return "OK_TEST"
         _post_send_cleanup(service, google_drive_files)
         return "OK"
     return "Error"
@@ -1463,20 +1467,20 @@ def main():
             args.conf = yaml.safe_load(config_file)
     if args.conf is None:
         log.critical("No configuration file found")
-        sys.exit(-1)
+        return -1
 
     if args.md2html and args.file[0].endswith(".md"):
         md2html(args.file[0], "../css/styles.css")
         file = args.file[0].replace(".md", ".html")
         make_html_images_inline(file, file)
-        sys.exit(0)
+        return -1
 
     if args.profile:
-        sys.exit(0 if process_profile(args) == "OK" else -1)
+        return 0 if process_profile(args) in ("OK", "OK_TEST") else -1
     else:
         log.critical("No profile specified")
-        sys.exit(-1)
+        return -1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

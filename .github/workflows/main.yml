@@ -17,7 +17,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
 
     runs-on: ${{ matrix.os }}
 
@@ -35,6 +35,21 @@ jobs:
 
       - name: Build executable
         run: pyinstaller --onefile  --noconfirm  --collect-submodules  './googleDriveLib.py' sendMail.py
+
+      - name: Create macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p release/sendMail-macos
+          cp dist/sendMail release/sendMail-macos/sendMail-macos
+          chmod +x release/sendMail-macos/sendMail-macos
+          printf 'Unsigned macOS package for sendMail.\nRun sendMail-macos from Terminal after mounting this DMG.\n' > release/sendMail-macos/README.txt
+          hdiutil create \
+            -volname "sendMail" \
+            -srcfolder release/sendMail-macos \
+            -ov \
+            -format UDZO \
+            dist/sendMail-macos.dmg
 
       - name: Rename executable
         run: |
@@ -86,4 +101,5 @@ jobs:
           files: |
             sendMail-linux
             sendMail-windows.exe
+            sendMail-macos.dmg
            
