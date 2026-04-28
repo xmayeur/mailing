@@ -574,7 +574,7 @@ class TestAnchorHandling:
     def test_anchor_tag_converted_to_span_on_load(self):
         html = '<a id="intro" name="intro"></a><p>text</p>'
         result = editor.EditorWindow._anchors_to_spans(html)
-        assert 'ql-anchor' in result
+        assert 'editor-anchor' in result
         assert 'data-anchor-id="intro"' in result
         assert '⚓' in result
         # Original <a> should be gone
@@ -583,20 +583,20 @@ class TestAnchorHandling:
     def test_anchor_with_href_not_converted(self):
         html = '<a href="https://example.com">link</a>'
         result = editor.EditorWindow._anchors_to_spans(html)
-        assert 'ql-anchor' not in result
+        assert 'editor-anchor' not in result
         assert 'href="https://example.com"' in result
 
     def test_spans_converted_to_anchor_tags_on_save(self):
-        html = '<span class="ql-anchor" data-anchor-id="section1" title="Anchor: section1">⚓</span>'
+        html = '<span class="editor-anchor" data-anchor-id="section1" title="Anchor: section1">⚓</span>'
         result = editor.EditorWindow._spans_to_anchors(html)
         assert '<a id="section1" name="section1"></a>' in result
-        assert 'ql-anchor' not in result
+        assert 'editor-anchor' not in result
 
     def test_multiple_anchors_converted(self):
         html = (
-            '<span class="ql-anchor" data-anchor-id="a1" title="Anchor: a1">⚓</span>'
+            '<span class="editor-anchor" data-anchor-id="a1" title="Anchor: a1">⚓</span>'
             '<p>text</p>'
-            '<span class="ql-anchor" data-anchor-id="a2" title="Anchor: a2">⚓</span>'
+            '<span class="editor-anchor" data-anchor-id="a2" title="Anchor: a2">⚓</span>'
         )
         result = editor.EditorWindow._spans_to_anchors(html)
         assert '<a id="a1" name="a1"></a>' in result
@@ -606,6 +606,116 @@ class TestAnchorHandling:
         """Anchor survives load→display→save cycle."""
         original_html = '<a id="top" name="top"></a><p>Content</p>'
         display_html = editor.EditorWindow._anchors_to_spans(original_html)
-        assert 'ql-anchor' in display_html
+        assert 'editor-anchor' in display_html
         saved_html = editor.EditorWindow._spans_to_anchors(display_html)
         assert '<a id="top" name="top"></a>' in saved_html
+
+
+# ---------------------------------------------------------------------------
+# Table cell normalization tests
+# ---------------------------------------------------------------------------
+
+class TestTableCellNormalization:
+    """Tests for EditorWindow._normalize_table_cells.
+
+    Quill v2's native table identifies each cell by a ``data-row`` attribute
+    (shared per row) and expects inline content directly inside <td>/<th>.
+    """
+
+    @staticmethod
+    def _row_ids(html: str) -> list:
+        import re
+        return re.findall(r'data-row="([^"]+)"', html)
+
+    def test_data_row_added_to_each_cell(self):
+        html = '<table><tr><td>a</td><td>b</td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert result.count('data-row="') == 2
+
+    def test_cells_in_same_row_share_row_id(self):
+        html = '<table><tr><td>a</td><td>b</td><td>c</td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        ids = self._row_ids(result)
+        assert len(ids) == 3
+        assert len(set(ids)) == 1  # all the same
+
+    def test_different_rows_have_different_ids(self):
+        html = (
+            '<table>'
+            '<tr><td>a</td><td>b</td></tr>'
+            '<tr><td>c</td><td>d</td></tr>'
+            '</table>'
+        )
+        result = editor.EditorWindow._normalize_table_cells(html)
+        ids = self._row_ids(result)
+        assert len(ids) == 4
+        assert ids[0] == ids[1]      # row 1 cells share id
+        assert ids[2] == ids[3]      # row 2 cells share id
+        assert ids[0] != ids[2]      # rows differ
+
+    def test_row_id_format_matches_quill(self):
+        html = '<table><tr><td>x</td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        ids = self._row_ids(result)
+        import re
+        assert re.fullmatch(r'row-[0-9a-f]+', ids[0])
+
+    def test_paragraph_inside_cell_is_unwrapped(self):
+        html = '<table><tr><td><p>text</p></td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert '<p>' not in result
+        assert 'text' in result
+
+    def test_image_inside_cell_kept_without_p_wrapper(self):
+        html = '<table><tr><td><p><img src="data:image/png;base64,abc"/></p></td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        # No <p> remains in the cell — img sits directly inside <td>
+        assert '<p>' not in result
+        assert '<img' in result
+        assert 'data:image/png;base64,abc' in result
+
+    def test_bare_image_in_cell_preserved(self):
+        html = '<table><tr><td><img src="data:image/png;base64,abc"/></td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert '<img' in result
+        assert 'data:image/png;base64,abc' in result
+
+    def test_multiple_paragraphs_in_cell_joined_with_br(self):
+        html = '<table><tr><td><p>line1</p><p>line2</p></td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert '<p>' not in result
+        assert 'line1' in result
+        assert 'line2' in result
+        assert '<br' in result
+
+    def test_heading_inside_cell_is_unwrapped(self):
+        html = '<table><tr><td><h2>Title</h2></td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert '<h2>' not in result
+        assert 'Title' in result
+
+    def test_inline_formatting_preserved(self):
+        html = '<table><tr><td><p><strong>bold</strong> text</p></td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert '<p>' not in result
+        assert '<strong>bold</strong>' in result
+
+    def test_multiple_cells_with_images(self):
+        html = (
+            '<table><tr>'
+            '<td><img src="data:image/png;base64,aaa"/></td>'
+            '<td><img src="data:image/png;base64,bbb"/></td>'
+            '</tr></table>'
+        )
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert result.count('<img') == 2
+        assert 'data:image/png;base64,aaa' in result
+        assert 'data:image/png;base64,bbb' in result
+
+    def test_nested_block_in_cell_unwrapped(self):
+        """<div><p>x</p></div> inside cell → 'x' (both blocks unwrapped)."""
+        html = '<table><tr><td><div><p>x</p></div></td></tr></table>'
+        result = editor.EditorWindow._normalize_table_cells(html)
+        assert '<div>' not in result
+        assert '<p>' not in result
+        assert 'x' in result
