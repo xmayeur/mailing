@@ -1,9 +1,6 @@
 name: Build and Release Executables
 
 on:
-  #  push:
-  #    tag:
-  #      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -34,7 +31,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --onefile  --noconfirm  --collect-submodules  './googleDriveLib.py' sendMail.py
+        run: pyinstaller --onefile --windowed --noconfirm --name sendMail --collect-submodules './googleDriveLib.py' editor.py
 
       - name: Create macOS DMG
         if: runner.os == 'macOS'
@@ -72,7 +69,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Add this to allow release creation
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -82,9 +79,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           merge-multiple: true
-
-      - name: List downloaded files (Debugging)
-        run: ls -R
 
       - name: Make files executable (Linux/Mac)
         run: chmod +x sendMail-* || true
@@ -102,4 +96,3 @@ jobs:
             sendMail-linux
             sendMail-windows.exe
             sendMail-macos.dmg
-           

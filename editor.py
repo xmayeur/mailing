@@ -15,7 +15,9 @@ The editor saves output as .html, ready for sendMail:
 import json
 import logging
 import os
+import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -58,6 +60,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
     QDialog,
     QDialogButtonBox,
+    QInputDialog,
     QFileDialog,
     QFormLayout,
     QComboBox,
@@ -71,6 +74,8 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QToolBar,
     QSpinBox,
     QStatusBar,
+    QTabWidget,
+    QTextBrowser,
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
@@ -347,14 +352,14 @@ class _SendDialog(QDialog):
         flag_layout.addStretch(1)
         form.addRow("Flags", flag_row)
 
-        self._buttons = QDialogButtonBox(
+        buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             parent=self,
         )
-        self._buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Send")
-        self._buttons.accepted.connect(self.accept)
-        self._buttons.rejected.connect(self.reject)
-        root.addWidget(self._buttons)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Send")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        root.addWidget(buttons)
 
         self._reload_profiles()
         if self.profile_combo.count():
@@ -454,6 +459,691 @@ class _SendDialog(QDialog):
         namespace.max_addr_per_mail = self.max_addr_input.value()
         namespace.pause = self.pause_input.value()
         return namespace
+
+
+@dataclass(frozen=True)
+class _LineFieldSpec:
+    key: str
+    label: str
+    tooltip: str = ""
+    placeholder: str = ""
+    password: bool = False
+    browse_caption: str | None = None
+    browse_filter: str = "All Files (*)"
+
+
+# ---------------------------------------------------------------------------
+# Settings / config editor
+# ---------------------------------------------------------------------------
+class _ConfigDialog(QDialog):
+    """Dialog for editing the sendMail YAML configuration file by profile."""
+
+    _TAB_HELP: dict[str, str] = {
+        "Identity": (
+            "<h3>Identity</h3>"
+            "<p>Profile identity and sender credentials.</p>"
+            "<ul>"
+            "<li><b>MAILCONFIG</b> can point at a secrets entry used by sendMail.</li>"
+            "<li><b>sender</b> and <b>sendername</b> are required.</li>"
+            "<li><b>username</b> and <b>password</b> are used by SMTP/IMAP mode.</li>"
+            "</ul>"
+        ),
+        "Delivery": (
+            "<h3>Delivery</h3>"
+            "<p>SMTP/IMAP settings used when the profile sends mail directly through a mail server.</p>"
+            "<ul>"
+            "<li><b>smtp_host</b> and <b>smtp_port</b> configure SMTP.</li>"
+            "<li><b>imap_host</b>, <b>imap_port</b>, and <b>sent_folder</b> configure sent-mail archival.</li>"
+            "</ul>"
+        ),
+        "Sources": (
+            "<h3>Sources</h3>"
+            "<p>Choose either a local subscriber file or the Google Sheets secret references.</p>"
+            "<ul>"
+            "<li><b>database</b> can be CSV, XLSX, XLSM, XLS, or ODS.</li>"
+            "<li><b>sa</b> and <b>sheetid</b> identify the Google Sheets service-account secrets.</li>"
+            "<li><b>token_file</b>, <b>scopes</b>, and <b>credentials_id</b> are used for Gmail API mode.</li>"
+            "</ul>"
+        ),
+        "Templates": (
+            "<h3>Templates</h3>"
+            "<p>Message defaults and mail-generation defaults.</p>"
+            "<ul>"
+            "<li><b>message</b> is the body template used by sendMail.</li>"
+            "<li><b>default_message</b> is used when no message is provided.</li>"
+            "<li><b>body</b> can be injected into templates via <code>${body}</code>.</li>"
+            "<li><b>styles</b> points at the CSS file used when HTML is generated from Markdown.</li>"
+            "<li><b>pause</b>, <b>from_index</b>, <b>to_index</b>, <b>wait</b>, <b>max_mails_per_hour</b>, and <b>max_addr_per_mail</b> control batch delivery.</li>"
+            "</ul>"
+        ),
+        "Filters": (
+            "<h3>Filters</h3>"
+            "<p><b>filter</b> and <b>filter_test</b> are YAML mappings.</p>"
+            "<p>Example:</p>"
+            "<pre>filter:\n  email: is not empty\n  country: one of \"BE\", \"FR\"</pre>"
+        ),
+        "Flags": (
+            "<h3>Flags</h3>"
+            "<p>These booleans mirror the runtime CLI switches.</p>"
+            "<ul>"
+            "<li><b>test</b> enables test mode.</li>"
+            "<li><b>verbose</b> increases logging.</li>"
+            "<li><b>doNotSend</b> suppresses actual delivery.</li>"
+            "<li><b>selected</b> limits processing to selected rows.</li>"
+            "<li><b>md2html</b> and <b>keep-html</b> are preserved for compatibility.</li>"
+            "</ul>"
+        ),
+    }
+
+    def __init__(
+            self,
+            parent=None,
+            *,
+            config_path: str,
+            config_data: dict[str, dict] | None = None,
+            initial_profile: str = "default",
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Settings")
+        self.setMinimumWidth(1080)
+        self.setMinimumHeight(780)
+
+        self._config_data: dict[str, dict] = self._normalize_config_data(config_data or {})
+        self._current_profile = ""
+        self._widgets: dict[str, QWidget] = {}
+        self._yaml_keys = {"filter", "filter_test"}
+        self._list_keys = {"scopes"}
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 12)
+        root.setSpacing(10)
+
+        path_row = QWidget(self)
+        path_layout = QHBoxLayout(path_row)
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        path_layout.setSpacing(8)
+        self.config_input = QLineEdit(config_path, self)
+        self.config_input.setReadOnly(True)
+        self.config_input.setToolTip("Path to the sendMail YAML configuration file")
+        path_layout.addWidget(self.config_input, 1)
+        browse_button = QPushButton("Browse", path_row)
+        browse_button.setToolTip("Choose a different config file")
+        browse_button.clicked.connect(self._browse_config)
+        path_layout.addWidget(browse_button)
+        reload_button = QPushButton("Reload", path_row)
+        reload_button.setToolTip("Reload the configuration from disk")
+        reload_button.clicked.connect(self._reload_from_disk)
+        path_layout.addWidget(reload_button)
+        root.addWidget(path_row)
+
+        profile_row = QWidget(self)
+        profile_layout = QHBoxLayout(profile_row)
+        profile_layout.setContentsMargins(0, 0, 0, 0)
+        profile_layout.setSpacing(8)
+        self.profile_combo = QComboBox(self)
+        self.profile_combo.setToolTip("Select a profile to edit")
+        self.profile_combo.currentTextChanged.connect(self._on_profile_changed)
+        profile_layout.addWidget(self.profile_combo, 1)
+
+        add_button = QPushButton("Add", profile_row)
+        add_button.setToolTip("Create a new profile")
+        add_button.clicked.connect(self._add_profile)
+        profile_layout.addWidget(add_button)
+
+        dup_button = QPushButton("Duplicate", profile_row)
+        dup_button.setToolTip("Duplicate the current profile")
+        dup_button.clicked.connect(self._duplicate_profile)
+        profile_layout.addWidget(dup_button)
+
+        del_button = QPushButton("Delete", profile_row)
+        del_button.setToolTip("Delete the current profile")
+        del_button.clicked.connect(self._delete_profile)
+        profile_layout.addWidget(del_button)
+        root.addWidget(profile_row)
+
+        self.tabs = QTabWidget(self)
+        self.tabs.currentChanged.connect(self._update_help)
+        root.addWidget(self.tabs, 1)
+
+        self.help_view = QTextBrowser(self)
+        self.help_view.setMinimumHeight(150)
+        self.help_view.setOpenExternalLinks(True)
+        self.help_view.setReadOnly(True)
+        root.addWidget(self.help_view)
+
+        self._build_identity_tab()
+        self._build_delivery_tab()
+        self._build_sources_tab()
+        self._build_templates_tab()
+        self._build_filters_tab()
+        self._build_flags_tab()
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.Help,
+            parent=self,
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Save")
+        buttons.accepted.connect(self._save_and_accept)
+        buttons.rejected.connect(self.reject)
+        buttons.helpRequested.connect(self._show_help)
+        root.addWidget(buttons)
+
+        self._reload_profiles(initial_profile)
+
+    def _normalize_config_data(self, data: dict[str, dict]) -> dict[str, dict]:
+        normalized: dict[str, dict] = {}
+        for name, profile in data.items():
+            if isinstance(profile, dict):
+                normalized[str(name)] = dict(profile)
+        return normalized
+
+    def _default_profile_data(self) -> dict[str, object]:
+        return {
+            "MAILCONFIG": "",
+            "username": "jdoe",
+            "password": "",
+            "sender": "john.doe@example.com",
+            "sendername": "John Doe",
+            "subject": "",
+            "message": "",
+            "body": "",
+            "database": "subscribers.csv",
+            "sa": "",
+            "sheetid": "",
+            "domain": "example.com",
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "imap_host": "imap.example.com",
+            "imap_port": 993,
+            "sent_folder": "Sent",
+            "token_file": "",
+            "scopes": [],
+            "credentials_id": "",
+            "pause": 1,
+            "default_message": "Hello",
+            "styles": "./css/styles.css",
+            "filter": {
+                "email": "is not empty",
+                "bounced": "is not bounced",
+                "cotisation": "greater than 0",
+                "first_name": 'one of "Jean", "Xavier"',
+            },
+            "filter_test": {"email": "is john.doe@example.com"},
+            "from_index": 0,
+            "to_index": 0,
+            "wait": 0,
+            "max_mails_per_hour": 1000,
+            "max_addr_per_mail": 50,
+            "test": False,
+            "verbose": False,
+            "doNotSend": False,
+            "selected": False,
+            "md2html": False,
+            "keep-html": False,
+        }
+
+    def _ensure_profiles(self) -> None:
+        if not self._config_data:
+            self._config_data = {"default": self._default_profile_data()}
+        elif "default" not in self._config_data:
+            self._config_data["default"] = self._default_profile_data()
+
+    def _reload_profiles(self, preferred_profile: str | None = None) -> None:
+        self._config_data = self._read_config_file(self.config_input.text().strip())
+        self._ensure_profiles()
+        self.profile_combo.blockSignals(True)
+        self.profile_combo.clear()
+        self.profile_combo.addItems(list(self._config_data.keys()))
+        self.profile_combo.blockSignals(False)
+
+        target = preferred_profile or self._current_profile or "default"
+        idx = self.profile_combo.findText(target)
+        self.profile_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self._load_profile(self.profile_combo.currentText())
+
+    def _reload_from_disk(self) -> None:
+        self._reload_profiles(self.profile_combo.currentText() or "default")
+
+    def _read_config_file(self, path: str) -> dict[str, dict]:
+        if not path or not os.path.exists(path):
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            return self._normalize_config_data(data if isinstance(data, dict) else {})
+        except Exception as exc:
+            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            return {}
+
+    def _browse_config(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select sendMail config",
+            str(Path(self.config_input.text()).parent) if self.config_input.text() else str(Path.home()),
+            "YAML Files (*.yml *.yaml);;All Files (*)",
+        )
+        if path:
+            self.config_input.setText(path)
+            self._reload_profiles("default")
+
+    def _build_tab(self, title: str) -> tuple[QWidget, QFormLayout]:
+        tab = QWidget(self)
+        layout = QFormLayout(tab)
+        layout.setLabelAlignment(layout.labelAlignment())
+        self.tabs.addTab(tab, title)
+        return tab, layout
+
+    def _add_line_field(
+            self,
+            layout: QFormLayout,
+            spec: _LineFieldSpec,
+    ) -> QLineEdit:
+        if spec.browse_caption:
+            row = QWidget(self)
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(8)
+            edit = QLineEdit(self)
+            if spec.password:
+                edit.setEchoMode(QLineEdit.EchoMode.Password)
+            if spec.placeholder:
+                edit.setPlaceholderText(spec.placeholder)
+            if spec.tooltip:
+                edit.setToolTip(spec.tooltip)
+            row_layout.addWidget(edit, 1)
+            browse_button = QPushButton("Browse", row)
+            browse_button.setToolTip(spec.tooltip or spec.browse_caption)
+
+            def _pick_path() -> None:
+                start_dir = str(Path(edit.text()).parent) if edit.text() else str(Path.home())
+                path, _ = QFileDialog.getOpenFileName(self, spec.browse_caption, start_dir, spec.browse_filter)
+                if path:
+                    edit.setText(path)
+
+            browse_button.clicked.connect(_pick_path)
+            row_layout.addWidget(browse_button)
+            layout.addRow(spec.label, row)
+        else:
+            edit = QLineEdit(self)
+            if spec.password:
+                edit.setEchoMode(QLineEdit.EchoMode.Password)
+            if spec.placeholder:
+                edit.setPlaceholderText(spec.placeholder)
+            if spec.tooltip:
+                edit.setToolTip(spec.tooltip)
+            layout.addRow(spec.label, edit)
+        self._widgets[spec.key] = edit
+        return edit
+
+    def _add_spin_field(
+            self,
+            layout: QFormLayout,
+            key: str,
+            label: str,
+            *,
+            tooltip: str = "",
+            minimum: int = 0,
+            maximum: int = 1_000_000,
+    ) -> QSpinBox:
+        spin = QSpinBox(self)
+        spin.setRange(minimum, maximum)
+        if tooltip:
+            spin.setToolTip(tooltip)
+        layout.addRow(label, spin)
+        self._widgets[key] = spin
+        return spin
+
+    def _add_check_field(
+            self,
+            layout: QFormLayout,
+            key: str,
+            label: str,
+            *,
+            tooltip: str = "",
+    ) -> QCheckBox:
+        check = QCheckBox(label, self)
+        if tooltip:
+            check.setToolTip(tooltip)
+        layout.addRow("", check)
+        self._widgets[key] = check
+        return check
+
+    def _add_text_field(
+            self,
+            layout: QFormLayout,
+            key: str,
+            label: str,
+            *,
+            tooltip: str = "",
+            placeholder: str = "",
+            minimum_height: int = 120,
+    ) -> QPlainTextEdit:
+        edit = QPlainTextEdit(self)
+        if tooltip:
+            edit.setToolTip(tooltip)
+        if placeholder:
+            edit.setPlaceholderText(placeholder)
+        edit.setMinimumHeight(minimum_height)
+        layout.addRow(label, edit)
+        self._widgets[key] = edit
+        return edit
+
+    def _build_identity_tab(self) -> None:
+        _, layout = self._build_tab("Identity")
+        self._add_line_field(layout,
+                             _LineFieldSpec("MAILCONFIG", "MAILCONFIG", tooltip="Secret name used by getSecrets()."))
+        self._add_line_field(layout,
+                             _LineFieldSpec("sender", "Sender", tooltip="Email address used in the From header."))
+        self._add_line_field(layout,
+                             _LineFieldSpec("sendername", "Sender name", tooltip="Display name for the sender."))
+        self._add_line_field(layout, _LineFieldSpec("username", "Username", tooltip="SMTP or IMAP login user."))
+        self._add_line_field(layout,
+                             _LineFieldSpec("password", "Password", tooltip="SMTP or IMAP password.", password=True))
+        self._add_line_field(layout,
+                             _LineFieldSpec("domain", "Domain", tooltip="Message-ID domain for generated emails."))
+
+    def _build_delivery_tab(self) -> None:
+        _, layout = self._build_tab("Delivery")
+        self._add_line_field(layout, _LineFieldSpec("smtp_host", "SMTP host", tooltip="SMTP server hostname."))
+        self._add_spin_field(layout, "smtp_port", "SMTP port", tooltip="SMTP server port.", minimum=0, maximum=65535)
+        self._add_line_field(layout, _LineFieldSpec("imap_host", "IMAP host", tooltip="IMAP server hostname."))
+        self._add_spin_field(layout, "imap_port", "IMAP port", tooltip="IMAP server port.", minimum=0, maximum=65535)
+        self._add_line_field(layout, _LineFieldSpec("sent_folder", "Sent folder",
+                                                    tooltip="Remote IMAP folder used to archive sent mail."))
+
+    def _build_sources_tab(self) -> None:
+        _, layout = self._build_tab("Sources")
+        self._add_line_field(
+            layout,
+            _LineFieldSpec(
+                "database",
+                "Database",
+                tooltip="Local subscriber file path (CSV/XLSX/XLSM/XLS/ODS).",
+                browse_caption="Select database",
+                browse_filter="Data Files (*.csv *.xlsx *.xlsm *.xls *.ods);;All Files (*)",
+            ),
+        )
+        self._add_line_field(layout, _LineFieldSpec("sa", "Service account (SA)",
+                                                    tooltip="Secret key name for Google service account JSON."))
+        self._add_line_field(layout, _LineFieldSpec("sheetid", "Sheet ID",
+                                                    tooltip="Secret key name for the Google Sheet identifier."))
+        self._add_line_field(
+            layout,
+            _LineFieldSpec(
+                "token_file",
+                "Token file",
+                tooltip="Path to the Gmail OAuth token file.",
+                browse_caption="Select token file",
+                browse_filter="JSON/YAML Files (*.json *.yml *.yaml);;All Files (*)",
+            ),
+        )
+        self._add_line_field(layout, _LineFieldSpec("credentials_id", "Credentials ID",
+                                                    tooltip="Secret key name for Gmail OAuth client config."))
+        self._add_text_field(
+            layout,
+            "scopes",
+            "Scopes",
+            tooltip="One OAuth scope per line. Commas are also accepted.",
+            placeholder="https://www.googleapis.com/auth/gmail.send",
+            minimum_height=100,
+        )
+
+    def _build_templates_tab(self) -> None:
+        _, layout = self._build_tab("Templates")
+        self._add_line_field(layout, _LineFieldSpec("subject", "Subject", tooltip="Optional default subject."))
+        self._add_text_field(
+            layout,
+            "message",
+            "Message",
+            tooltip="Primary message template used by sendMail.",
+            placeholder="Mail body / template text",
+            minimum_height=120,
+        )
+        self._add_text_field(
+            layout,
+            "default_message",
+            "Default message",
+            tooltip="Fallback template used when message is empty.",
+            placeholder="Hello",
+            minimum_height=120,
+        )
+        self._add_line_field(layout,
+                             _LineFieldSpec("body", "Body", tooltip="Optional body replacement text for ${body}."))
+        self._add_line_field(
+            layout,
+            _LineFieldSpec(
+                "styles",
+                "Stylesheet",
+                tooltip="Path to the CSS stylesheet used for HTML conversion.",
+                browse_caption="Select stylesheet",
+                browse_filter="CSS Files (*.css);;All Files (*)",
+            ),
+        )
+        self._add_spin_field(layout, "pause", "Pause (sec)", tooltip="Pause between batches, in seconds.", minimum=0,
+                             maximum=3600)
+        self._add_spin_field(layout, "from_index", "From index", tooltip="Starting subscriber row.", minimum=0)
+        self._add_spin_field(layout, "to_index", "To index", tooltip="Stopping subscriber row.", minimum=0)
+        self._add_spin_field(layout, "wait", "Wait (min)", tooltip="Wait before restarting, in minutes.", minimum=0)
+        self._add_spin_field(layout, "max_mails_per_hour", "Max mails/hour", tooltip="Hourly sending limit.", minimum=1)
+        self._add_spin_field(layout, "max_addr_per_mail", "Max addr/mail",
+                             tooltip="Maximum recipient addresses per email.", minimum=1)
+
+    def _build_filters_tab(self) -> None:
+        _, layout = self._build_tab("Filters")
+        self._add_text_field(
+            layout,
+            "filter",
+            "filter",
+            tooltip="YAML mapping used as the active filter set.",
+            placeholder="email: is not empty",
+            minimum_height=150,
+        )
+        self._add_text_field(
+            layout,
+            "filter_test",
+            "filter_test",
+            tooltip="YAML mapping used when test mode is enabled.",
+            placeholder="email: is john.doe@example.com",
+            minimum_height=120,
+        )
+
+    def _build_flags_tab(self) -> None:
+        _, layout = self._build_tab("Flags")
+        self._add_check_field(layout, "test", "Test", tooltip="Enable test mode.")
+        self._add_check_field(layout, "verbose", "Verbose", tooltip="Increase logging verbosity.")
+        self._add_check_field(layout, "doNotSend", "Do not send", tooltip="Suppress actual sending.")
+        self._add_check_field(layout, "selected", "Selected only", tooltip="Send only selected rows.")
+        self._add_check_field(layout, "md2html", "md2html", tooltip="Keep the Markdown-to-HTML compatibility flag.")
+        self._add_check_field(layout, "keep-html", "keep-html", tooltip="Preserve generated HTML output.")
+
+    def _profile_names(self) -> list[str]:
+        return list(self._config_data.keys())
+
+    def _profile_value(self, profile: str) -> dict[str, object]:
+        value = self._config_data.get(profile, {})
+        return dict(value) if isinstance(value, dict) else {}
+
+    def _dump_yaml_block(self, value: object) -> str:
+        if value in (None, ""):
+            return ""
+        if isinstance(value, dict):
+            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
+        try:
+            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
+        except Exception:
+            return str(value)
+
+    def _load_yaml_block(self, text: str, field_name: str) -> object:
+        raw = text.strip()
+        if not raw:
+            return {} if field_name in self._yaml_keys else []
+        try:
+            data = yaml.safe_load(raw)
+        except Exception as exc:
+            raise ValueError(f"Invalid YAML in {field_name}: {exc}") from exc
+        if field_name in self._yaml_keys:
+            if data is None:
+                return {}
+            if not isinstance(data, dict):
+                raise ValueError(f"{field_name} must be a YAML mapping")
+            return data
+        if field_name in self._list_keys:
+            if data is None:
+                return []
+            if isinstance(data, list):
+                return [str(item).strip() for item in data if str(item).strip()]
+            return [part.strip() for part in re.split(r"[\n,]+", raw) if part.strip()]
+        return data
+
+    def _load_profile(self, profile: str) -> None:
+        if not profile:
+            return
+        self._current_profile = profile
+        cfg = self._profile_value(profile)
+        defaults = self._default_profile_data()
+
+        for key, widget in self._widgets.items():
+            value = cfg.get(key, defaults.get(key, ""))
+            if isinstance(widget, QLineEdit):
+                widget.setText("" if value is None else str(value))
+            elif isinstance(widget, QSpinBox):
+                try:
+                    widget.setValue(int(value))
+                except Exception:
+                    widget.setValue(int(defaults.get(key, 0)))
+            elif isinstance(widget, QCheckBox):
+                widget.setChecked(bool(value))
+            elif isinstance(widget, QPlainTextEdit):
+                if key in self._yaml_keys:
+                    widget.setPlainText(self._dump_yaml_block(value))
+                elif key in self._list_keys:
+                    if isinstance(value, list):
+                        widget.setPlainText("\n".join(str(item) for item in value if str(item).strip()))
+                    elif value:
+                        widget.setPlainText(str(value))
+                    else:
+                        widget.setPlainText("")
+                else:
+                    widget.setPlainText("" if value is None else str(value))
+
+        current_index = self.tabs.currentIndex()
+        if current_index >= 0:
+            self._update_help(current_index)
+
+    def _collect_profile_data(self) -> dict[str, object]:
+        base = self._profile_value(self._current_profile)
+        for key, widget in self._widgets.items():
+            if isinstance(widget, QLineEdit):
+                base[key] = widget.text().strip()
+            elif isinstance(widget, QSpinBox):
+                base[key] = widget.value()
+            elif isinstance(widget, QCheckBox):
+                base[key] = widget.isChecked()
+            elif isinstance(widget, QPlainTextEdit):
+                base[key] = self._load_yaml_block(widget.toPlainText(), key)
+        return base
+
+    def _persist_current_profile(self) -> None:
+        if not self._current_profile:
+            return
+        self._config_data[self._current_profile] = self._collect_profile_data()
+
+    def _on_profile_changed(self, profile: str) -> None:
+        if not profile:
+            return
+        if self._current_profile and profile != self._current_profile:
+            self._persist_current_profile()
+        self._load_profile(profile)
+
+    def _new_profile_name(self, title: str, default: str) -> str | None:
+        name, ok = QInputDialog.getText(self, title, "Profile name:", text=default)
+        if not ok:
+            return None
+        name = name.strip()
+        if not name:
+            return None
+        return name
+
+    def _add_profile(self) -> None:
+        name = self._new_profile_name("Add Profile", "new-profile")
+        if not name:
+            return
+        self._persist_current_profile()
+        if name in self._config_data:
+            QMessageBox.warning(self, "Profile Exists", f"Profile '{name}' already exists.")
+            return
+        self._config_data[name] = self._default_profile_data()
+        self._reload_profiles(name)
+
+    def _duplicate_profile(self) -> None:
+        if not self._current_profile:
+            return
+        name = self._new_profile_name("Duplicate Profile", f"{self._current_profile}-copy")
+        if not name:
+            return
+        self._persist_current_profile()
+        if name in self._config_data:
+            QMessageBox.warning(self, "Profile Exists", f"Profile '{name}' already exists.")
+            return
+        self._config_data[name] = self._collect_profile_data()
+        self._reload_profiles(name)
+
+    def _delete_profile(self) -> None:
+        if not self._current_profile:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Delete Profile",
+            f"Delete profile '{self._current_profile}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._config_data.pop(self._current_profile, None)
+        if not self._config_data:
+            self._config_data = {"default": self._default_profile_data()}
+        self._reload_profiles(next(iter(self._config_data.keys())))
+
+    def _update_help(self, index: int) -> None:
+        title = self.tabs.tabText(index) if index >= 0 else "Identity"
+        self.help_view.setHtml(self._TAB_HELP.get(title, ""))
+
+    def _show_help(self) -> None:
+        message = (
+            "<h3>Config editor help</h3>"
+            "<p>This dialog edits the YAML profiles used by sendMail.</p>"
+            "<ul>"
+            "<li>Each top-level YAML key is a profile name.</li>"
+            "<li>Unknown keys are preserved when saving.</li>"
+            "<li>Use <b>Scopes</b> one per line.</li>"
+            "<li><b>filter</b> and <b>filter_test</b> must be YAML mappings.</li>"
+            "<li>The config file path can be changed with <b>Browse</b>.</li>"
+            "</ul>"
+        )
+        QMessageBox.information(self, "Settings Help", message)
+
+    def _save_config(self) -> None:
+        self._persist_current_profile()
+        path = self.config_input.text().strip()
+        if not path:
+            raise ValueError("No config file path selected")
+        output = {}
+        for profile in self._profile_names():
+            output[profile] = self._profile_value(profile)
+        path_obj = Path(path)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        with open(path_obj, "w", encoding="utf-8") as f:
+            yaml.safe_dump(output, f, sort_keys=False, allow_unicode=True)
+
+    def _save_and_accept(self) -> None:
+        try:
+            self._save_config()
+        except Exception as exc:
+            QMessageBox.critical(self, "Save Error", f"Could not save configuration:\n{exc}")
+            return
+        self.accept()
 
 
 # ---------------------------------------------------------------------------
@@ -937,7 +1627,13 @@ class EditorWindow(QMainWindow):
         menubar = self.menuBar()
         assert menubar is not None
 
-        # --- File menu ---
+        self._build_file_menu(menubar)
+        self._build_settings_menu(menubar)
+        self._build_format_menu(menubar)
+        self._build_table_menu(menubar)
+        self._build_insert_menu(menubar)
+
+    def _build_file_menu(self, menubar) -> None:
         file_menu = menubar.addMenu("&File")
         assert file_menu is not None
 
@@ -954,7 +1650,6 @@ class EditorWindow(QMainWindow):
         save_action = file_menu.addAction("&Save")
         save_action.setShortcut("Ctrl+S")
         save_action.triggered.connect(self._save)
-        self._save_action = save_action
 
         save_as_action = file_menu.addAction("Save &As...")
         save_as_action.setShortcut("Ctrl+Shift+S")
@@ -978,7 +1673,14 @@ class EditorWindow(QMainWindow):
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
 
-        # --- Format menu ---
+    def _build_settings_menu(self, menubar) -> None:
+        settings_menu = menubar.addMenu("&Settings")
+        assert settings_menu is not None
+
+        edit_config_action = settings_menu.addAction("&Edit Config...")
+        edit_config_action.triggered.connect(self._menu_edit_config)
+
+    def _build_format_menu(self, menubar) -> None:
         fmt_menu = menubar.addMenu("F&ormat")
         assert fmt_menu is not None
 
@@ -1044,7 +1746,7 @@ class EditorWindow(QMainWindow):
         apply_css_action.setToolTip("Choose a CSS file to style the editor and saved HTML")
         apply_css_action.triggered.connect(self._menu_apply_css)
 
-        # --- Table menu ---
+    def _build_table_menu(self, menubar) -> None:
         tbl_menu = menubar.addMenu("&Table")
         assert tbl_menu is not None
 
@@ -1097,7 +1799,7 @@ class EditorWindow(QMainWindow):
             lambda: self._run_js("tableOp('deleteTable')")
         )
 
-        # --- Insert menu ---
+    def _build_insert_menu(self, menubar) -> None:
         ins_menu = menubar.addMenu("&Insert")
         assert ins_menu is not None
 
@@ -1211,8 +1913,6 @@ class EditorWindow(QMainWindow):
         if _SM_AVAILABLE and hasattr(sm, "get_default_config_path"):
             try:
                 cfg = sm.get_default_config_path()
-                if cfg == -1:
-                    cfg = sm.get_default_config_path()
                 if cfg != -1:
                     return str(cfg)
             except Exception as exc:
@@ -1307,6 +2007,18 @@ class EditorWindow(QMainWindow):
         else:
             log.warning("sendMail returned non-success status after send attempt: %r", result)
             QMessageBox.warning(self, "Send", "Sending failed. Check the log for details.")
+
+    def _menu_edit_config(self) -> None:
+        """Open the settings dialog to edit the sendMail YAML config file."""
+        config_path = self._resolve_send_config_path()
+        config_data = self._load_send_config(config_path)
+        dialog = _ConfigDialog(
+            self,
+            config_path=config_path,
+            config_data=config_data,
+            initial_profile="default",
+        )
+        dialog.exec()
 
     def _menu_table_insert(self) -> None:
         """Open the table dimensions dialog and insert a table."""
