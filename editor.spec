@@ -19,7 +19,7 @@ block_cipher = None
 # or QWebEngineView fails silently at runtime.
 qt_webengine_datas = collect_data_files("PyQt6.QtWebEngineCore", include_py_files=False)
 
-base_dir = Path(SPECPATH).resolve()
+base_dir = Path(SPECPATH).resolve() / "src"
 editor_asset_datas = [
     (str(path), "editor_assets")
     for path in (base_dir / "editor_assets").rglob("*")
