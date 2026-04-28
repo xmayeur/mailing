@@ -208,7 +208,7 @@ class TestEditorBridgeImageInsert:
     def test_returns_data_uri_on_file_selection(self):
         bridge = _make_bridge()
         with (
-            patch("PyQt6.QtWidgets.QFileDialog.getOpenFileName", return_value=("/tmp/img.png", "")),
+            patch("editor.QFileDialog.getOpenFileName", return_value=("/tmp/img.png", "")),
             patch("editor.sm") as mock_sm,
         ):
             mock_sm.file_to_base64.return_value = "abc123"
@@ -219,14 +219,14 @@ class TestEditorBridgeImageInsert:
 
     def test_returns_empty_string_on_cancel(self):
         bridge = _make_bridge()
-        with patch("PyQt6.QtWidgets.QFileDialog.getOpenFileName", return_value=("", "")):
+        with patch("editor.QFileDialog.getOpenFileName", return_value=("", "")):
             result = bridge.request_image_insert()
         assert result == ""
 
     def test_returns_empty_string_on_exception(self):
         bridge = _make_bridge()
         with (
-            patch("PyQt6.QtWidgets.QFileDialog.getOpenFileName", return_value=("/bad/path.png", "")),
+            patch("editor.QFileDialog.getOpenFileName", return_value=("/bad/path.png", "")),
             patch("editor.sm") as mock_sm,
         ):
             mock_sm.file_to_base64.side_effect = FileNotFoundError("not found")
@@ -240,11 +240,13 @@ class TestEditorBridgeImageInsert:
             tmp.write(b"\x89PNG\r\n\x1a\n")  # minimal PNG header bytes
             tmp_path = tmp.name
         try:
-            with patch("PyQt6.QtWidgets.QFileDialog.getOpenFileName", return_value=(tmp_path, "")):
+            with patch("editor.QFileDialog.getOpenFileName", return_value=(tmp_path, "")):
                 orig = editor._SM_AVAILABLE
                 editor._SM_AVAILABLE = False
-                result = bridge.request_image_insert()
-                editor._SM_AVAILABLE = orig
+                try:
+                    result = bridge.request_image_insert()
+                finally:
+                    editor._SM_AVAILABLE = orig
             assert result.startswith("data:image/png;base64,") or result.startswith("data:")
         finally:
             os.unlink(tmp_path)
