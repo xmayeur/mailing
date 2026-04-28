@@ -1,5 +1,5 @@
 """
-Unit tests for editor.py
+Unit tests for src/editor.py
 
 All PyQt6 modules are mocked before import so these tests run headlessly
 on CI without a display server, following the same pattern used in test_sendMail.py.
@@ -131,8 +131,8 @@ sys.modules["PyQt6.QtWidgets"].QDialog = _FakeQDialog
 sys.modules["PyQt6.QtWidgets"].QDialog.DialogCode = _FakeQDialog.DialogCode
 sys.modules["PyQt6.QtWidgets"].QSpinBox = MagicMock()
 
-# Add parent directory to path so editor can be imported
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add source directory to path so editor can be imported
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 import editor  # noqa: E402  (must come after sys.modules patching)
 from editor import EditorBridge  # noqa: E402

@@ -255,7 +255,7 @@ Send a newsletter to all active members with a PDF attachment:
 
 .. code-block:: bash
 
-    python sendMail.py --profile artscroises \
+    python src/sendMail.py --profile artscroises \
         -s "Newsletter January 2026" \
         newsletter.pdf logo.png
 
@@ -266,7 +266,7 @@ Test email sending with a custom message to the test group only:
 
 .. code-block:: bash
 
-    python sendMail.py --profile artscroises \
+    python src/sendMail.py --profile artscroises \
         -s "Test Newsletter" \
         -m "This is a test message" \
         -t \
@@ -280,7 +280,7 @@ Send HTML email with controlled rate limiting:
 
 .. code-block:: bash
 
-    python sendMail.py --profile cambristi \
+    python src/sendMail.py --profile cambristi \
         -s "Event Announcement" \
         -mh 500 \
         -na 25 \
@@ -295,7 +295,7 @@ Process only records 100 to 200 from the database:
 
 .. code-block:: bash
 
-    python sendMail.py --profile artscroises \
+    python src/sendMail.py --profile artscroises \
         -s "Newsletter" \
         -f 100 \
         -to 200 \
@@ -308,7 +308,7 @@ Preview what would be sent without actually sending emails:
 
 .. code-block:: bash
 
-    python sendMail.py --profile artscroises \
+    python src/sendMail.py --profile artscroises \
         -s "Newsletter Test" \
         -x \
         -v \
@@ -321,7 +321,7 @@ Send only to recipients marked as "selected" in the database:
 
 .. code-block:: bash
 
-    python sendMail.py --profile artscroises \
+    python src/sendMail.py --profile artscroises \
         -s "Special Announcement" \
         --selected \
         announcement.pdf
@@ -333,7 +333,7 @@ Use a local CSV file instead of Google Sheets:
 
 .. code-block:: bash
 
-    python sendMail.py --profile artscroises \
+    python src/sendMail.py --profile artscroises \
         -s "Newsletter" \
         -db subscribers.csv \
         newsletter.pdf
@@ -345,7 +345,7 @@ Wait 30 minutes before starting the mail campaign:
 
 .. code-block:: bash
 
-    python sendMail.py --profile artscroises \
+    python src/sendMail.py --profile artscroises \
         -s "Scheduled Newsletter" \
         -w 30 \
         newsletter.pdf

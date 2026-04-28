@@ -1,15 +1,9 @@
 #!/bin/sh
 
- #!/bin/sh
- rm -fr ./dist ./build
+cd "$(git rev-parse --show-toplevel)"
+rm -fr ./dist ./build
 # create the .app file
- # pyinstaller --onedir --windowed \
- pyinstaller -F \
- --noconfirm \
- --icon images/mail.png \
- --collect-submodules  './googleDriveLib.py' \
- --add-data  './config.yml:.' \
- sendMail.py
+pyinstaller sendMail.spec
 
 ## Create a folder (named dmg) to prepare our DMG in (if it doesn't already exist).
 #mkdir -p dist/dmg

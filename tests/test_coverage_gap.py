@@ -4,8 +4,8 @@ from unittest.mock import Mock, MagicMock, patch, mock_open
 
 import pytest
 
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add source directory to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 # Mock external dependencies before importing sendMail
 mock_get_secret = MagicMock(return_value={"key": "value"})
@@ -35,7 +35,7 @@ import sendMail  # noqa: E402
 
 
 class TestCoverageGap:
-    """Tests to cover identified gaps in sendMail.py"""
+    """Tests to cover identified gaps in src/sendMail.py"""
 
     @patch("sendMail.os.path.exists", return_value=True)
     @patch("sendMail.BeautifulSoup")
