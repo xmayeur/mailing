@@ -31,39 +31,44 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --onefile --windowed --noconfirm --name sendMail --collect-submodules './googleDriveLib.py' editor.py
+        run: pyinstaller editor.spec
+
+      - name: Package non-macOS build
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import shutil
+          import os
+          from pathlib import Path
+
+          root = Path("dist")
+          archive_name = f"sendMailEditor-{os.environ['RUNNER_OS'].lower()}"
+          shutil.make_archive(str(root / archive_name), "zip", root_dir=root, base_dir="sendMailEditor")
+          PY
 
       - name: Create macOS DMG
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          mkdir -p release/sendMail-macos
-          cp dist/sendMail release/sendMail-macos/sendMail-macos
-          chmod +x release/sendMail-macos/sendMail-macos
-          printf 'Unsigned macOS package for sendMail.\nRun sendMail-macos from Terminal after mounting this DMG.\n' > release/sendMail-macos/README.txt
+          mkdir -p release/sendMailEditor-macos
+          cp -R dist/sendMailEditor.app release/sendMailEditor-macos/sendMailEditor.app
+          printf 'Unsigned macOS package for sendMailEditor.\nRun the app from Finder after mounting this DMG.\n' > release/sendMailEditor-macos/README.txt
           hdiutil create \
-            -volname "sendMail" \
-            -srcfolder release/sendMail-macos \
+            -volname "sendMailEditor" \
+            -srcfolder release/sendMailEditor-macos \
             -ov \
             -format UDZO \
-            dist/sendMail-macos.dmg
-
-      - name: Rename executable
-        run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            mv dist/sendMail.exe dist/sendMail-windows.exe
-          elif [[ "$RUNNER_OS" == "Linux" ]]; then
-            mv dist/sendMail dist/sendMail-linux
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            mv dist/sendMail dist/sendMail-macos
-          fi
-        shell: bash
+            dist/sendMailEditor-macos.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: sendMail-${{ matrix.os }}
-          path: dist/*
+          name: sendMailEditor-${{ matrix.os }}
+          path: |
+            dist/sendMailEditor-*.zip
+            dist/sendMailEditor-macos.dmg
+          if-no-files-found: ignore
 
   release:
     needs: build
@@ -81,7 +86,7 @@ jobs:
           merge-multiple: true
 
       - name: Make files executable (Linux/Mac)
-        run: chmod +x sendMail-* || true
+        run: chmod +x sendMailEditor-* || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -93,6 +98,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            sendMail-linux
-            sendMail-windows.exe
-            sendMail-macos.dmg
+            sendMailEditor-linux.zip
+            sendMailEditor-windows.zip
+            sendMailEditor-macos.dmg

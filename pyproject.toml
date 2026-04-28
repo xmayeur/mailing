@@ -25,6 +25,8 @@ dependencies = [
     "PyQt6-WebEngine>=6.7.0",
     "html2text>=2024.2.26",
     "commitizen (>=4.13.10,<5.0.0)",
+    "sphinx (>=9.1.0,<10.0.0)",
+    "sphinx-rtd-theme (>=3.1.0,<4.0.0)",
 ]
 
 [dependency-groups]

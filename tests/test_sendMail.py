@@ -1,5 +1,5 @@
 """
-Unit tests for sendMail.py module
+Unit tests for src/sendMail.py module
 """
 
 import email
@@ -15,8 +15,8 @@ from unittest.mock import Mock
 import pytest
 from googleapiclient import errors
 
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add source directory to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 # Mock external dependencies
 # Note: googleDriveLib is tested separately in test_googleDriveLib.py
@@ -334,14 +334,14 @@ class TestEmailBuilding:
 class TestArgumentParser:
     """Tests for argument parser setup"""
 
-    @patch("sys.argv", ["sendMail.py", "--profile", "artscroises", "-s", "Test"])
+    @patch("sys.argv", ["src/sendMail.py", "--profile", "artscroises", "-s", "Test"])
     def test_setup_argparse_basic(self):
         """Test basic argument parsing"""
         args = sendMail.setup_argparse()
         assert args.profile == "artscroises"
         assert args.subject == "Test"
 
-    @patch("sys.argv", ["sendMail.py", "--profile", "test", "-t", "-v"])
+    @patch("sys.argv", ["src/sendMail.py", "--profile", "test", "-t", "-v"])
     def test_setup_argparse_flags(self):
         """Test flag arguments"""
         args = sendMail.setup_argparse()
@@ -1285,7 +1285,7 @@ def test_md2html_default_styles():
             f.write("# Hello")
 
         # Mock __file__ to point to our tmp_dir so styles.css is created there
-        with patch("sendMail.__file__", os.path.join(tmp_dir, "sendMail.py")):
+        with patch("sendMail.__file__", os.path.join(tmp_dir, "src/sendMail.py")):
             html_file = sendMail.md2html(md_file)
             assert html_file is not None
             assert os.path.exists(html_file)
@@ -1540,7 +1540,7 @@ def test_send_gmail_error():
         # Mock the entire chain
         err = MockHttpError(MagicMock(status=400), b"Error")
 
-        # In sendMail.py: message = (service.users().messages().send(userId='me', body=message).execute())
+        # In src/sendMail.py: message = (service.users().messages().send(userId='me', body=message).execute())
         # We need to make sure the call to execute() raises err.
         mock_execute = MagicMock(side_effect=err)
 
@@ -1863,7 +1863,7 @@ def test_make_html_images_inline():
 
 
 def test_process_profile_message_replacement_and_password_prompt():
-    """Tests lines 1186-1190 and 1194 of sendMail.py"""
+    """Tests lines 1186-1190 and 1194 of src/sendMail.py"""
     args = MagicMock()
     args.profile = "test_profile"
     args.conf = {
@@ -1912,7 +1912,7 @@ def test_process_profile_message_replacement_and_password_prompt():
 
 
 def test_process_profile_test_filter():
-    """Tests line 1200 of sendMail.py"""
+    """Tests line 1200 of src/sendMail.py"""
     args = MagicMock()
     args.profile = "test_profile"
     args.conf = {
@@ -1950,7 +1950,7 @@ def test_process_profile_test_filter():
 
 
 def test_process_profile_test_nosubject():
-    """Tests line 1200 of sendMail.py"""
+    """Tests line 1200 of src/sendMail.py"""
     args = MagicMock()
     args.profile = "test_profile"
     args.conf = {
