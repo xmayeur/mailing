@@ -1,3 +1,14 @@
+## 1.4.0 (2026-04-29)
+
+### Feat
+
+- **editor**: add PyInstaller spec for standalone WYSIWYG editor build
+
+### Refactor
+
+- **editor**: extract and modularize widget configuration and loading methods
+- **editor**: centralize constants and improve maintainability
+
 ## 1.3.0 (2026-04-28)
 
 ### Feat
