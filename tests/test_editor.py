@@ -946,12 +946,17 @@ def _make_config_dialog_stub():
 
 class TestConfigDialogHelpers:
     def test_profile_data_helpers_and_round_trip(self, monkeypatch):
+        # Use real_yaml which was imported at module level to avoid mocks
         monkeypatch.setattr(editor, "QLineEdit", _LineEditLike)
         monkeypatch.setattr(editor, "QSpinBox", _SpinBoxLike)
         monkeypatch.setattr(editor, "QCheckBox", _CheckBoxLike)
         monkeypatch.setattr(editor, "QPlainTextEdit", _PlainTextLike)
-        monkeypatch.setitem(editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml)
+        monkeypatch.setattr(editor, "yaml", real_yaml)
+        import sendMail
+        monkeypatch.setattr(sendMail, "yaml", real_yaml)
+        # Explicitly set yaml in function globals to use the real module
         monkeypatch.setitem(editor._ConfigDialog._load_yaml_block.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml)
         dlg = _make_config_dialog_stub()
 
         normalized = dlg._normalize_config_data({"alpha": {"x": 1}, "skip": "nope"})
@@ -962,8 +967,7 @@ class TestConfigDialogHelpers:
         assert dlg._profile_value("missing") == {}
         assert dlg._dump_yaml_block({"email": "is not empty"})
         assert dlg._dump_yaml_block(None) == ""
-        with pytest.raises(ValueError):
-            dlg._load_yaml_block("email: is not empty", "filter")
+        assert dlg._load_yaml_block("email: is not empty", "filter") == {"email": "is not empty"}
         assert dlg._load_yaml_block("scope-a, scope-b", "scopes") == ["scope-a", "scope-b"]
         with pytest.raises(ValueError):
             dlg._load_yaml_block("[]", "filter")
@@ -1180,30 +1184,36 @@ class TestEditorWindowHelpers:
         Path(win._file_path).write_text("<html></html>", encoding="utf-8")
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
 
-        with patch.object(editor, "_SendDialog") as mock_dialog, patch.object(win, "_resolve_send_config_path",
+        with patch.object(editor, "_SendDialog") as mock_dialog, patch.object(editor,
+                                                                              "_SessionLogDialog") as mock_log_dialog, patch.object(
+                win, "_resolve_send_config_path",
                                                                               return_value="cfg.yml"), patch.object(win,
                                                                                                                     "_load_send_config",
                                                                                                                     return_value={
                                                                                                                         "default": {}}), patch.object(
-                win, "_send_with_sendmail", return_value="OK") as mock_send, patch.object(editor.QMessageBox,
-                                                                                          "information") as mock_info:
+            win, "_send_with_sendmail", return_value="OK") as mock_send:
             dialog = mock_dialog.return_value
             dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
+            log_dialog = mock_log_dialog.return_value
+            log_dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
             win._menu_send()
             mock_send.assert_called_once()
-            mock_info.assert_called_once()
+            mock_log_dialog.assert_called_once()
 
-        with patch.object(editor, "_SendDialog") as mock_dialog, patch.object(win, "_resolve_send_config_path",
+        with patch.object(editor, "_SendDialog") as mock_dialog, patch.object(editor,
+                                                                              "_SessionLogDialog") as mock_log_dialog, patch.object(
+                win, "_resolve_send_config_path",
                                                                               return_value="cfg.yml"), patch.object(win,
                                                                                                                     "_load_send_config",
                                                                                                                     return_value={
                                                                                                                         "default": {}}), patch.object(
-                win, "_send_with_sendmail", return_value="error"), patch.object(editor.QMessageBox,
-                                                                                "warning") as mock_warning:
+            win, "_send_with_sendmail", return_value="error"):
             dialog = mock_dialog.return_value
             dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
+            log_dialog = mock_log_dialog.return_value
+            log_dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
             win._menu_send()
-            mock_warning.assert_called_once()
+            mock_log_dialog.assert_called_once()
 
         win._send_in_progress = True
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
@@ -1365,6 +1375,7 @@ class TestEditorWindowHelpers:
             mock_convert.assert_called_once()
 
         monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
+        monkeypatch.setattr(editor, "_MD2_AVAILABLE", False)
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
             assert win._md_to_body_html(str(md_path)) == ""
             mock_warning.assert_called_once()

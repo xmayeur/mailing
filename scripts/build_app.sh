@@ -3,14 +3,14 @@
 cd "$(git rev-parse --show-toplevel)"
 rm -fr ./dist ./build
 # create the .app file
-pyinstaller sendMail.spec
+pyinstaller editor.spec
 
 ## Create a folder (named dmg) to prepare our DMG in (if it doesn't already exist).
-#mkdir -p dist/dmg
-## Empty the dmg folder.
-#rm -r dist/dmg/*
+mkdir -p dist/dmg
+# Empty the dmg folder.
+rm -r dist/dmg/*
 ## Copy the app bundle to the dmg folder.
-#cp -r dist/sendMail.app dist/dmg
+cp -r dist/sendMail.app dist/dmg
 ## If the DMG already exists, delete it.
 #test -f "dist/sendMail.dmg" && rm "dist/sendMail.dmg"
 #create-dmg \

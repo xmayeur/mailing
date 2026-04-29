@@ -1,0 +1,709 @@
+
+1.0PythonFrontend"1776688025784*py2.Bÿ=
+
+imports1
+
+extends2
+
+returns3
+
+	has param4
+
+module5
+
+
+class6
+
+function7
+
+tests/test_sendMail.py9
+
+tests.test_sendMail11
+
+email12
+
+email.mime.application14
+
+os16
+
+shutil18
+	
+sys20
+
+tempfile22
+
+email.mime.multipart24
+
+unittest.mock26
+
+googleapiclient.errors28
+
+googleapiclient30
+
+sendMail32
+%
+smtplib.SMTPAuthenticationError34
+
+smtplib36
+	
+bs438
+H
+Btests.test_sendMail.test_save_to_sent_verbose_and_retry_exhaustion40
+C
+=tests.test_sendMail.test_process_artscroises_wait_and_cleanup42
+Q
+Ktests.test_sendMail.test_process_attachments_no_files_and_no_mailing_folder44
+;
+5tests.test_sendMail.test_get_newsletter_name_branches46
+-
+'tests.test_sendMail.TestGetGmailService48
+O
+Itests.test_sendMail.TestGetGmailService.test_get_gmail_service_oauth_flow50
+T
+Ntests.test_sendMail.TestGetGmailService.test_get_gmail_service_with_token_file52
+=
+7tests.test_sendMail.test_generate_mailing_from_to_index54
+:
+4tests.test_sendMail.test_send_mail_retry_and_verbose56
+/
+)tests.test_sendMail.TestMailingGeneration58
+R
+Ltests.test_sendMail.TestMailingGeneration.test_generate_mailing_smtp_success60
+O
+Itests.test_sendMail.TestMailingGeneration.test_generate_mailing_no_reader62
+T
+Ntests.test_sendMail.TestMailingGeneration.test_generate_mailing_missing_config64
+J
+Dtests.test_sendMail.test_process_artscroises_wait_and_no_secret_file66
+5
+/tests.test_sendMail.test_md2html_default_styles68
+6
+0tests.test_sendMail.test_build_email_image_error70
++
+%tests.test_sendMail.TestFormatMessage72
+E
+?tests.test_sendMail.TestFormatMessage.test_format_message_basic74
+G
+Atests.test_sendMail.TestFormatMessage.test_format_message_invalid76
+M
+Gtests.test_sendMail.TestFormatMessage.test_format_message_multiple_vars78
+/
+)tests.test_sendMail.test_send_gmail_error80
+6
+0tests.test_sendMail.test_make_html_images_inline82
+'
+!tests.test_sendMail.MockHttpError84
+
+	Exception86
+/
+)tests.test_sendMail.MockHttpError.__str__88
+0
+*tests.test_sendMail.MockHttpError.__init__90
+=
+7tests.test_sendMail.test_process_profile_test_nosubject92
+0
+*tests.test_sendMail.TestGoogleSheetHelpers94
+J
+Dtests.test_sendMail.TestGoogleSheetHelpers.test_read_all_sheet_named96
+L
+Ftests.test_sendMail.TestGoogleSheetHelpers.test_read_all_sheet_default98
+S
+Ltests.test_sendMail.TestGoogleSheetHelpers.test_open_google_db_members_sheet100
+=
+6tests.test_sendMail.test_generate_mailing_hourly_limit102
+6
+/tests.test_sendMail.test_md2html_file_not_found104
++
+$tests.test_sendMail.TestEmailSending106
+V
+Otests.test_sendMail.TestEmailSending.test_save_to_sent_failure_retries_and_logs108
+M
+Ftests.test_sendMail.TestEmailSending.test_send_mail_connection_failure110
+B
+;tests.test_sendMail.TestEmailSending.test_send_mail_success112
+E
+>tests.test_sendMail.TestEmailSending.test_save_to_sent_success114
+?
+8tests.test_sendMail.test_build_email_attachments_pdf_txt116
+G
+@tests.test_sendMail.test_generate_mailing_batching_and_filtering118
+E
+>tests.test_sendMail.test_get_smtp_connection_generic_exception120
+-
+&tests.test_sendMail.TestGmailFunctions122
+Q
+Jtests.test_sendMail.TestGmailFunctions.test_generate_mailing_gmail_success124
+E
+>tests.test_sendMail.TestGmailFunctions.test_send_gmail_success126
+L
+Etests.test_sendMail.test_get_default_config_path_creates_dir_and_file128
+,
+%tests.test_sendMail.TestFileUtilities130
+G
+@tests.test_sendMail.TestFileUtilities.test_guess_type_with_magic132
+J
+Ctests.test_sendMail.TestFileUtilities.test_guess_type_without_magic134
+K
+Dtests.test_sendMail.TestFileUtilities.test_file_to_base64_local_file136
+J
+Ctests.test_sendMail.TestFileUtilities.test_file_to_base64_http_file138
+I
+Btests.test_sendMail.TestFileUtilities.test_file_to_base64_http_404140
+/
+(tests.test_sendMail.test_main_no_profile142
+3
+,tests.test_sendMail.TestAttachmentProcessing144
+W
+Ptests.test_sendMail.TestAttachmentProcessing.test_process_attachments_with_files146
+[
+Ttests.test_sendMail.TestAttachmentProcessing.test_process_attachments_file_not_found148
+E
+>tests.test_sendMail.test_prepare_html_for_cid_with_invalid_src150
+W
+Ptests.test_sendMail.test_process_profile_message_replacement_and_password_prompt152
+;
+4tests.test_sendMail.test_process_profile_test_filter154
+2
++tests.test_sendMail.TestGetSubscriberReader156
+V
+Otests.test_sendMail.TestGetSubscriberReader.test_get_subscriber_reader_calamine158
+[
+Ttests.test_sendMail.TestGetSubscriberReader.test_get_subscriber_reader_google_sheets160
+Q
+Jtests.test_sendMail.TestGetSubscriberReader.test_get_subscriber_reader_csv162
+0
+)tests.test_sendMail.TestGetNewsletterName164
+U
+Ntests.test_sendMail.TestGetNewsletterName.test_get_newsletter_name_md_and_body166
+F
+?tests.test_sendMail.test_prepare_html_and_get_images_exceptions168
+6
+/tests.test_sendMail.test_build_email_max_addr_1170
+4
+-tests.test_sendMail.test_main_missing_profile172
+>
+7tests.test_sendMail.test_get_default_config_path_exists174
+1
+*tests.test_sendMail.test_main_missing_args176
+F
+?tests.test_sendMail.test_process_artscroises_wait_and_no_secret178
+D
+=tests.test_sendMail.test_get_subscriber_reader_file_not_found180
+-
+&tests.test_sendMail.TestHTMLProcessing182
+[
+Ttests.test_sendMail.TestHTMLProcessing.test_prepare_html_and_get_images_base64_error184
+N
+Gtests.test_sendMail.TestHTMLProcessing.test_prepare_html_and_get_images186
+U
+Ntests.test_sendMail.TestHTMLProcessing.test_prepare_html_and_get_images_base64188
+G
+@tests.test_sendMail.TestHTMLProcessing.test_prepare_html_for_cid190
+W
+Ptests.test_sendMail.TestHTMLProcessing.test_prepare_html_for_cid_external_images192
+?
+8tests.test_sendMail.test_get_default_config_path_windows194
+,
+%tests.test_sendMail.TestEmailBuilding196
+F
+?tests.test_sendMail.TestEmailBuilding.test_build_email_with_bcc198
+C
+<tests.test_sendMail.TestEmailBuilding.test_build_email_basic200
+V
+Otests.test_sendMail.TestEmailBuilding.test_build_email_with_markdown_attachment202
+;
+4tests.test_sendMail.test_filter_artscroises_branches204
+<
+5tests.test_sendMail.test_filter_cambristi_index_error206
+K
+Dtests.test_sendMail.test_get_default_config_path_dir_exists_file_not208
+F
+?tests.test_sendMail.test_process_artscroises_wait_and_no_config210
+/
+(tests.test_sendMail.TestProcessFunctions212
+P
+Itests.test_sendMail.TestProcessFunctions.test_process_artscroises_success214
+-
+&tests.test_sendMail.TestArgumentParser216
+G
+@tests.test_sendMail.TestArgumentParser.test_setup_argparse_flags218
+G
+@tests.test_sendMail.TestArgumentParser.test_setup_argparse_basic220
+<
+5tests.test_sendMail.test_get_default_config_path_unix222
+.
+'tests.test_sendMail.TestFilterFunctions224
+N
+Gtests.test_sendMail.TestFilterFunctions.test_filter_cambristi_test_mode226
+K
+Dtests.test_sendMail.TestFilterFunctions.test_filter_cambristi_member228
+O
+Htests.test_sendMail.TestFilterFunctions.test_filter_artscroises_inactive230
+V
+Otests.test_sendMail.TestFilterFunctions.test_filter_artscroises_active_selected232
+&
+tests.test_sendMail.mock_config234
+9
+2tests.test_sendMail.test_main_using_default_config236
+3
+,tests.test_sendMail.test_process_artscroises238
+5
+.tests.test_sendMail.test_md2html_custom_styles240
+-
+&tests.test_sendMail.TestSMTPConnection242
+Q
+Jtests.test_sendMail.TestSMTPConnection.test_get_smtp_connection_auth_error244
+N
+Gtests.test_sendMail.TestSMTPConnection.test_get_smtp_connection_success246
+,
+%tests.test_sendMail.TestIndicesHelper248
+C
+<tests.test_sendMail.TestIndicesHelper.test_get_indices_empty250
+C
+<tests.test_sendMail.TestIndicesHelper.test_get_indices_basic252
+8
+1tests.test_sendMail.test_main_with_frozen_program254
+)
+"tests.test_sendMail.TestDict2Class256
+C
+<tests.test_sendMail.TestDict2Class.test_lowercase_conversion258
+G
+@tests.test_sendMail.TestDict2Class.test_dict_to_class_conversion260
+.
+'tests.test_sendMail.test_module_imports262J
+
+8
+89 j²
+ 
+10
+10115 *
+8 (
+
+13
+13125
+
+15
+15145
+
+17
+17165
+
+19
+19185
+
+21
+21205
+
+23
+23225
+
+25
+25245
+
+27
+27265
+
+29
+29285
+
+31
+31305
+
+33
+33325
+
+35
+35345
+
+37
+37365
+
+39
+39385
+
+41
+41407 210
+
+43
+43427 210
+
+45
+45447 210
+
+47
+47467 210
+
+49
+49486 210
+
+51
+51507 249
+
+53
+53527 249
+
+55
+55547 210
+
+57
+57567 210
+
+59
+59586 210
+
+61
+61607 259
+
+63
+63627 259
+
+65
+65647 259
+
+67
+67667 210
+
+69
+69687 210
+
+71
+71707 210
+
+73
+73726 210
+
+75
+75747 273
+
+77
+77767 273
+
+79
+79787 273
+
+81
+81807 210
+
+83
+83827 210
+
+85
+85846 210
+
+87
+87866
+
+89
+89887 285
+
+91
+91907 285
+
+93
+93927 210
+
+95
+95946 210
+
+97
+97967 295
+
+99
+99987 295
+
+101
+1011007 295
+
+103
+1031027 210
+
+105
+1051047 210
+
+107
+1071066 210
+
+109
+1091087 2107
+
+111
+1111107 2107
+
+113
+1131127 2107
+
+115
+1151147 2107
+
+117
+1171167 210
+
+119
+1191187 210
+
+121
+1211207 210
+
+123
+1231226 210
+
+125
+1251247 2123
+
+127
+1271267 2123
+
+129
+1291287 210
+
+131
+1311306 210
+
+133
+1331327 2131
+
+135
+1351347 2131
+
+137
+1371367 2131
+
+139
+1391387 2131
+
+141
+1411407 2131
+
+143
+1431427 210
+
+145
+1451446 210
+
+147
+1471467 2145
+
+149
+1491487 2145
+
+151
+1511507 210
+
+153
+1531527 210
+
+155
+1551547 210
+
+157
+1571566 210
+
+159
+1591587 2157
+
+161
+1611607 2157
+
+163
+1631627 2157
+
+165
+1651646 210
+
+167
+1671667 2165
+
+169
+1691687 210
+
+171
+1711707 210
+
+173
+1731727 210
+
+175
+1751747 210
+
+177
+1771767 210
+
+179
+1791787 210
+
+181
+1811807 210
+
+183
+1831826 210
+
+185
+1851847 2183
+
+187
+1871867 2183
+
+189
+1891887 2183
+
+191
+1911907 2183
+
+193
+1931927 2183
+
+195
+1951947 210
+
+197
+1971966 210
+
+199
+1991987 2197
+
+201
+2012007 2197
+
+203
+2032027 2197
+
+205
+2052047 210
+
+207
+2072067 210
+
+209
+2092087 210
+
+211
+2112107 210
+
+213
+2132126 210
+
+215
+2152147 2213
+
+217
+2172166 210
+
+219
+2192187 2217
+
+221
+2212207 2217
+
+223
+2232227 210
+
+225
+2252246 210
+
+227
+2272267 2225
+
+229
+2292287 2225
+
+231
+2312307 2225
+
+233
+2332327 2225
+
+235
+2352347 210
+
+237
+2372367 210
+
+239
+2392387 210
+
+241
+2412407 210
+
+243
+2432426 210
+
+245
+2452447 2243
+
+247
+2472467 2243
+
+249
+2492486 210
+
+251
+2512507 2249
+
+253
+2532527 2249
+
+255
+2552547 210
+
+257
+2572566 210
+
+259
+2592587 2257
+
+261
+2612607 2257
+
+263
+2632627 210r¦
+
+10131*
+8 (
+
+10151*
+8 (
+
+10171*
+8 (
+
+
+10191*
+8 (
+
+10211*
+8	 	(
+
+10231*
+8
+ 
+(
+
+10251*
+8 (/
+
+10271*
+8 (6
+
+10271*
+8 (
+
+10291*
+8 (#
+
+10311*
+8 (#
+
+10331*
+8< <(
+
+10351*
+8á á(4
+
+10371*
+8á	 á(4
+
+10391*
+8¤	 ¤	(
+
+85872*
+8+ +(

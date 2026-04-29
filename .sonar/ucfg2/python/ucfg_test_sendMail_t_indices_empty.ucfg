@@ -1,0 +1,63 @@
+
+<tests.test_sendMail.TestIndicesHelper.test_get_indices_emptyI
+=/Users/xavier/PycharmProjects/sendMail/tests/test_sendMail.py ("2*å
+2
+‘ ‘($
+
+’ ’(
+%1"listB
+@
+
+’ ’(
+header"__id*"
+
+__unknown_file (
+
+%1|
+z
+
+“ “(-
+%2"sendMail.get_indices*(
+
+__unknown_file (
+
+
+sendMail*&
+
+__unknown_file (
+
+
+headerB
+@
+
+“ “(-
+result"__id*"
+
+__unknown_file (
+
+%2
+
+” ”(
+%3"dict
+
+
+” ”(
+%4"	__compare*"
+
+__unknown_file (
+==*&
+
+__unknown_file (
+
+
+result*"
+
+__unknown_file (
+
+%3*
+3*6
+3
+test_sendMail.py"
+— —
+implicit returnB)'
+%tests.test_sendMail.TestIndicesHelperH

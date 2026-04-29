@@ -1,0 +1,3 @@
+
+Š€"HttpError {self.resp.status if hasattr(self.resp, 'status') else 'unknown'} when requesting {self.uri} returned {self.content}"strself1 1("
+	2 2(*=/Users/xavier/PycharmProjects/sendMail/tests/test_sendMail.py

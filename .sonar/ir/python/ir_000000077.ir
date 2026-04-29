@@ -1,0 +1,17 @@
+
+ÒÈ"
+    Create a dictionary that maps each header element to its corresponding
+    index in the list of headers.
+
+    :param header: List of header strings.
+    :type header: list
+    :return: A dictionary where keys are elements from the header list and
+             values are their corresponding indices.
+    :rtype: dict
+    "strheader
+× ×("A-
++
+
+â â(/"?python-unknown?:Bdict
+
+â â(/*2/Users/xavier/PycharmProjects/sendMail/sendMail.py

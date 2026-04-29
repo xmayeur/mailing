@@ -44,12 +44,14 @@ a = Analysis(
         "html2text",
         "bs4",
         "markdown2",
+        "sendMail",
     ] + collect_submodules("PyQt6"),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Exclude sendMail's heavy deps that the editor doesn't need at build time
+        # Exclude sendMail's heavy cloud deps to keep the editor binary lean.
+        # Editor uses sendMail for markdown conversion and local operations only.
         "gspread",
         "googleapiclient",
         "oauth2client",

@@ -62,6 +62,22 @@ _CID_INLINE_DOMAIN = "inline.img"
 _OP_IS_NOT_EMPTY = "is not empty"
 _OP_IS_EQUAL_TO = "is equal to"
 _OP_IS_NOT_EQUAL_TO = "is not equal to"
+_OP_GREATER_THAN = "greater than"
+_OP_LESS_THAN = "less than"
+_OP_GREATER_THAN_OR_EQUAL = "greater than or equal to"
+_OP_LESS_THAN_OR_EQUAL = "less than or equal to"
+_OP_ONE_OF = "one of"
+_OP_NOT_ONE_OF = "not one of"
+_OP_MATCHES = "matches"
+_OP_DOES_NOT_MATCH = "does not match"
+_OP_CONTAINS = "contains"
+_OP_DOES_NOT_CONTAIN = "does not contain"
+_OP_STARTS_WITH = "starts with"
+_OP_ENDS_WITH = "ends with"
+_OP_IS = "is"
+_OP_IS_NOT = "is not"
+_OP_IS_BOUNCED = "is bounced"
+_OP_IS_NOT_BOUNCED = "is not bounced"
 
 
 def get_default_config_path():
@@ -368,7 +384,7 @@ def get_smtp_connection(param):
     """
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -994,34 +1010,41 @@ def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
     except (ValueError, TypeError):
         log.warning(f"Invalid filter value for field '{k}: {tv_raw}'")
         return False
-    if op in ("ge", "greater or equal to"):
-        return fv >= tv
-    if op in ("gt", "greater than"):
-        return fv > tv
-    if op in ("le", "less or equal to"):
-        return fv <= tv
-    if op in ("lt", "less than"):
-        return fv < tv
-    if op in ("eq", _OP_IS_EQUAL_TO):
-        return fv == tv
-    if op in ("ne", _OP_IS_NOT_EQUAL_TO):
-        return fv != tv
-    return True
+
+    operators = {
+        "ge": lambda a, b: a >= b,
+        "greater or equal to": lambda a, b: a >= b,
+        _OP_GREATER_THAN_OR_EQUAL: lambda a, b: a >= b,
+        "gt": lambda a, b: a > b,
+        "greater than": lambda a, b: a > b,
+        _OP_GREATER_THAN: lambda a, b: a > b,
+        "le": lambda a, b: a <= b,
+        "less or equal to": lambda a, b: a <= b,
+        _OP_LESS_THAN_OR_EQUAL: lambda a, b: a <= b,
+        "lt": lambda a, b: a < b,
+        "less than": lambda a, b: a < b,
+        _OP_LESS_THAN: lambda a, b: a < b,
+        "eq": lambda a, b: a == b,
+        _OP_IS_EQUAL_TO: lambda a, b: a == b,
+        "ne": lambda a, b: a != b,
+        _OP_IS_NOT_EQUAL_TO: lambda a, b: a != b,
+    }
+    return operators.get(op, lambda a, b: True)(fv, tv)
 
 
 def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
     """Evaluate a string/membership comparison."""
-    if op in ("in", "one of"):
+    if op in ("in", "one of", _OP_ONE_OF):
         return field_value in test_value  # type: ignore[operator]
-    if op in ("not in", "none of"):
+    if op in ("not in", "none of", _OP_NOT_ONE_OF):
         return field_value not in test_value  # type: ignore[operator]
-    if op in ("is", _OP_IS_EQUAL_TO):
+    if op in ("is", _OP_IS_EQUAL_TO, _OP_IS):
         return field_value == test_value
-    if op in ("is not", _OP_IS_NOT_EQUAL_TO):
+    if op in ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT):
         return field_value != test_value
-    if op == _OP_IS_NOT_EMPTY:
+    if op in (_OP_IS_NOT_EMPTY, "is not empty"):
         return field_value != "" and field_value is not None
-    if op == "is empty":
+    if op in ("is empty", ):
         return field_value == "" or field_value is None
     return True
 
