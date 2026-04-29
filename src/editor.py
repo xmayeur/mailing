@@ -743,45 +743,54 @@ class _ConfigDialog(QDialog):
         self.tabs.addTab(tab, title)
         return tab, layout
 
+    def _configure_line_edit(self, edit: QLineEdit, spec: _LineFieldSpec) -> None:
+        if spec.password:
+            edit.setEchoMode(QLineEdit.EchoMode.Password)
+        if spec.placeholder:
+            edit.setPlaceholderText(spec.placeholder)
+        if spec.tooltip:
+            edit.setToolTip(spec.tooltip)
+
+    def _add_browse_button_to_row(
+            self,
+            row_layout: QHBoxLayout,
+            edit: QLineEdit,
+            row: QWidget,
+            spec: _LineFieldSpec,
+    ) -> None:
+        browse_button = QPushButton("Browse", row)
+        browse_button.setToolTip(spec.tooltip or spec.browse_caption or "Browse")
+
+        def _pick_path() -> None:
+            start_dir = str(Path(edit.text()).parent) if edit.text() else str(Path.home())
+            path, _ = QFileDialog.getOpenFileName(
+                self, spec.browse_caption, start_dir, spec.browse_filter
+            )
+            if path:
+                edit.setText(path)
+
+        browse_button.clicked.connect(_pick_path)
+        row_layout.addWidget(browse_button)
+
     def _add_line_field(
             self,
             layout: QFormLayout,
             spec: _LineFieldSpec,
     ) -> QLineEdit:
+        edit = QLineEdit(self)
+        self._configure_line_edit(edit, spec)
+
         if spec.browse_caption:
             row = QWidget(self)
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
             row_layout.setSpacing(8)
-            edit = QLineEdit(self)
-            if spec.password:
-                edit.setEchoMode(QLineEdit.EchoMode.Password)
-            if spec.placeholder:
-                edit.setPlaceholderText(spec.placeholder)
-            if spec.tooltip:
-                edit.setToolTip(spec.tooltip)
             row_layout.addWidget(edit, 1)
-            browse_button = QPushButton("Browse", row)
-            browse_button.setToolTip(spec.tooltip or spec.browse_caption)
-
-            def _pick_path() -> None:
-                start_dir = str(Path(edit.text()).parent) if edit.text() else str(Path.home())
-                path, _ = QFileDialog.getOpenFileName(self, spec.browse_caption, start_dir, spec.browse_filter)
-                if path:
-                    edit.setText(path)
-
-            browse_button.clicked.connect(_pick_path)
-            row_layout.addWidget(browse_button)
+            self._add_browse_button_to_row(row_layout, edit, row, spec)
             layout.addRow(spec.label, row)
         else:
-            edit = QLineEdit(self)
-            if spec.password:
-                edit.setEchoMode(QLineEdit.EchoMode.Password)
-            if spec.placeholder:
-                edit.setPlaceholderText(spec.placeholder)
-            if spec.tooltip:
-                edit.setToolTip(spec.tooltip)
             layout.addRow(spec.label, edit)
+
         self._widgets[spec.key] = edit
         return edit
 
@@ -1005,6 +1014,34 @@ class _ConfigDialog(QDialog):
             return [part.strip() for part in re.split(r"[\n,]+", raw) if part.strip()]
         return data
 
+    def _load_widget_line_edit(self, widget: QLineEdit, value: object) -> None:
+        widget.setText("" if value is None else str(value))
+
+    def _load_widget_spin_box(self, widget: QSpinBox, value: object, default: int) -> None:
+        try:
+            widget.setValue(int(value))
+        except Exception:
+            widget.setValue(default)
+
+    def _load_widget_check_box(self, widget: QCheckBox, value: object) -> None:
+        widget.setChecked(bool(value))
+
+    def _load_widget_plain_text(self, widget: QPlainTextEdit, value: object, key: str) -> None:
+        if key in self._yaml_keys:
+            widget.setPlainText(self._dump_yaml_block(value))
+        elif key in self._list_keys:
+            self._load_widget_plain_text_list(widget, value)
+        else:
+            widget.setPlainText("" if value is None else str(value))
+
+    def _load_widget_plain_text_list(self, widget: QPlainTextEdit, value: object) -> None:
+        if isinstance(value, list):
+            widget.setPlainText("\n".join(str(item) for item in value if str(item).strip()))
+        elif value:
+            widget.setPlainText(str(value))
+        else:
+            widget.setPlainText("")
+
     def _load_profile(self, profile: str) -> None:
         if not profile:
             return
@@ -1015,26 +1052,14 @@ class _ConfigDialog(QDialog):
         for key, widget in self._widgets.items():
             value = cfg.get(key, defaults.get(key, ""))
             if isinstance(widget, QLineEdit):
-                widget.setText("" if value is None else str(value))
+                self._load_widget_line_edit(widget, value)
             elif isinstance(widget, QSpinBox):
-                try:
-                    widget.setValue(int(value))
-                except Exception:
-                    widget.setValue(int(defaults.get(key, 0)))
+                default_val = int(defaults.get(key, 0))
+                self._load_widget_spin_box(widget, value, default_val)
             elif isinstance(widget, QCheckBox):
-                widget.setChecked(bool(value))
+                self._load_widget_check_box(widget, value)
             elif isinstance(widget, QPlainTextEdit):
-                if key in self._yaml_keys:
-                    widget.setPlainText(self._dump_yaml_block(value))
-                elif key in self._list_keys:
-                    if isinstance(value, list):
-                        widget.setPlainText("\n".join(str(item) for item in value if str(item).strip()))
-                    elif value:
-                        widget.setPlainText(str(value))
-                    else:
-                        widget.setPlainText("")
-                else:
-                    widget.setPlainText("" if value is None else str(value))
+                self._load_widget_plain_text(widget, value, key)
 
         current_index = self.tabs.currentIndex()
         if current_index >= 0:
@@ -1474,7 +1499,7 @@ class EditorWindow(QMainWindow):
             aid = m.group(1)
             return f'<a id="{aid}" name="{aid}"></a>'
         return re.sub(
-            r'<span[^>]*?class="editor-anchor"[^>]*?data-anchor-id="([^"]+)"[^>]*>⚓</span>',
+            r'<span(?:(?!class="editor-anchor")[^>])*class="editor-anchor"(?:(?!data-anchor-id=)[^>])*data-anchor-id="([^"]+)"[^>]*>⚓</span>',
             _replace,
             html,
         )
