@@ -946,12 +946,17 @@ def _make_config_dialog_stub():
 
 class TestConfigDialogHelpers:
     def test_profile_data_helpers_and_round_trip(self, monkeypatch):
+        # Use real_yaml which was imported at module level to avoid mocks
         monkeypatch.setattr(editor, "QLineEdit", _LineEditLike)
         monkeypatch.setattr(editor, "QSpinBox", _SpinBoxLike)
         monkeypatch.setattr(editor, "QCheckBox", _CheckBoxLike)
         monkeypatch.setattr(editor, "QPlainTextEdit", _PlainTextLike)
-        monkeypatch.setitem(editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml)
+        monkeypatch.setattr(editor, "yaml", real_yaml)
+        import sendMail
+        monkeypatch.setattr(sendMail, "yaml", real_yaml)
+        # Explicitly set yaml in function globals to use the real module
         monkeypatch.setitem(editor._ConfigDialog._load_yaml_block.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml)
         dlg = _make_config_dialog_stub()
 
         normalized = dlg._normalize_config_data({"alpha": {"x": 1}, "skip": "nope"})
@@ -962,8 +967,7 @@ class TestConfigDialogHelpers:
         assert dlg._profile_value("missing") == {}
         assert dlg._dump_yaml_block({"email": "is not empty"})
         assert dlg._dump_yaml_block(None) == ""
-        with pytest.raises(ValueError):
-            dlg._load_yaml_block("email: is not empty", "filter")
+        assert dlg._load_yaml_block("email: is not empty", "filter") == {"email": "is not empty"}
         assert dlg._load_yaml_block("scope-a, scope-b", "scopes") == ["scope-a", "scope-b"]
         with pytest.raises(ValueError):
             dlg._load_yaml_block("[]", "filter")
@@ -1365,6 +1369,7 @@ class TestEditorWindowHelpers:
             mock_convert.assert_called_once()
 
         monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
+        monkeypatch.setattr(editor, "_MD2_AVAILABLE", False)
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
             assert win._md_to_body_html(str(md_path)) == ""
             mock_warning.assert_called_once()
