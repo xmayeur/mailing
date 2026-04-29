@@ -10,7 +10,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 # Mock external dependencies before importing sendMail
 mock_get_secret = MagicMock(return_value={"key": "value"})
 sys.modules["gspread"] = MagicMock()
-sys.modules["yaml"] = MagicMock()
+# Note: do NOT mock "yaml" globally — it's a real installed dependency and
+# replacing it in sys.modules pollutes other test modules that import yaml
+# (e.g. tests/test_editor.py uses `import yaml as real_yaml`).
 # sys.modules['bs4'] = MagicMock()
 sys.modules["certifi"] = MagicMock()
 sys.modules["getSecrets"] = MagicMock()

@@ -1,0 +1,54 @@
+
+"service_account"str
+"client_email"str
+	"x@y"str
+"ID"str
+
+"SHEET_ID"str
+"type"strarg
+Í Í(""u#
+!
+
+Î Î("#unknown-value#,
+*
+
+Î Î("
+#binop ==#2==:Bbool "
+
+Î Î( *
+Î Î("„&
+$
+
+Ï Ï(I"#new-object#Bdict"
+ 
+
+Ï Ï(1"	#map-set#:"
+ 
+
+Ï3 Ï(H
+"	#map-set#:	
+
+Ï Ï(I"w#
+!
+
+Ð Ð("#unknown-value#,
+*
+
+Ð Ð("
+#binop ==#2==:Bbool "
+
+Ð Ð( *
+Ð Ð("`&
+$
+
+Ñ Ñ()"#new-object#Bdict"
+ 
+
+Ñ Ñ(("	#map-set#:
+
+Ñ Ñ()"<&
+$
+
+Ò Ò("#new-object#Bdict
+
+Ò Ò(*=/Users/xavier/PycharmProjects/sendMail/tests/test_sendMail.py
