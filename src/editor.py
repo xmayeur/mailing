@@ -778,6 +778,7 @@ class _ConfigDialog(QDialog):
             spec: _LineFieldSpec,
     ) -> QLineEdit:
         edit = QLineEdit(self)
+        edit.setMinimumWidth(300)
         self._configure_line_edit(edit, spec)
 
         if spec.browse_caption:
@@ -886,6 +887,12 @@ class _ConfigDialog(QDialog):
                                                     tooltip="Secret key name for Google service account JSON."))
         self._add_line_field(layout, _LineFieldSpec("sheetid", "Sheet ID",
                                                     tooltip="Secret key name for the Google Sheet identifier."))
+        self._add_line_field(layout, _LineFieldSpec("mail", "Email",
+                                                    tooltip="Gmail account email address for sending via Gmail API."))
+        self._add_line_field(layout, _LineFieldSpec("folder", "Gmail Folder",
+                                                    tooltip="Gmail folder name for storing messages to send."))
+        self._add_line_field(layout, _LineFieldSpec("members", "Members Endpoint",
+                                                    tooltip="URL endpoint for retrieving member data."))
         self._add_line_field(
             layout,
             _LineFieldSpec(
@@ -896,6 +903,8 @@ class _ConfigDialog(QDialog):
                 browse_filter="JSON/YAML Files (*.json *.yml *.yaml);;All Files (*)",
             ),
         )
+        self._add_line_field(layout, _LineFieldSpec("token_id", "Token ID",
+                                                    tooltip="Secret key name for Gmail OAuth token."))
         self._add_line_field(layout, _LineFieldSpec("credentials_id", "Credentials ID",
                                                     tooltip="Secret key name for Gmail OAuth client config."))
         self._add_text_field(
@@ -980,7 +989,12 @@ class _ConfigDialog(QDialog):
 
     def _profile_value(self, profile: str) -> dict[str, object]:
         value = self._config_data.get(profile, {})
-        return dict(value) if isinstance(value, dict) else {}
+        if not isinstance(value, dict):
+            return {}
+        normalized = {}
+        for k, v in value.items():
+            normalized[str(k).lower()] = v
+        return normalized
 
     def _dump_yaml_block(self, value: object) -> str:
         if value in (None, ""):
@@ -1042,6 +1056,27 @@ class _ConfigDialog(QDialog):
         else:
             widget.setPlainText("")
 
+    def _get_config_value_for_widget(self, key: str, widget: QWidget, cfg: dict, defaults: dict) -> object:
+        if key in cfg:
+            return cfg[key]
+        if isinstance(widget, QSpinBox):
+            return defaults.get(key, "")
+        return None
+
+    def _get_spinbox_default_value(self, key: str, cfg: dict, defaults: dict) -> int:
+        return int(defaults.get(key, 0)) if key in cfg else 0
+
+    def _load_widget_by_type(self, widget: QWidget, key: str, value: object, cfg: dict, defaults: dict) -> None:
+        if isinstance(widget, QLineEdit):
+            self._load_widget_line_edit(widget, value)
+        elif isinstance(widget, QSpinBox):
+            default_val = self._get_spinbox_default_value(key, cfg, defaults)
+            self._load_widget_spin_box(widget, value, default_val)
+        elif isinstance(widget, QCheckBox):
+            self._load_widget_check_box(widget, value)
+        elif isinstance(widget, QPlainTextEdit):
+            self._load_widget_plain_text(widget, value, key)
+
     def _load_profile(self, profile: str) -> None:
         if not profile:
             return
@@ -1050,32 +1085,33 @@ class _ConfigDialog(QDialog):
         defaults = self._default_profile_data()
 
         for key, widget in self._widgets.items():
-            value = cfg.get(key, defaults.get(key, ""))
-            if isinstance(widget, QLineEdit):
-                self._load_widget_line_edit(widget, value)
-            elif isinstance(widget, QSpinBox):
-                default_val = int(defaults.get(key, 0))
-                self._load_widget_spin_box(widget, value, default_val)
-            elif isinstance(widget, QCheckBox):
-                self._load_widget_check_box(widget, value)
-            elif isinstance(widget, QPlainTextEdit):
-                self._load_widget_plain_text(widget, value, key)
+            value = self._get_config_value_for_widget(key, widget, cfg, defaults)
+            self._load_widget_by_type(widget, key, value, cfg, defaults)
 
         current_index = self.tabs.currentIndex()
         if current_index >= 0:
             self._update_help(current_index)
 
     def _collect_profile_data(self) -> dict[str, object]:
-        base = self._profile_value(self._current_profile)
+        original_profile = self._config_data.get(self._current_profile, {})
+        original_case_map = {str(k).lower(): k for k in original_profile.keys()} if isinstance(original_profile,
+                                                                                               dict) else {}
+
+        base = {}
         for key, widget in self._widgets.items():
+            original_key = original_case_map.get(key.lower(), key)
             if isinstance(widget, QLineEdit):
-                base[key] = widget.text().strip()
+                value = widget.text().strip()
             elif isinstance(widget, QSpinBox):
-                base[key] = widget.value()
+                value = widget.value()
             elif isinstance(widget, QCheckBox):
-                base[key] = widget.isChecked()
+                value = widget.isChecked()
             elif isinstance(widget, QPlainTextEdit):
-                base[key] = self._load_yaml_block(widget.toPlainText(), key)
+                value = self._load_yaml_block(widget.toPlainText(), key)
+            else:
+                continue
+            if value or value == 0 or value is False:
+                base[original_key] = value
         return base
 
     def _persist_current_profile(self) -> None:
