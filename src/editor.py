@@ -11,6 +11,7 @@ Usage:
 The editor saves output as .html, ready for sendMail:
     python src/sendMail.py --profile cambristi data/newsletter.html
 """
+from __future__ import annotations
 
 import json
 import logging
@@ -86,12 +87,19 @@ from PyQt6.QtWidgets import (  # noqa: E402
 # ---------------------------------------------------------------------------
 try:
     import sendMail as sm  # noqa: E402  (import after path setup)
-
     _SM_AVAILABLE = True
 except Exception as exc:  # pragma: no cover
     log.warning("sendMail module not importable: %s — MD import disabled", exc)
     _SM_AVAILABLE = False
 
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+_CONFIG_ERROR = "Config Error"
+_DEFAULT_MIME_TYPE = "image/png"
+_HTML_EXT = ".html"
+_HTML_PARSER = "html.parser"
 
 # ---------------------------------------------------------------------------
 # Table-operation SVG icons (16×16, Excel / LibreOffice style)
@@ -107,8 +115,8 @@ _SVG_INSERT_TABLE = (
 )
 
 _SVG_SEND = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">'
-    '<path d="M1.5 8l12-5-3.2 5 3.2 5-12-5z" fill="#1565C0"/>'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="2 2 14 14">'
+    '<path d="M1.5 8l16-5-3.2 5 3.2 5-16-5z" fill="#1565C0"/>'
     '<path d="M1.8 8h7.2" stroke="#fff" stroke-width="1" stroke-linecap="round"/>'
     '</svg>'
 )
@@ -402,7 +410,7 @@ class _SendDialog(QDialog):
                     self._config_data = data
                     self.profile_combo.addItems(sorted(data.keys()))
         except Exception as exc:
-            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
         finally:
             self.profile_combo.blockSignals(False)
         if self.profile_combo.count() == 0:
@@ -714,7 +722,7 @@ class _ConfigDialog(QDialog):
                 data = yaml.safe_load(f) or {}
             return self._normalize_config_data(data if isinstance(data, dict) else {})
         except Exception as exc:
-            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
             return {}
 
     def _browse_config(self) -> None:
@@ -1193,14 +1201,14 @@ class EditorBridge(QObject):
         try:
             if _SM_AVAILABLE:
                 b64 = sm.file_to_base64(path)
-                mimetype = sm.guess_type(path) or "image/png"
+                mimetype = sm.guess_type(path) or _DEFAULT_MIME_TYPE
             else:
                 import base64
                 import mimetypes
 
                 with open(path, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode("utf-8")
-                mimetype = mimetypes.guess_type(path)[0] or "image/png"
+                mimetype = mimetypes.guess_type(path)[0] or _DEFAULT_MIME_TYPE
             return f"data:{mimetype};base64,{b64}"
         except Exception as exc:
             log.error("Image insert failed: %s", exc)
@@ -1361,7 +1369,7 @@ class EditorWindow(QMainWindow):
         ext = Path(path).suffix.lower()
         if ext == ".md":
             body_html = self._md_to_body_html(path)
-        elif ext in (".html", ".htm"):
+        elif ext in (_HTML_EXT, ".htm"):
             body_html = self._html_to_body_html(path)
         else:
             QMessageBox.warning(
@@ -1410,7 +1418,7 @@ class EditorWindow(QMainWindow):
                 content = sm.make_html_images_inline(html_path)
             else:
                 content = self._inline_images_fallback(html_path)
-            soup = BeautifulSoup(content, "html.parser")
+            soup = BeautifulSoup(content, _HTML_PARSER)
             body = soup.find("body")
             result = body.decode_contents() if body else content
             result = self._normalize_table_cells(result)
@@ -1466,10 +1474,25 @@ class EditorWindow(QMainWindow):
             aid = m.group(1)
             return f'<a id="{aid}" name="{aid}"></a>'
         return re.sub(
-            r'<span[^>]+class="editor-anchor"[^>]+data-anchor-id="([^"]+)"[^>]*>⚓</span>',
+            r'<span[^>]*?class="editor-anchor"[^>]*?data-anchor-id="([^"]+)"[^>]*>⚓</span>',
             _replace,
             html,
         )
+
+    @staticmethod
+    def _unwrap_cell_blocks(cell, soup, block_tags: tuple) -> None:
+        """Unwrap block-level children in a table cell, inserting <br> between them."""
+        while True:
+            direct_blocks = [
+                c for c in cell.children
+                if getattr(c, "name", None) in block_tags
+            ]
+            if not direct_blocks:
+                break
+            for i, block in enumerate(direct_blocks):
+                if i > 0:
+                    block.insert_before(soup.new_tag("br"))
+                block.unwrap()
 
     @staticmethod
     def _normalize_table_cells(html: str) -> str:
@@ -1489,27 +1512,15 @@ class EditorWindow(QMainWindow):
         from bs4 import BeautifulSoup
         import secrets
 
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, _HTML_PARSER)
         block_tags = ("p", "h1", "h2", "h3", "h4", "h5", "h6",
                       "div", "blockquote", "pre")
 
         for tr in soup.find_all("tr"):
-            row_id = "row-" + secrets.token_hex(2)  # matches Quill's nt() format
+            row_id = "row-" + secrets.token_hex(2)
             for cell in tr.find_all(["td", "th"], recursive=False):
                 cell["data-row"] = row_id
-                # Iteratively unwrap block-level children, keeping line breaks.
-                # Repeats until the cell holds only inline content.
-                while True:
-                    direct_blocks = [
-                        c for c in list(cell.children)
-                        if getattr(c, "name", None) in block_tags
-                    ]
-                    if not direct_blocks:
-                        break
-                    for i, block in enumerate(direct_blocks):
-                        if i > 0:
-                            block.insert_before(soup.new_tag("br"))
-                        block.unwrap()
+                EditorWindow._unwrap_cell_blocks(cell, soup, block_tags)
 
         body = soup.find("body")
         return body.decode_contents() if body else str(soup)
@@ -1531,7 +1542,7 @@ class EditorWindow(QMainWindow):
                 return m.group(0)
             img_path = os.path.join(base_dir, src) if not os.path.isabs(src) else src
             try:
-                mime = mimetypes.guess_type(img_path)[0] or "image/png"
+                mime = mimetypes.guess_type(img_path)[0] or _DEFAULT_MIME_TYPE
                 with open(img_path, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode("utf-8")
                 return f'src="data:{mime};base64,{b64}"'
@@ -1556,7 +1567,7 @@ class EditorWindow(QMainWindow):
 
         body_html = self._spans_to_anchors(self._bridge.get_current_html())
         stem = Path(self._file_path).with_suffix("")
-        html_path = str(stem) + ".html"
+        html_path = str(stem) + _HTML_EXT
 
         try:
             self._write_html_file(html_path, body_html)
@@ -1583,7 +1594,7 @@ class EditorWindow(QMainWindow):
         )
         if not path:
             return False
-        self._file_path = str(Path(path).with_suffix(".html"))
+        self._file_path = str(Path(path).with_suffix(_HTML_EXT))
         return self._save()
 
     def _write_html_file(self, path: str, body_html: str) -> None:
@@ -1928,7 +1939,7 @@ class EditorWindow(QMainWindow):
                 data = yaml.safe_load(f) or {}
             return data if isinstance(data, dict) else {}
         except Exception as exc:
-            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
             return {}
 
     def _send_with_sendmail(self, dialog: _SendDialog) -> str:
