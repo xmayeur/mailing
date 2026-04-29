@@ -11,6 +11,7 @@ Usage:
 The editor saves output as .html, ready for sendMail:
     python src/sendMail.py --profile cambristi data/newsletter.html
 """
+from __future__ import annotations
 
 import json
 import logging
@@ -86,12 +87,19 @@ from PyQt6.QtWidgets import (  # noqa: E402
 # ---------------------------------------------------------------------------
 try:
     import sendMail as sm  # noqa: E402  (import after path setup)
-
     _SM_AVAILABLE = True
 except Exception as exc:  # pragma: no cover
     log.warning("sendMail module not importable: %s — MD import disabled", exc)
     _SM_AVAILABLE = False
 
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+_CONFIG_ERROR = "Config Error"
+_DEFAULT_MIME_TYPE = "image/png"
+_HTML_EXT = ".html"
+_HTML_PARSER = "html.parser"
 
 # ---------------------------------------------------------------------------
 # Table-operation SVG icons (16×16, Excel / LibreOffice style)
@@ -107,8 +115,8 @@ _SVG_INSERT_TABLE = (
 )
 
 _SVG_SEND = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">'
-    '<path d="M1.5 8l12-5-3.2 5 3.2 5-12-5z" fill="#1565C0"/>'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="2 2 14 14">'
+    '<path d="M1.5 8l16-5-3.2 5 3.2 5-16-5z" fill="#1565C0"/>'
     '<path d="M1.8 8h7.2" stroke="#fff" stroke-width="1" stroke-linecap="round"/>'
     '</svg>'
 )
@@ -402,7 +410,7 @@ class _SendDialog(QDialog):
                     self._config_data = data
                     self.profile_combo.addItems(sorted(data.keys()))
         except Exception as exc:
-            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
         finally:
             self.profile_combo.blockSignals(False)
         if self.profile_combo.count() == 0:
@@ -714,7 +722,7 @@ class _ConfigDialog(QDialog):
                 data = yaml.safe_load(f) or {}
             return self._normalize_config_data(data if isinstance(data, dict) else {})
         except Exception as exc:
-            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
             return {}
 
     def _browse_config(self) -> None:
@@ -735,45 +743,55 @@ class _ConfigDialog(QDialog):
         self.tabs.addTab(tab, title)
         return tab, layout
 
+    def _configure_line_edit(self, edit: QLineEdit, spec: _LineFieldSpec) -> None:
+        if spec.password:
+            edit.setEchoMode(QLineEdit.EchoMode.Password)
+        if spec.placeholder:
+            edit.setPlaceholderText(spec.placeholder)
+        if spec.tooltip:
+            edit.setToolTip(spec.tooltip)
+
+    def _add_browse_button_to_row(
+            self,
+            row_layout: QHBoxLayout,
+            edit: QLineEdit,
+            row: QWidget,
+            spec: _LineFieldSpec,
+    ) -> None:
+        browse_button = QPushButton("Browse", row)
+        browse_button.setToolTip(spec.tooltip or spec.browse_caption or "Browse")
+
+        def _pick_path() -> None:
+            start_dir = str(Path(edit.text()).parent) if edit.text() else str(Path.home())
+            path, _ = QFileDialog.getOpenFileName(
+                self, spec.browse_caption, start_dir, spec.browse_filter
+            )
+            if path:
+                edit.setText(path)
+
+        browse_button.clicked.connect(_pick_path)
+        row_layout.addWidget(browse_button)
+
     def _add_line_field(
             self,
             layout: QFormLayout,
             spec: _LineFieldSpec,
     ) -> QLineEdit:
+        edit = QLineEdit(self)
+        edit.setMinimumWidth(300)
+        self._configure_line_edit(edit, spec)
+
         if spec.browse_caption:
             row = QWidget(self)
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
             row_layout.setSpacing(8)
-            edit = QLineEdit(self)
-            if spec.password:
-                edit.setEchoMode(QLineEdit.EchoMode.Password)
-            if spec.placeholder:
-                edit.setPlaceholderText(spec.placeholder)
-            if spec.tooltip:
-                edit.setToolTip(spec.tooltip)
             row_layout.addWidget(edit, 1)
-            browse_button = QPushButton("Browse", row)
-            browse_button.setToolTip(spec.tooltip or spec.browse_caption)
-
-            def _pick_path() -> None:
-                start_dir = str(Path(edit.text()).parent) if edit.text() else str(Path.home())
-                path, _ = QFileDialog.getOpenFileName(self, spec.browse_caption, start_dir, spec.browse_filter)
-                if path:
-                    edit.setText(path)
-
-            browse_button.clicked.connect(_pick_path)
-            row_layout.addWidget(browse_button)
+            self._add_browse_button_to_row(row_layout, edit, row, spec)
             layout.addRow(spec.label, row)
         else:
-            edit = QLineEdit(self)
-            if spec.password:
-                edit.setEchoMode(QLineEdit.EchoMode.Password)
-            if spec.placeholder:
-                edit.setPlaceholderText(spec.placeholder)
-            if spec.tooltip:
-                edit.setToolTip(spec.tooltip)
             layout.addRow(spec.label, edit)
+
         self._widgets[spec.key] = edit
         return edit
 
@@ -869,6 +887,12 @@ class _ConfigDialog(QDialog):
                                                     tooltip="Secret key name for Google service account JSON."))
         self._add_line_field(layout, _LineFieldSpec("sheetid", "Sheet ID",
                                                     tooltip="Secret key name for the Google Sheet identifier."))
+        self._add_line_field(layout, _LineFieldSpec("mail", "Email",
+                                                    tooltip="Gmail account email address for sending via Gmail API."))
+        self._add_line_field(layout, _LineFieldSpec("folder", "Gmail Folder",
+                                                    tooltip="Gmail folder name for storing messages to send."))
+        self._add_line_field(layout, _LineFieldSpec("members", "Members Endpoint",
+                                                    tooltip="URL endpoint for retrieving member data."))
         self._add_line_field(
             layout,
             _LineFieldSpec(
@@ -879,6 +903,8 @@ class _ConfigDialog(QDialog):
                 browse_filter="JSON/YAML Files (*.json *.yml *.yaml);;All Files (*)",
             ),
         )
+        self._add_line_field(layout, _LineFieldSpec("token_id", "Token ID",
+                                                    tooltip="Secret key name for Gmail OAuth token."))
         self._add_line_field(layout, _LineFieldSpec("credentials_id", "Credentials ID",
                                                     tooltip="Secret key name for Gmail OAuth client config."))
         self._add_text_field(
@@ -963,7 +989,12 @@ class _ConfigDialog(QDialog):
 
     def _profile_value(self, profile: str) -> dict[str, object]:
         value = self._config_data.get(profile, {})
-        return dict(value) if isinstance(value, dict) else {}
+        if not isinstance(value, dict):
+            return {}
+        normalized = {}
+        for k, v in value.items():
+            normalized[str(k).lower()] = v
+        return normalized
 
     def _dump_yaml_block(self, value: object) -> str:
         if value in (None, ""):
@@ -997,6 +1028,55 @@ class _ConfigDialog(QDialog):
             return [part.strip() for part in re.split(r"[\n,]+", raw) if part.strip()]
         return data
 
+    def _load_widget_line_edit(self, widget: QLineEdit, value: object) -> None:
+        widget.setText("" if value is None else str(value))
+
+    def _load_widget_spin_box(self, widget: QSpinBox, value: object, default: int) -> None:
+        try:
+            widget.setValue(int(value))
+        except Exception:
+            widget.setValue(default)
+
+    def _load_widget_check_box(self, widget: QCheckBox, value: object) -> None:
+        widget.setChecked(bool(value))
+
+    def _load_widget_plain_text(self, widget: QPlainTextEdit, value: object, key: str) -> None:
+        if key in self._yaml_keys:
+            widget.setPlainText(self._dump_yaml_block(value))
+        elif key in self._list_keys:
+            self._load_widget_plain_text_list(widget, value)
+        else:
+            widget.setPlainText("" if value is None else str(value))
+
+    def _load_widget_plain_text_list(self, widget: QPlainTextEdit, value: object) -> None:
+        if isinstance(value, list):
+            widget.setPlainText("\n".join(str(item) for item in value if str(item).strip()))
+        elif value:
+            widget.setPlainText(str(value))
+        else:
+            widget.setPlainText("")
+
+    def _get_config_value_for_widget(self, key: str, widget: QWidget, cfg: dict, defaults: dict) -> object:
+        if key in cfg:
+            return cfg[key]
+        if isinstance(widget, QSpinBox):
+            return defaults.get(key, "")
+        return None
+
+    def _get_spinbox_default_value(self, key: str, cfg: dict, defaults: dict) -> int:
+        return int(defaults.get(key, 0)) if key in cfg else 0
+
+    def _load_widget_by_type(self, widget: QWidget, key: str, value: object, cfg: dict, defaults: dict) -> None:
+        if isinstance(widget, QLineEdit):
+            self._load_widget_line_edit(widget, value)
+        elif isinstance(widget, QSpinBox):
+            default_val = self._get_spinbox_default_value(key, cfg, defaults)
+            self._load_widget_spin_box(widget, value, default_val)
+        elif isinstance(widget, QCheckBox):
+            self._load_widget_check_box(widget, value)
+        elif isinstance(widget, QPlainTextEdit):
+            self._load_widget_plain_text(widget, value, key)
+
     def _load_profile(self, profile: str) -> None:
         if not profile:
             return
@@ -1005,44 +1085,33 @@ class _ConfigDialog(QDialog):
         defaults = self._default_profile_data()
 
         for key, widget in self._widgets.items():
-            value = cfg.get(key, defaults.get(key, ""))
-            if isinstance(widget, QLineEdit):
-                widget.setText("" if value is None else str(value))
-            elif isinstance(widget, QSpinBox):
-                try:
-                    widget.setValue(int(value))
-                except Exception:
-                    widget.setValue(int(defaults.get(key, 0)))
-            elif isinstance(widget, QCheckBox):
-                widget.setChecked(bool(value))
-            elif isinstance(widget, QPlainTextEdit):
-                if key in self._yaml_keys:
-                    widget.setPlainText(self._dump_yaml_block(value))
-                elif key in self._list_keys:
-                    if isinstance(value, list):
-                        widget.setPlainText("\n".join(str(item) for item in value if str(item).strip()))
-                    elif value:
-                        widget.setPlainText(str(value))
-                    else:
-                        widget.setPlainText("")
-                else:
-                    widget.setPlainText("" if value is None else str(value))
+            value = self._get_config_value_for_widget(key, widget, cfg, defaults)
+            self._load_widget_by_type(widget, key, value, cfg, defaults)
 
         current_index = self.tabs.currentIndex()
         if current_index >= 0:
             self._update_help(current_index)
 
     def _collect_profile_data(self) -> dict[str, object]:
-        base = self._profile_value(self._current_profile)
+        original_profile = self._config_data.get(self._current_profile, {})
+        original_case_map = {str(k).lower(): k for k in original_profile.keys()} if isinstance(original_profile,
+                                                                                               dict) else {}
+
+        base = {}
         for key, widget in self._widgets.items():
+            original_key = original_case_map.get(key.lower(), key)
             if isinstance(widget, QLineEdit):
-                base[key] = widget.text().strip()
+                value = widget.text().strip()
             elif isinstance(widget, QSpinBox):
-                base[key] = widget.value()
+                value = widget.value()
             elif isinstance(widget, QCheckBox):
-                base[key] = widget.isChecked()
+                value = widget.isChecked()
             elif isinstance(widget, QPlainTextEdit):
-                base[key] = self._load_yaml_block(widget.toPlainText(), key)
+                value = self._load_yaml_block(widget.toPlainText(), key)
+            else:
+                continue
+            if value or value == 0 or value is False:
+                base[original_key] = value
         return base
 
     def _persist_current_profile(self) -> None:
@@ -1193,14 +1262,14 @@ class EditorBridge(QObject):
         try:
             if _SM_AVAILABLE:
                 b64 = sm.file_to_base64(path)
-                mimetype = sm.guess_type(path) or "image/png"
+                mimetype = sm.guess_type(path) or _DEFAULT_MIME_TYPE
             else:
                 import base64
                 import mimetypes
 
                 with open(path, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode("utf-8")
-                mimetype = mimetypes.guess_type(path)[0] or "image/png"
+                mimetype = mimetypes.guess_type(path)[0] or _DEFAULT_MIME_TYPE
             return f"data:{mimetype};base64,{b64}"
         except Exception as exc:
             log.error("Image insert failed: %s", exc)
@@ -1361,7 +1430,7 @@ class EditorWindow(QMainWindow):
         ext = Path(path).suffix.lower()
         if ext == ".md":
             body_html = self._md_to_body_html(path)
-        elif ext in (".html", ".htm"):
+        elif ext in (_HTML_EXT, ".htm"):
             body_html = self._html_to_body_html(path)
         else:
             QMessageBox.warning(
@@ -1410,7 +1479,7 @@ class EditorWindow(QMainWindow):
                 content = sm.make_html_images_inline(html_path)
             else:
                 content = self._inline_images_fallback(html_path)
-            soup = BeautifulSoup(content, "html.parser")
+            soup = BeautifulSoup(content, _HTML_PARSER)
             body = soup.find("body")
             result = body.decode_contents() if body else content
             result = self._normalize_table_cells(result)
@@ -1466,10 +1535,25 @@ class EditorWindow(QMainWindow):
             aid = m.group(1)
             return f'<a id="{aid}" name="{aid}"></a>'
         return re.sub(
-            r'<span[^>]+class="editor-anchor"[^>]+data-anchor-id="([^"]+)"[^>]*>⚓</span>',
+            r'<span(?:(?!class="editor-anchor")[^>])*class="editor-anchor"(?:(?!data-anchor-id=)[^>])*data-anchor-id="([^"]+)"[^>]*>⚓</span>',
             _replace,
             html,
         )
+
+    @staticmethod
+    def _unwrap_cell_blocks(cell, soup, block_tags: tuple) -> None:
+        """Unwrap block-level children in a table cell, inserting <br> between them."""
+        while True:
+            direct_blocks = [
+                c for c in cell.children
+                if getattr(c, "name", None) in block_tags
+            ]
+            if not direct_blocks:
+                break
+            for i, block in enumerate(direct_blocks):
+                if i > 0:
+                    block.insert_before(soup.new_tag("br"))
+                block.unwrap()
 
     @staticmethod
     def _normalize_table_cells(html: str) -> str:
@@ -1489,27 +1573,15 @@ class EditorWindow(QMainWindow):
         from bs4 import BeautifulSoup
         import secrets
 
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, _HTML_PARSER)
         block_tags = ("p", "h1", "h2", "h3", "h4", "h5", "h6",
                       "div", "blockquote", "pre")
 
         for tr in soup.find_all("tr"):
-            row_id = "row-" + secrets.token_hex(2)  # matches Quill's nt() format
+            row_id = "row-" + secrets.token_hex(2)
             for cell in tr.find_all(["td", "th"], recursive=False):
                 cell["data-row"] = row_id
-                # Iteratively unwrap block-level children, keeping line breaks.
-                # Repeats until the cell holds only inline content.
-                while True:
-                    direct_blocks = [
-                        c for c in list(cell.children)
-                        if getattr(c, "name", None) in block_tags
-                    ]
-                    if not direct_blocks:
-                        break
-                    for i, block in enumerate(direct_blocks):
-                        if i > 0:
-                            block.insert_before(soup.new_tag("br"))
-                        block.unwrap()
+                EditorWindow._unwrap_cell_blocks(cell, soup, block_tags)
 
         body = soup.find("body")
         return body.decode_contents() if body else str(soup)
@@ -1531,7 +1603,7 @@ class EditorWindow(QMainWindow):
                 return m.group(0)
             img_path = os.path.join(base_dir, src) if not os.path.isabs(src) else src
             try:
-                mime = mimetypes.guess_type(img_path)[0] or "image/png"
+                mime = mimetypes.guess_type(img_path)[0] or _DEFAULT_MIME_TYPE
                 with open(img_path, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode("utf-8")
                 return f'src="data:{mime};base64,{b64}"'
@@ -1556,7 +1628,7 @@ class EditorWindow(QMainWindow):
 
         body_html = self._spans_to_anchors(self._bridge.get_current_html())
         stem = Path(self._file_path).with_suffix("")
-        html_path = str(stem) + ".html"
+        html_path = str(stem) + _HTML_EXT
 
         try:
             self._write_html_file(html_path, body_html)
@@ -1583,7 +1655,7 @@ class EditorWindow(QMainWindow):
         )
         if not path:
             return False
-        self._file_path = str(Path(path).with_suffix(".html"))
+        self._file_path = str(Path(path).with_suffix(_HTML_EXT))
         return self._save()
 
     def _write_html_file(self, path: str, body_html: str) -> None:
@@ -1928,7 +2000,7 @@ class EditorWindow(QMainWindow):
                 data = yaml.safe_load(f) or {}
             return data if isinstance(data, dict) else {}
         except Exception as exc:
-            QMessageBox.warning(self, "Config Error", f"Could not load config:\n{exc}")
+            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
             return {}
 
     def _send_with_sendmail(self, dialog: _SendDialog) -> str:
