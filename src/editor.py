@@ -49,6 +49,22 @@ FONT_CHOICES = [
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("editor")
 
+
+class _LogCapture(logging.Handler):
+    """Captures log records into a list for display in the session log dialog."""
+
+    def __init__(self, log_list: list[str]) -> None:
+        super().__init__()
+        self.log_list = log_list
+        self.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            self.log_list.append(msg)
+        except Exception:
+            self.handleError(record)
+
 # ---------------------------------------------------------------------------
 # Qt imports
 # ---------------------------------------------------------------------------
@@ -180,6 +196,43 @@ class _LinkDialog(QDialog):
 
     def get_text(self) -> str:
         return self.text_input.text().strip()
+
+
+# ---------------------------------------------------------------------------
+# Session log viewer dialog
+# ---------------------------------------------------------------------------
+class _SessionLogDialog(QDialog):
+    """Dialog displaying the session log from a send operation."""
+
+    def __init__(self, parent=None, log_entries: list[str] | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Send Session Log")
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(600)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+
+        self.log_view = QPlainTextEdit(self)
+        self.log_view.setReadOnly(True)
+        self.log_view.setFont(self.log_view.font())
+        if log_entries:
+            self.log_view.setPlainText("\n".join(log_entries))
+        layout.addWidget(self.log_view, 1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Close,
+            parent=self,
+        )
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def append_log(self, text: str) -> None:
+        """Append text to the log view."""
+        cursor = self.log_view.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self.log_view.setTextCursor(cursor)
+        self.log_view.insertPlainText(text + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -2126,6 +2179,9 @@ class EditorWindow(QMainWindow):
             return
 
         self._send_in_progress = True
+        log_entries = []
+        log_handler = _LogCapture(log_entries)
+        logging.getLogger().addHandler(log_handler)
         try:
             result = self._send_with_sendmail(dialog)
         except Exception as exc:
@@ -2134,15 +2190,13 @@ class EditorWindow(QMainWindow):
             return
         finally:
             self._send_in_progress = False
+            logging.getLogger().removeHandler(log_handler)
 
-        if self._send_result_is_success(result):
-            if isinstance(result, str) and result.strip().upper() == "OK_TEST":
-                QMessageBox.information(self, "Send", "Message sent successfully in test mode.")
-            else:
-                QMessageBox.information(self, "Send", "Message sent successfully.")
-        else:
+        if not self._send_result_is_success(result):
             log.warning("sendMail returned non-success status after send attempt: %r", result)
-            QMessageBox.warning(self, "Send", "Sending failed. Check the log for details.")
+
+        log_dialog = _SessionLogDialog(self, log_entries=log_entries)
+        log_dialog.exec()
 
     def _menu_edit_config(self) -> None:
         """Open the settings dialog to edit the sendMail YAML config file."""
