@@ -89,8 +89,16 @@ try:
     import sendMail as sm  # noqa: E402  (import after path setup)
     _SM_AVAILABLE = True
 except Exception as exc:  # pragma: no cover
-    log.warning("sendMail module not importable: %s — MD import disabled", exc)
+    log.warning("sendMail module not importable: %s", exc)
     _SM_AVAILABLE = False
+
+# Fallback markdown support
+try:
+    import markdown2  # noqa: E402
+
+    _MD2_AVAILABLE = True
+except Exception:  # pragma: no cover
+    _MD2_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
@@ -1441,34 +1449,77 @@ class EditorWindow(QMainWindow):
         self._file_path = path
         self._bridge.reset(body_html)
         self._update_title()
+
+        # Load default profile stylesheet if available
+        self._load_default_stylesheet()
+
         self._load_editor_page(body_html)
 
     def _md_to_body_html(self, md_path: str) -> str:
-        """Convert a .md file to an HTML body string (uses sm.md2html)."""
-        if not _SM_AVAILABLE:
-            QMessageBox.warning(
-                self, "sendMail Not Available", "Cannot import sendMail module — MD conversion disabled."
-            )
-            return ""
+        """Convert a .md file to an HTML body string."""
+        if _SM_AVAILABLE:
+            return self._md_to_body_html_sendmail(md_path)
+        if _MD2_AVAILABLE:
+            return self._md_to_body_html_markdown2(md_path)
+        QMessageBox.warning(
+            self, "Markdown Not Available",
+            "Cannot import markdown — MD conversion disabled. Install 'markdown2' package."
+        )
+        return ""
 
+    def _md_to_body_html_sendmail(self, md_path: str) -> str:
+        """Convert .md using sendMail.md2html."""
         html_path = None
         try:
-            # md2html writes {stem}.html next to the .md file
             html_path = sm.md2html(md_path, styles=None, embed_styles=False)
             if not html_path or not os.path.exists(html_path):
                 log.error("md2html produced no output for: %s", md_path)
                 return ""
             return self._html_to_body_html(html_path)
         except Exception as exc:
-            log.error("MD conversion failed: %s", exc)
+            log.error("sendMail MD conversion failed: %s", exc)
             return ""
         finally:
-            # Delete the transient .html file; .md is the canonical source
             if html_path and os.path.exists(html_path) and html_path != md_path:
                 try:
                     os.remove(html_path)
                 except OSError:
                     pass
+
+    def _md_to_body_html_markdown2(self, md_path: str) -> str:
+        """Convert .md using markdown2 library, with image inlining."""
+        try:
+            with open(md_path, "r", encoding="utf-8") as f:
+                md_content = f.read()
+            html_body = markdown2.markdown(md_content)
+            if not isinstance(html_body, str):
+                return ""
+
+            base_dir = os.path.dirname(os.path.abspath(md_path))
+
+            def _inline_images(m: re.Match) -> str:
+                src = m.group(1)
+                if src.startswith("data:") or src.startswith("http"):
+                    return m.group(0)
+                img_path = os.path.join(base_dir, src) if not os.path.isabs(src) else src
+                try:
+                    import base64
+                    import mimetypes
+                    mime = mimetypes.guess_type(img_path)[0] or _DEFAULT_MIME_TYPE
+                    with open(img_path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("utf-8")
+                    return f'src="data:{mime};base64,{b64}"'
+                except OSError:
+                    return m.group(0)
+
+            result = re.sub(r'src="([^"]*)"', _inline_images, html_body)
+            result = self._normalize_table_cells(result)
+            result = self._collapse_blank_paragraphs(result)
+            result = self._anchors_to_spans(result)
+            return result
+        except Exception as exc:
+            log.error("markdown2 conversion failed: %s", exc)
+            return ""
 
     def _html_to_body_html(self, html_path: str) -> str:
         """Extract the <body> inner HTML, inlining images and normalising anchors/blank lines."""
@@ -2002,6 +2053,19 @@ class EditorWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
             return {}
+
+    def _load_default_stylesheet(self) -> None:
+        """Load the default profile's stylesheet if available."""
+        try:
+            config_path = self._resolve_send_config_path()
+            config_data = self._load_send_config(config_path)
+            styles_path = config_data.get("default", {}).get("styles")
+            if styles_path:
+                abs_path = os.path.abspath(styles_path)
+                if os.path.exists(abs_path):
+                    self._bridge.css_changed.emit(abs_path)
+        except Exception as exc:
+            log.debug("Could not load default stylesheet: %s", exc)
 
     def _send_with_sendmail(self, dialog: _SendDialog) -> str:
         """Run sendMail with the options selected in the dialog."""
