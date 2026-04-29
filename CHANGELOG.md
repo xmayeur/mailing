@@ -1,3 +1,10 @@
+## 1.5.0 (2026-04-29)
+
+### Feat
+
+- **config**: add initial mailing list configurations for multiple accounts
+- **editor**: add new Gmail API fields and improve profile handling
+
 ## 1.4.0 (2026-04-29)
 
 ### Feat
