@@ -35,7 +35,7 @@ class DatabaseSchemaProvider:
                 headers = next(reader, [])
                 return [h.strip() for h in headers if h.strip()]
         except (OSError, FileNotFoundError, StopIteration) as e:
-            log.warning("Could not read CSV headers: %s", e)
+            log.debug("Could not read CSV headers: %s", e)
             return []
 
     @staticmethod
@@ -64,15 +64,15 @@ class DatabaseSchemaProvider:
                             ws = worksheet
                             break
                 if ws is None:
-                    log.warning("Sheet %s not found", sheet_name)
+                    log.debug("Sheet %s not found", sheet_name)
                     return []
                 headers = ws.row_values(1)
                 return [h.strip() for h in headers if h.strip()]
             else:
-                log.warning("Service object is not a gspread Spreadsheet")
+                log.debug("Service object is not a gspread Spreadsheet")
                 return []
         except Exception as e:
-            log.warning("Could not read Google Sheets headers: %s", e)
+            log.debug("Could not read Google Sheets headers: %s", e)
             return []
 
     @staticmethod
@@ -102,5 +102,5 @@ class DatabaseSchemaProvider:
                 gsheet_service, database_path, sheet_name
             )
 
-        log.warning("Unknown database type: %s", database_path)
+        log.debug("Unknown database type: %s", database_path)
         return []
