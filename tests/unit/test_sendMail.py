@@ -12,10 +12,9 @@ from email.mime.multipart import MIMEMultipart
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
-from googleapiclient import errors
-
 # Save real yaml module to restore after tests (prevent pollution of other tests)
 import yaml as _real_yaml
+from googleapiclient import errors
 
 # Add source directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
