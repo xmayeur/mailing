@@ -19,6 +19,8 @@ Features
 * **HTML Processing**: Process HTML files with automatic image optimization and CID embedding
 * **Bulk Mailing**: Send mass emails with rate limiting, batching, and filtering capabilities
 * **Google Drive Integration**: Download and manage files from Google Drive
+* **Filter Validation**: Real-time YAML filter syntax checking and field name validation
+* **Filter Matching**: Apply filters to subscriber rows for preview and testing
 
 Table of Contents
 =================

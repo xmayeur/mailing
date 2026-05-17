@@ -13,31 +13,32 @@ A comprehensive email campaign management system for organizations managing mail
 
 **sendMail** is a Python-based bulk email management system that provides:
 
-* **Bulk email sending** with rate limiting and batch processing
-* **Multiple email profiles**
-* **Google Sheets integration** for subscriber management
-* **CSV/Excel database support** for dynamic subscriber lists
-* **Google Drive integration** for attachment handling
-* **Markdown support** for email content
-* **HTML email templates** with inline image support
-* **SMTP and Gmail API** support for sending emails
-* **Flexible filtering** based on subscriber attributes
+- **Bulk email sending** with rate limiting and batch processing
+- **Multiple email profiles**
+- **Google Sheets integration** for subscriber management
+- **CSV/Excel database support** for dynamic subscriber lists
+- **Google Drive integration** for attachment handling
+- **Markdown support** for email content
+- **HTML email templates** with inline image support
+- **SMTP and Gmail API** support for sending emails
+- **Flexible filtering** based on subscriber attributes
 
 It also includes a standalone **WYSIWYG newsletter editor** for composing and refining HTML newsletters before sending
 them through `sendMail`.
 
 ## Features
 
-* 📧 **Multi-profile email campaigns** with configurable settings
-* 📊 **Google Sheets integration** for dynamic subscriber lists
-* 📁 **Google Drive integration** for automatic attachment downloads
-* 🎨 **HTML email support** with automatic inline image processing
-* ⏱️ **Rate limiting** to comply with email provider restrictions
-* 🔄 **Batch processing** with pause and resume capabilities
-* 🧪 **Test mode** for safe campaign testing
-* 📝 **Detailed logging** for monitoring and debugging
-* 🔒 **Secure credential management** via secrets vault
-* ✍️ **Standalone newsletter editor** with live HTML preview and sendMail-compatible output
+- 📧 **Multi-profile email campaigns** with configurable settings
+- 📊 **Google Sheets integration** for dynamic subscriber lists
+- 📁 **Google Drive integration** for automatic attachment downloads
+- 🎨 **HTML email support** with automatic inline image processing
+- ⏱️ **Rate limiting** to comply with email provider restrictions
+- 🔄 **Batch processing** with pause and resume capabilities
+- 🧪 **Test mode** for safe campaign testing
+- 📝 **Detailed logging** for monitoring and debugging
+- 🔒 **Secure credential management** via secrets vault
+- ✍️ **Standalone newsletter editor** with live HTML preview and sendMail-compatible output
+- 🔍 **Advanced filter validation** with real-time syntax checking and field verification
 
 ## Editor
 
@@ -45,12 +46,12 @@ The editor is a separate desktop app for creating and editing newsletter content
 
 ### Main Features
 
-* Open blank documents or existing `.md` and `.html` files
-* Edit content with Quill-based rich text formatting
-* Insert inline images from local files
-* Insert links, tables, horizontal rules, and named anchors
-* Apply custom CSS to preview and exported HTML
-* Preserve sendMail-ready HTML output for direct campaign use
+- Open blank documents or existing `.md` and `.html` files
+- Edit content with Quill-based rich text formatting
+- Insert inline images from local files
+- Insert links, tables, horizontal rules, and named anchors
+- Apply custom CSS to preview and exported HTML
+- Preserve sendMail-ready HTML output for direct campaign use
 
 ### Launching the Editor
 
@@ -79,19 +80,19 @@ pip install -r requirements.txt
 
 ### Dependencies
 
-* gspread
-* google-auth
-* google-auth-oauthlib
-* google-auth-httplib2
-* google-api-python-client
-* oauth2client
-* PyYAML
-* beautifulsoup4
-* Pillow
-* requests
-* certifi
-* markdown2
-* python-calamine
+- gspread
+- google-auth
+- google-auth-oauthlib
+- google-auth-httplib2
+- google-api-python-client
+- oauth2client
+- PyYAML
+- beautifulsoup4
+- Pillow
+- requests
+- certifi
+- markdown2
+- python-calamine
 
 ## Configuration
 
@@ -169,13 +170,30 @@ where:
 <value>: is the value to compare with
 ```
 
+### Filter Validation and Editor
+
+The editor includes real-time filter validation to help you get filters right before sending:
+
+- **Syntax checking**: Validates YAML filter syntax
+- **Field verification**: Confirms all filter fields exist in your subscriber database
+- **Live preview**: See how many subscribers match your filter criteria
+- **Field suggestions**: Get autocomplete suggestions from your database headers
+
+The validation modules (`filter_validator`, `schema_provider`, `filter_matcher`) provide:
+- YAML filter parsing and syntax validation
+- CSV and Google Sheets schema extraction
+- Real-time filter preview on sample data
+
+See [Filter Validator](docs/filter_validator.rst), [Schema Provider](docs/schema_provider.rst),
+and [Filter Matcher](docs/filter_matcher.rst) modules for API details.
+
 ### Secrets Management
 
 Optionally, Credentials and API keys can be stored securely using the `getSecrets` module. Typical secrets:
 
-* **MAILCONFIG**: SMTP/IMAP credentials
-* **Service Account**: Google API credentials
-* **Sheet ID**: Google Sheets identifier
+- **MAILCONFIG**: SMTP/IMAP credentials
+- **Service Account**: Google API credentials
+- **Sheet ID**: Google Sheets identifier
 
 ## Command-Line Usage
 
@@ -334,20 +352,20 @@ python src/sendMail.py --profile artscroises \
 
 The subscriber database should include the following columns:
 
-* `id` - Unique subscriber ID
-* `first_name` - First name
-* `last_name` - Last name
-* `email` - Email address
-* `status` - Subscription status (active/inactive)
-* `group` - Mailing list group
-* `selected` - Selection marker (x for selected)
-* `member` - Membership status (yes/no)
-* `phone` - Phone number
-* `mobile_phone` - Mobile phone number
-* `address` - Street address
-* `city` - City
-* `zip` - Postal code
-* `Cotisation YYYY` - Cotisation payment status for year YYYY
+- `id` - Unique subscriber ID
+- `first_name` - First name
+- `last_name` - Last name
+- `email` - Email address
+- `status` - Subscription status (active/inactive)
+- `group` - Mailing list group
+- `selected` - Selection marker (x for selected)
+- `member` - Membership status (yes/no)
+- `phone` - Phone number
+- `mobile_phone` - Mobile phone number
+- `address` - Street address
+- `city` - City
+- `zip` - Postal code
+- `Cotisation YYYY` - Cotisation payment status for year YYYY
 
 ### CSV Format
 
@@ -359,10 +377,10 @@ When using a local CSV file with `-db`, use the same column structure as above w
 
 HTML email templates support:
 
-* Inline images (automatically converted to CID references)
-* Image optimization and compression
-* Responsive design elements
-* CSS styling
+- Inline images (automatically converted to CID references)
+- Image optimization and compression
+- Responsive design elements
+- CSS styling
 
 Place images in the same directory as the HTML file and reference them with relative paths:
 
@@ -385,10 +403,10 @@ Available variables match the column names in your database.
 
 All operations are logged to `sendMail.log` with timestamps and severity levels:
 
-* **INFO**: Normal operations
-* **WARNING**: Non-critical issues
-* **ERROR**: Failed operations
-* **CRITICAL**: Fatal errors
+- **INFO**: Normal operations
+- **WARNING**: Non-critical issues
+- **ERROR**: Failed operations
+- **CRITICAL**: Fatal errors
 
 ## Google Drive Integration
 
@@ -413,27 +431,27 @@ The system can automatically download attachments from Google Drive:
 
 ### Authentication Errors
 
-* Verify SMTP/IMAP credentials in secrets
-* Check Google API credentials are valid
-* Ensure service account has proper permissions
+- Verify SMTP/IMAP credentials in secrets
+- Check Google API credentials are valid
+- Ensure service account has proper permissions
 
 ### Rate Limiting Issues
 
-* Reduce `max_mails_per_hour` and `max_addr_per_mail`
-* Increase `pause` duration between sends
-* Use `-w` to schedule sends during off-peak hours
+- Reduce `max_mails_per_hour` and `max_addr_per_mail`
+- Increase `pause` duration between sends
+- Use `-w` to schedule sends during off-peak hours
 
 ### Template Problems
 
-* Verify HTML syntax is valid
-* Check image paths are relative and correct
-* Test with simple text email first
+- Verify HTML syntax is valid
+- Check image paths are relative and correct
+- Test with simple text email first
 
 ### Database Connection Issues
 
-* Verify Google Sheets ID is correct
-* Check service account has access to the sheet
-* Try using local CSV with `-db` flag
+- Verify Google Sheets ID is correct
+- Check service account has access to the sheet
+- Try using local CSV with `-db` flag
 
 ## Testing
 
@@ -474,22 +492,22 @@ tests/
 
 The test suite covers:
 
-* ✅ **Dictionary to Class conversion** utilities
-* ✅ **File utilities** (MIME type detection, Base64 encoding)
-* ✅ **Message formatting** with variable substitution
-* ✅ **Filtering functions** for both profiles
-* ✅ **Email building** with various configurations
-* ✅ **Google Drive** connection, file listing, download, upload, and rename
-* ✅ **Argument parsing** for command-line interface
+- ✅ **Dictionary to Class conversion** utilities
+- ✅ **File utilities** (MIME type detection, Base64 encoding)
+- ✅ **Message formatting** with variable substitution
+- ✅ **Filtering functions** for both profiles
+- ✅ **Email building** with various configurations
+- ✅ **Google Drive** connection, file listing, download, upload, and rename
+- ✅ **Argument parsing** for command-line interface
 
 ### Continuous Integration
 
 Tests run automatically on every push and pull request via GitHub Actions:
 
-* ✅ Multiple Python versions (3.10, 3.11)
-* ✅ Multiple operating systems (Ubuntu, macOS, Windows)
-* ✅ Code coverage reporting via Codecov
-* ✅ Linting with flake8 and black
+- ✅ Multiple Python versions (3.10, 3.11)
+- ✅ Multiple operating systems (Ubuntu, macOS, Windows)
+- ✅ Code coverage reporting via Codecov
+- ✅ Linting with flake8 and black
 
 ### Test Status
 
@@ -566,4 +584,4 @@ All notable changes to this project will be documented here.
 
 ### 2026-02-11
 
-* Added initial changelog section to README.
+- Added initial changelog section to README.

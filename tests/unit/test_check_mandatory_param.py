@@ -3,7 +3,7 @@ import sys
 import unittest
 
 # Add source directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 import sendMail
 
@@ -57,11 +57,11 @@ class TestCheckMandatoryParam(unittest.TestCase):
         """Test valid configuration for SMTP/IMAP mode."""
         params = self.common_valid.copy()
         params.update(
-            {  # type: ignore[arg-type]
+            {
                 "smtp_host": "smtp.example.com",
-                "smtp_port": 587,
+                "smtp_port": 587,  # type: ignore[dict-item]
                 "imap_host": "imap.example.com",
-                "imap_port": 993,
+                "imap_port": 993,  # type: ignore[dict-item]
                 "username": "user",
                 "password": "password",
                 "sent_folder": "Sent",
@@ -83,11 +83,11 @@ class TestCheckMandatoryParam(unittest.TestCase):
         for p in smtp_params:
             params = self.common_valid.copy()
             params.update(
-                {  # type: ignore[arg-type]
+                {
                     "smtp_host": "smtp.example.com",
-                    "smtp_port": 587,
+                    "smtp_port": 587,  # type: ignore[dict-item]
                     "imap_host": "imap.example.com",
-                    "imap_port": 993,
+                    "imap_port": 993,  # type: ignore[dict-item]
                     "username": "user",
                     "password": "password",
                     "sent_folder": "Sent",
@@ -104,9 +104,9 @@ class TestCheckMandatoryParam(unittest.TestCase):
         """Test valid configuration for Gmail mode."""
         params = self.common_valid.copy()
         params.update(
-            {  # type: ignore[arg-type]
+            {
                 "token_file": "token.json",
-                "scopes": ["https://www.googleapis.com/auth/gmail.send"],
+                "scopes": ["https://www.googleapis.com/auth/gmail.send"],  # type: ignore[dict-item]
                 "credentials_id": "gmail_creds",
             }
         )
@@ -119,9 +119,9 @@ class TestCheckMandatoryParam(unittest.TestCase):
         for p in gmail_params:
             params = self.common_valid.copy()
             params.update(
-                {  # type: ignore[arg-type]
+                {
                     "token_file": "token.json",
-                    "scopes": ["scope"],
+                    "scopes": ["scope"],  # type: ignore[dict-item]
                     "credentials_id": "creds",
                 }
             )
