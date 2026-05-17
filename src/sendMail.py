@@ -1047,6 +1047,12 @@ _FILTER_OPS = [
     _OP_IS_NOT_EQUAL_TO,
     "eq",
     "ne",
+    "contains",
+    "does not contain",
+    "starts with",
+    "ends with",
+    "matches",
+    "does not match",
 ]
 
 
@@ -1103,6 +1109,18 @@ def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
     return result
 
 
+def _eval_regex(test_value: Any, field_value: str, negate: bool = False) -> bool:
+    """Evaluate regex match. Returns False on error, respecting negate flag."""
+    if not test_value:
+        return True if negate else False
+    try:
+        match = bool(re.search(test_value, field_value))
+        return (not match) if negate else match
+    except re.error as e:
+        log.warning(f"Invalid regex pattern '{test_value}': {e}")
+        return True if negate else False
+
+
 def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
     """Evaluate a string/membership comparison."""
     if op in ("in", "one of", _OP_ONE_OF):
@@ -1117,6 +1135,18 @@ def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
         return field_value != "" and field_value is not None
     if op in ("is empty", ):
         return field_value == "" or field_value is None
+    if op in ("contains", _OP_CONTAINS):
+        return bool(test_value in field_value) if test_value else False
+    if op in ("does not contain", _OP_DOES_NOT_CONTAIN):
+        return bool(test_value not in field_value) if test_value else True
+    if op in ("starts with", _OP_STARTS_WITH):
+        return bool(field_value.startswith(test_value)) if test_value else False
+    if op in ("ends with", _OP_ENDS_WITH):
+        return bool(field_value.endswith(test_value)) if test_value else False
+    if op in ("matches", _OP_MATCHES):
+        return _eval_regex(test_value, field_value, negate=False)
+    if op in ("does not match", _OP_DOES_NOT_MATCH):
+        return _eval_regex(test_value, field_value, negate=True)
     return True
 
 
@@ -1135,7 +1165,8 @@ def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> b
     match for row to be included (AND logic).
 
     Supported operations: is, is not, gt, lt, ge, le, in, not in,
-    is empty, is not empty, and their aliases (e.g., "greater than", "one of").
+    is empty, is not empty, contains, does not contain, starts with, ends with,
+    matches, does not match, and their aliases (e.g., "greater than", "one of").
 
     Args:
         filter: Dict of {field_name: "operator value"} (e.g., {"status": "is active"})
