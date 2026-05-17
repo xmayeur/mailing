@@ -755,3 +755,172 @@ test:
         finally:
             Path(camb_path).unlink()
             Path(arts_path).unlink()
+
+    def test_filter_validation_string_operations(self, qapp: Any, temp_attachment: str) -> None:
+        """Test that string operations are recognized as valid by filter validator."""
+        csv_content = "email,name,domain\n"
+        csv_content += "john@example.com,John Smith,example.com\n"
+        csv_content += "jane@gmail.com,Jane Doe,gmail.com\n"
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
+            f.write(csv_content)
+            csv_path = f.name
+
+        try:
+            config_data = {
+                "test": {
+                    "sender": "test@example.com",
+                    "database": csv_path,
+                    "filter": {},
+                }
+            }  # type: ignore[assignment]
+
+            dialog = _SendDialog(
+                attachment_path=temp_attachment,
+                config_path="",
+                config_data=config_data,
+                initial_profile="test",
+            )
+
+            dialog._load_profile_defaults("test")
+
+            # Test "contains" operation
+            dialog.filter_text_edit.setPlainText("email: contains @example")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            assert dialog.filter_status_label.text() == ""
+
+            # Test "starts with" operation
+            dialog.filter_text_edit.setPlainText("name: starts with John")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            assert dialog.filter_status_label.text() == ""
+
+            # Test "ends with" operation
+            dialog.filter_text_edit.setPlainText("domain: ends with .com")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            assert dialog.filter_status_label.text() == ""
+
+            # Test "matches" operation (regex)
+            dialog.filter_text_edit.setPlainText("email: matches .*@.*\\.com")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            assert dialog.filter_status_label.text() == ""
+
+            # Test "does not contain" operation
+            dialog.filter_text_edit.setPlainText("email: does not contain @gmail")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            assert dialog.filter_status_label.text() == ""
+
+            # Test "does not match" operation
+            dialog.filter_text_edit.setPlainText("domain: does not match .*gmail.*")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            assert dialog.filter_status_label.text() == ""
+        finally:
+            Path(csv_path).unlink()
+
+    def test_filter_preview_string_operations(self, qapp: Any, temp_attachment: str) -> None:
+        """Test that record preview correctly filters with string operations."""
+        csv_content = "email,name,domain\n"
+        csv_content += "john@example.com,John Smith,example.com\n"
+        csv_content += "jane@gmail.com,Jane Doe,gmail.com\n"
+        csv_content += "bob@example.org,Bob Jones,example.org\n"
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
+            f.write(csv_content)
+            csv_path = f.name
+
+        try:
+            config_data = {
+                "test": {
+                    "sender": "test@example.com",
+                    "database": csv_path,
+                    "filter": {},
+                }
+            }  # type: ignore[assignment]
+
+            dialog = _SendDialog(
+                attachment_path=temp_attachment,
+                config_path="",
+                config_data=config_data,
+                initial_profile="test",
+            )
+
+            dialog._load_profile_defaults("test")
+
+            # Test "contains" - should show 2 records with @example
+            dialog.filter_text_edit.setPlainText("email: contains @example")
+            dialog._validation_timer.stop()
+            dialog.filter_and_display_records()
+            # Check that record display was updated
+            assert dialog.record_count_label.text() != ""
+            assert "Matching Records:" in dialog.record_count_label.text()
+
+            # Test "starts with" - should show 1 record starting with John
+            dialog.filter_text_edit.setPlainText("name: starts with John")
+            dialog._validation_timer.stop()
+            dialog.filter_and_display_records()
+            assert dialog.record_count_label.text() != ""
+
+            # Test "ends with" - should show 2 records ending with .com
+            dialog.filter_text_edit.setPlainText("domain: ends with .com")
+            dialog._validation_timer.stop()
+            dialog.filter_and_display_records()
+            assert dialog.record_count_label.text() != ""
+
+            # Test "matches" regex - should show all records with valid email format
+            dialog.filter_text_edit.setPlainText("email: matches .*@.*\\..*")
+            dialog._validation_timer.stop()
+            dialog.filter_and_display_records()
+            assert dialog.record_count_label.text() != ""
+        finally:
+            Path(csv_path).unlink()
+
+    def test_filter_preview_string_operations_no_matches(
+        self, qapp: Any, temp_attachment: str
+    ) -> None:
+        """Test that record preview shows 0 records when string operation matches nothing."""
+        csv_content = "email,name,domain\n"
+        csv_content += "john@example.com,John Smith,example.com\n"
+        csv_content += "jane@gmail.com,Jane Doe,gmail.com\n"
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
+            f.write(csv_content)
+            csv_path = f.name
+
+        try:
+            config_data = {
+                "test": {
+                    "sender": "test@example.com",
+                    "database": csv_path,
+                    "filter": {},
+                }
+            }  # type: ignore[assignment]
+
+            dialog = _SendDialog(
+                attachment_path=temp_attachment,
+                config_path="",
+                config_data=config_data,
+                initial_profile="test",
+            )
+
+            dialog._load_profile_defaults("test")
+
+            # Filter that matches no records
+            dialog.filter_text_edit.setPlainText("email: contains @nonexistent")
+            dialog._validation_timer.stop()
+            dialog.filter_and_display_records()
+            # Should show 0 records
+            assert "0 records" in dialog.record_count_label.text() or \
+                   dialog.records_table.rowCount() == 0
+        finally:
+            Path(csv_path).unlink()

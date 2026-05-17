@@ -99,3 +99,117 @@ def test_filter_with_data():
     row[5] = "True"
     filter_rules = {"selected": "not in x, y, X, Yes"}
     assert not sendMail.filter(filter_rules, row, indices)
+
+
+def test_filter_contains():
+    """Test 'contains' operation."""
+    indices = {"email": 0, "name": 1, "domain": 2}
+    row = ["john@example.com", "John Smith", "example.com"]
+
+    # Matching contains
+    assert not sendMail.filter({"email": "contains @"}, row, indices)
+    assert not sendMail.filter({"name": "contains Smith"}, row, indices)
+
+    # Non-matching contains
+    assert sendMail.filter({"email": "contains @gmail"}, row, indices)
+    assert sendMail.filter({"name": "contains Doe"}, row, indices)
+
+    # Case sensitive
+    assert sendMail.filter({"name": "contains john"}, row, indices)
+
+
+def test_filter_does_not_contain():
+    """Test 'does not contain' operation."""
+    indices = {"email": 0, "name": 1}
+    row = ["john@example.com", "John Smith"]
+
+    # Matching does not contain
+    assert not sendMail.filter({"email": "does not contain @gmail"}, row, indices)
+    assert not sendMail.filter({"name": "does not contain Doe"}, row, indices)
+
+    # Non-matching does not contain
+    assert sendMail.filter({"email": "does not contain @"}, row, indices)
+    assert sendMail.filter({"name": "does not contain Smith"}, row, indices)
+
+
+def test_filter_starts_with():
+    """Test 'starts with' operation."""
+    indices = {"email": 0, "name": 1, "domain": 2}
+    row = ["john@example.com", "John Smith", "example.com"]
+
+    # Matching starts with
+    assert not sendMail.filter({"email": "starts with john"}, row, indices)
+    assert not sendMail.filter({"name": "starts with John"}, row, indices)
+    assert not sendMail.filter({"domain": "starts with example"}, row, indices)
+
+    # Non-matching starts with
+    assert sendMail.filter({"email": "starts with jane"}, row, indices)
+    assert sendMail.filter({"name": "starts with jane"}, row, indices)
+
+    # Case sensitive
+    assert sendMail.filter({"name": "starts with john"}, row, indices)
+
+
+def test_filter_ends_with():
+    """Test 'ends with' operation."""
+    indices = {"email": 0, "name": 1, "domain": 2}
+    row = ["john@example.com", "John Smith", "example.com"]
+
+    # Matching ends with
+    assert not sendMail.filter({"email": "ends with .com"}, row, indices)
+    assert not sendMail.filter({"name": "ends with Smith"}, row, indices)
+    assert not sendMail.filter({"domain": "ends with .com"}, row, indices)
+
+    # Non-matching ends with
+    assert sendMail.filter({"email": "ends with .org"}, row, indices)
+    assert sendMail.filter({"name": "ends with Doe"}, row, indices)
+
+    # Case sensitive
+    assert sendMail.filter({"name": "ends with smith"}, row, indices)
+
+
+def test_filter_matches_regex():
+    """Test 'matches' operation with regex."""
+    indices = {"email": 0, "name": 1, "phone": 2}
+    row = ["john@example.com", "John Smith", "123-456-7890"]
+
+    # Matching regex patterns
+    assert not sendMail.filter({"email": "matches .*@example\\.com"}, row, indices)
+    assert not sendMail.filter({"name": "matches John.*"}, row, indices)
+    assert not sendMail.filter({"phone": "matches \\d{3}-\\d{3}-\\d{4}"}, row, indices)
+
+    # Non-matching regex patterns
+    assert sendMail.filter({"email": "matches .*@gmail\\.com"}, row, indices)
+    assert sendMail.filter({"name": "matches Jane.*"}, row, indices)
+
+    # Multiple matches
+    assert not sendMail.filter({"email": "matches john|jane"}, row, indices)
+
+    # Case sensitive regex
+    assert sendMail.filter({"email": "matches JOHN.*"}, row, indices)
+
+
+def test_filter_matches_regex_invalid():
+    """Test 'matches' operation with invalid regex patterns."""
+    indices = {"text": 0}
+    row = ["test string"]
+
+    # Invalid regex should return False (exclude row)
+    assert sendMail.filter({"text": "matches [invalid("}, row, indices)
+
+    # Invalid regex in 'does not match' should return True (include row)
+    assert not sendMail.filter({"text": "does not match [invalid("}, row, indices)
+
+
+def test_filter_does_not_match_regex():
+    """Test 'does not match' operation with regex."""
+    indices = {"email": 0, "name": 1}
+    row = ["john@example.com", "John Smith"]
+
+    # Matching does not match
+    assert not sendMail.filter({"email": "does not match .*@gmail\\.com"}, row, indices)
+    assert not sendMail.filter({"name": "does not match Jane.*"}, row, indices)
+
+    # Non-matching does not match
+    assert sendMail.filter({"email": "does not match .*@example\\.com"}, row, indices)
+    assert sendMail.filter({"name": "does not match John.*"}, row, indices)
