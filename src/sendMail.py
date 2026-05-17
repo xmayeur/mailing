@@ -1141,7 +1141,7 @@ def filter(filter, row, indices):  # noqa: A001,A002
     for k, v in filter.items():
         field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
-            log.warning(f"Invalid field '{k}'")
+            log.debug(f"Invalid field '{k}' - field not found in database schema")
             return True
         try:
             op, test_value = _parse_filter_expr(v, k)
