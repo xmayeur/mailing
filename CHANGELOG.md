@@ -1,3 +1,21 @@
+## v1.8.0 (2026-05-17)
+
+### Feat
+
+- complete filter editor and schema caching features
+
+### Fix
+
+- update integration test expectations for improved error messages
+- reorder imports in test_sendMail.py to resolve style issue
+- reorganize CHANGELOG to put v1.7.0 at top
+- add requests to docs build requirements
+- normalize CHANGELOG whitespace
+
+### Refactor
+
+- use log.debug for filter operation errors and fix yaml module pollution
+
 ## v1.7.0 (2026-05-17)
 
 ### Feat
