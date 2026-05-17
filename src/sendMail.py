@@ -1,13 +1,28 @@
 #!/usr/bin/env python
-# coding: utf-8
-"""
-Utilities to handle logging, Google Sheets, file manipulation, and API interactions.
+"""Bulk email campaign management system for organizations.
 
-This module provides functions and classes for initializing logging, working with Google Sheets,
-manipulating files (e.g., determining MIME types or encoding files in Base64), and API interactions
-such as those for invoicing with a third-party service. It also includes utilities for processing
-HTML content and converting data structures.
+Provides functionality for sending email campaigns to subscribers via SMTP or Gmail API,
+with support for:
+- Google Sheets and CSV subscriber databases
+- HTML email templates with inline image support
+- Rate limiting and batch processing
+- Google Drive integration for attachments
+- Markdown to HTML conversion
+- Flexible filtering based on subscriber attributes
+- Email profiles with IMAP/SMTP configuration
 
+Main usage:
+    python src/sendMail.py --profile <profile_name> -s "Subject" [files...]
+
+Key classes:
+    Dict2Class: Convert dictionaries to objects
+
+Key functions:
+    build_email: Build MIME email message
+    send_mail: Send email via SMTP
+    send_gmail: Send email via Gmail API
+    filter: Filter subscriber rows based on criteria
+    generate_mailing: Generate and send campaign emails
 """
 from __future__ import annotations
 
@@ -33,9 +48,9 @@ from email.utils import formataddr
 from getpass import getpass
 from glob import glob
 from os import getenv, mkdir
-from os.path import join, exists
+from os.path import exists, join
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
-from time import time, sleep
+from time import sleep, time
 from typing import Any
 from uuid import uuid4
 
@@ -43,7 +58,6 @@ import gspread
 import markdown2 as md
 import requests
 import yaml
-from PIL import Image
 from bs4 import BeautifulSoup
 from getSecrets import get_secret
 from google.auth.transport.requests import Request
@@ -52,8 +66,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient import errors
 from googleapiclient.discovery import build
 from oauth2client.service_account import ServiceAccountCredentials
+from PIL import Image
 
-import googleDriveLib as gd
+import googleDriveLib as gd  # noqa: N813
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 _CSP_IMG_DOMAIN = "{_CSP_IMG_DOMAIN}"
@@ -81,17 +96,11 @@ _OP_IS_NOT_BOUNCED = "is not bounced"
 
 
 def get_default_config_path():
-    """
-    Determines the home directory of the current user based on the operating system.
+    """Get default configuration file path based on OS home directory.
 
-    This function checks the operating system and retrieves the appropriate
-    environment variable that represents the user's home directory. For Windows,
-    it uses the `USERPROFILE` environment variable. For other operating systems,
-    it uses the `HOME` environment variable.
-
-    :return: The path to the user's home directory as a string, or None if it
-        cannot be determined.
-    :rtype: Optional[str]
+    Returns:
+        str: Path to sendMail.yml in user's .config directory,
+             e.g., ~/.config/sendMail.yml
     """
     home = getenv("USERPROFILE") if os.name == "nt" else getenv("HOME")
     home = home or ""
@@ -134,18 +143,16 @@ def get_default_config_path():
     return cfg
 
 
-def init_log(log_file=None):
-    """
-    Initializes and configures a logger for logging messages. The logger writes
-    messages to the console and optionally to a log file, using a predefined
-    format for log messages. This function sets the logger's default level to
-    INFO and the file handler's level to DEBUG if a file logger is enabled.
+def init_log(log_file: str | None = None) -> logging.Logger:
+    """Initialize logging configuration.
 
-    :param log_file: Path to the file where log messages will be stored. If None,
-        no file logging is enabled. Optional.
-    :type log_file: str, optional
-    :return: Configured logger instance.
-    :rtype: logging.Logger
+    Sets up logging with default format, level, and optional file handler.
+
+    Args:
+        log_file: Path to log file. If None, logs to console only (default: None)
+
+    Returns:
+        Configured Logger instance
     """
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -165,12 +172,15 @@ log = init_log(log_file="sendMail.log")
 
 
 # for artscroises profile
-def open_google_db_members_sheet(sa, id):
-    """
-    Open  a Google Sheet and return it as a spreadsheet object
-    :param sa: Service Account entry name in secret vault
-    :param id: Google Sheet ID entry name in secret vault
-    :return: a workbook spreadsheet object
+def open_google_db_members_sheet(sa: str, sheet_id: str) -> Any:
+    """Open Google Sheet and return spreadsheet object.
+
+    Args:
+        sa: Service account entry name in secret vault
+        sheet_id: Google Sheet ID entry name in secret vault
+
+    Returns:
+        gspread Spreadsheet object for reading/writing data
     """
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -178,31 +188,67 @@ def open_google_db_members_sheet(sa, id):
         "https://www.googleapis.com/auth/drive",
     ]
 
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)  # type: ignore[arg-type]
-    gc = gspread.authorize(creds)  # type: ignore[arg-type]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)  # pyright: ignore
+    gc = gspread.authorize(creds)  # pyright: ignore
 
-    spreadsheet_id = get_secret(id)["ID"]
+    spreadsheet_id = get_secret(sheet_id)["ID"]
     wb = gc.open_by_key(spreadsheet_id)
     return wb
 
 
-def read_all_sheet(wb, sheet_name: str = ""):
-    """
-    Read all ranges of a sheet
-    :param wb: workbook object
-    :param sheet_name: sheet name - default=sheet1
-    :return: range of value (array of arrays)
+def read_all_sheet(wb: Any, sheet_name: str = "") -> list[list[Any]]:
+    """Read all values from a Google Sheet.
+
+    Args:
+        wb: gspread Spreadsheet object
+        sheet_name: Sheet name to read. If empty, reads first sheet
+
+    Returns:
+        List of lists containing all sheet values (array of arrays)
     """
     ws = wb.sheet1 if not sheet_name else wb.worksheet(sheet_name)
-    return ws.get_all_values()
+    return list(ws.get_all_values())
+
+
+def get_google_sheets_schema(sa: str, sheet_id: str) -> list[str]:
+    """Extract field names (header row) from Google Sheet for validation.
+
+    Args:
+        sa: Service account entry name in secret vault
+        sheet_id: Google Sheet ID entry name in secret vault
+
+    Returns:
+        List of field names from first row of Google Sheet, or empty list on error
+    """
+    try:
+        wb = open_google_db_members_sheet(sa, sheet_id)
+        data = read_all_sheet(wb)
+        if data and len(data) > 0:
+            # First row contains field names
+            headers = [h.strip() for h in data[0] if h.strip()]
+            return headers
+        return []
+    except Exception as e:  # noqa: BLE001
+        log.warning("Could not extract Google Sheets schema: %s", e)
+        return []
 
 
 class Dict2Class:
-    """
-    Convert a dict to a class
+    """Convert dictionary to object with lowercase attribute names.
+
+    Allows dict-like configs to be accessed as objects (obj.key instead of dict['key']).
+    All keys are converted to lowercase attribute names.
+
+    Args:
+        my_dict: Dictionary to convert to object
+
+    Example:
+        config = Dict2Class({'Name': 'John', 'Email': 'j@example.com'})
+        config.name  # 'John'
+        config.email  # 'j@example.com'
     """
 
-    def __init__(self, my_dict: dict) -> None:
+    def __init__(self, my_dict: dict[str, Any]) -> None:
         for key in my_dict:
             object.__setattr__(self, key.lower(), my_dict[key])
 
@@ -213,50 +259,55 @@ class Dict2Class:
         object.__setattr__(self, name, value)
 
 
-def guess_type(filepath):
-    """
-    Return the mimetype of a file, given its path.
-    This is a wrapper around two alternative methods - Unix 'file'-style
-    magic which guesses the type based on file content (if available),
-    and simple guessing based on the file extension (eg .jpg).
-    :param filepath: Path to the file.
-    :type filepath: str
-    :return: Mimetype string.
-    :rtype: str
+def guess_type(filepath: str) -> str | None:
+    """Detect MIME type of a file by content or extension.
+
+    Tries magic-based detection first (file content), falls back to
+    extension-based guessing if magic not available.
+
+    Args:
+        filepath: Path to file to identify
+
+    Returns:
+        MIME type string (e.g., 'image/png') or None if detection fails
     """
     try:
-        import magic  # python-magic  # type: ignore[import-not-found]
+        import magic  # type: ignore[import-not-found]
 
-        return magic.from_file(filepath, mime=True)
-    except ImportError:
+        result: str | None = magic.from_file(filepath, mime=True)
+        return result
+    except (ImportError, ModuleNotFoundError):
         import mimetypes
 
         return mimetypes.guess_type(filepath)[0]
 
 
-def file_to_base64(filepath):
-    """
-    Returns the content of a file as a Base64 encoded string.
-    :param filepath: Path to the file.
-    :type filepath: str
-    :return: The file content, Base64 encoded.
-    :rtype: str
+def file_to_base64(filepath: str) -> str:
+    """Encode file contents as base64 string.
+
+    Handles both local files and HTTP URLs.
+
+    Args:
+        filepath: Local file path or HTTP URL
+
+    Returns:
+        Base64 encoded file content as string, or empty string on error
     """
     import base64
 
-    encoded_str = ""
+    encoded_bytes: bytes
     if "http" in filepath:
         img = requests.get(filepath)
         if img.status_code != 200:
             return ""
-        encoded_str = base64.b64encode(img.content)
+        encoded_bytes = base64.b64encode(img.content)
     else:
         with open(filepath, "rb") as f:
-            encoded_str = base64.b64encode(f.read())
-    return encoded_str.decode("utf-8")
+            encoded_bytes = base64.b64encode(f.read())
+    return encoded_bytes.decode("utf-8")
 
 
-def make_html_images_inline(in_filepath, out_filepath=None) -> str:
+def make_html_images_inline(in_filepath: str, out_filepath: str | None = None) -> str:
     """
     Takes an HTML file and writes a new version with inline Base64 encoded
     images.
@@ -267,7 +318,7 @@ def make_html_images_inline(in_filepath, out_filepath=None) -> str:
     :returns the html data with inline images
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
-    with open(in_filepath, "r") as file:
+    with open(in_filepath) as file:
         soup = BeautifulSoup(file, _HTML_PARSER)
     for img in soup.find_all("img"):
         src = str(img.attrs["src"])
@@ -306,7 +357,7 @@ def prepare_html_for_cid(in_filepath):
     :rtype: tuple[str, list[tuple[str, str]]]
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
-    with open(in_filepath, "r", encoding="utf-8") as file:
+    with open(in_filepath, encoding="utf-8") as file:
         soup = BeautifulSoup(file, _HTML_PARSER)
 
     image_paths = []
@@ -344,17 +395,17 @@ def get_subscriber_reader(param):
     :rtype: tuple(iterator | None, file | None)
     """
     if param.database is None:
-        wb = open_google_db_members_sheet(sa=param.sa, id=param.sheetid)
+        wb = open_google_db_members_sheet(sa=param.sa, sheet_id=param.sheetid)
         return iter(read_all_sheet(wb)), None
 
     try:
         if param.database.endswith(".csv"):
-            csvfile = open(param.database, "r", newline="", encoding="utf-8-sig")
+            csvfile = open(param.database, newline="", encoding="utf-8-sig")
             return csv.reader(csvfile, delimiter=",", quotechar='"'), csvfile
         else:
             from python_calamine import CalamineWorkbook
 
-            workbook = CalamineWorkbook.from_path(param.database)  # type: ignore[arg-type]
+            workbook = CalamineWorkbook.from_path(param.database)
             return iter(workbook.get_sheet_by_index(0).to_python()), workbook
 
     except FileNotFoundError:
@@ -362,25 +413,35 @@ def get_subscriber_reader(param):
         return None, None
 
 
-def get_indices(header):
+def get_indices(header: list[Any]) -> dict[str, int]:
     """
     Create a dictionary that maps each header element to its corresponding
     index in the list of headers.
 
-    :param header: List of header strings.
-    :type header: list
-    :return: A dictionary where keys are elements from the header list and
-             values are their corresponding indices.
-    :rtype: dict
+    Args:
+        header: List of header values (strings or other types from CSV/sheets).
+
+    Returns:
+        Dictionary where keys are string representations of header elements
+        and values are their corresponding indices.
     """
-    return {h: i for i, h in enumerate(header)}
+    return {str(h): i for i, h in enumerate(header)}
 
 
-def get_smtp_connection(param):
-    """
-    Open a connection to the SMTP server.
-    :param param:
-    :return:
+def get_smtp_connection(param: Any) -> SMTP | None:
+    """Open SMTP connection with TLS.
+
+    Creates connection to SMTP server, upgrades to TLS, and authenticates
+    with provided credentials.
+
+    Args:
+        param: Configuration object with smtp_host, smtp_port, username, password
+
+    Returns:
+        SMTP connection object, or None if connection failed
+
+    Raises:
+        SystemExit: On authentication failure (logs critical error)
     """
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
@@ -437,12 +498,16 @@ def get_gmail_service(param):
     return build("gmail", "v1", credentials=creds)
 
 
-def save_to_sent(param, msg):
-    """
-    Store the message in the Sent folder using IMAP.
-    :param param:
-    :param msg:
-    :return:
+def save_to_sent(param: Any, msg: MIMEMultipart) -> None:
+    """Store message in IMAP Sent folder.
+
+    Saves sent email to Sent folder for archival. Retries up to 3 times
+    on failure with 10-second delays.
+
+    Args:
+        param: Configuration object with imap_host, imap_port, username,
+               password, sent_folder, verbose
+        msg: Email message (MIMEMultipart) to store
     """
     n = 3
     for attempt in range(n):
@@ -520,7 +585,7 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
     :rtype: tuple[str, list[dict[str, str]], str]
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
-    with open(in_filepath, "r", encoding="utf-8") as file:
+    with open(in_filepath, encoding="utf-8") as file:
         soup = BeautifulSoup(file, _HTML_PARSER)
 
     inline_images = []
@@ -550,29 +615,22 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
     return str(soup), inline_images, temp_dir
 
 
-def format_message(template, row, header):
-    """
-    Formats a message template by replacing placeholders with corresponding values
-    from the `row` list, based on the column names provided in the `header`.
+def format_message(template: str, row: list[Any], header: list[str]) -> str:
+    """Format message by replacing ${field} placeholders with row values.
 
-    The placeholders within the template follow the syntax `${column_name}`,
-    where `column_name` corresponds to an entry in the `header` list. If any
-    error occurs during formatting, the original template is returned unchanged.
+    Substitutes template placeholders with subscriber data. Placeholders use
+    syntax ${column_name} which maps to header column names.
 
-    :param template: The template string containing placeholders to be replaced.
-    :type template: str
-    :param row: A list of values where indexes correspond to the column names in the
-        `header`.
-    :type row: list
-    :param header: A list of column names, where the index of each column
-        corresponds to positional values in `row`.
-    :type header: list
-    :return: A formatted string with placeholders substituted with values from the
-        `row` list, or the original template in case of an error.
-    :rtype: str
+    Args:
+        template: Template string with ${field_name} placeholders
+        row: List of subscriber values (one per column)
+        header: List of column/field names (indices match row)
+
+    Returns:
+        Formatted message with values substituted, or original template on error
     """
     try:
-        def _replace(m: re.Match) -> str:
+        def _replace(m: re.Match[str]) -> str:
             key = m.group(1)
             return str(row[header.index(key)])
 
@@ -668,29 +726,31 @@ def md2html(file_path, styles=None, embed_styles=False):
         log.error(f"Le fichier Markdown {file_path} n'existe pas.")
         return None
     else:
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             data = f.read()
 
     converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
+    csp = f"default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;"
 
     if styles is None:
         head = f"""
     <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
+        <meta http-equiv="Content-Security-Policy" content="{csp}">
         <style>{default_styles}</style>
     </head>
-    
+
 """
     elif embed_styles and os.path.exists(styles):
-        with open(styles, "r") as f:
+        with open(styles) as f:
             default_styles = f.read()
             head = f"""
                 <!-- Add locale and title header -->
                 <head>
                     <meta charset="UTF-8">
-                    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
+                    <meta http-equiv="Content-Security-Policy"
+                          content="{csp}">
                     <style>{default_styles}</style>
                 </head>
 
@@ -700,7 +760,7 @@ def md2html(file_path, styles=None, embed_styles=False):
    <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
+        <meta http-equiv="Content-Security-Policy" content="{csp}">
         <link rel="stylesheet" href="{styles}">
     </head>
 """
@@ -712,7 +772,14 @@ def md2html(file_path, styles=None, embed_styles=False):
     return file_path
 
 
-def _set_email_headers(msg, param, subject, to, cc, bcc):
+def _set_email_headers(
+    msg: MIMEMultipart,
+    param: Any,
+    subject: str,
+    to: str,
+    cc: str,
+    bcc: str | None,
+) -> tuple[str | None, str | None]:
     """Populate standard headers on *msg* and return the (possibly swapped) to/bcc pair."""
     msg["Subject"] = subject
     msg["From"] = formataddr((param.sendername, param.sender))
@@ -720,7 +787,7 @@ def _set_email_headers(msg, param, subject, to, cc, bcc):
     msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"
     msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     if param.max_addr_per_mail == 1:
-        to = bcc
+        to = bcc  # type: ignore[assignment]
         bcc = None
         msg["To"] = to
     else:
@@ -744,7 +811,7 @@ def _process_html_attachment(att, param, all_inline_images, temp_dirs):
     all_inline_images.extend(found_images)
     temp_dirs.append(t_dir)
     if is_md and not hasattr(param, "keep-html"):
-        os.remove(att)  # type: ignore[arg-type]
+        os.remove(att)  # pyright: ignore
     return html_content
 
 
@@ -781,38 +848,40 @@ def _attach_body(msg, msg_related, message, all_inline_images):
 
 
 def build_email(
-        param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None
-):
-    """
-    Constructs an email message with specified subject, recipients, message body,
-    attachments, or inline images. The email includes advanced configurations such as
-    List-Unsubscribe headers and inline attachment handling. Designed to
-    support both simple and complex email requirements with flexibility.
+        param: Any,
+        subject: str = "",
+        to: str = "",
+        cc: str = "",
+        bcc: str | None = None,
+        message: str = "",
+        images: str | list[str] | None = None,
+        attachments: str | list[str] | None = None
+) -> tuple[MIMEMultipart, list[str]]:
+    """Build MIME email message with attachments and inline images.
 
-    :param param: A configuration object containing sender details, profiles, and rules.
-    :param subject: The subject of the email. Defaults to an empty string.
-    :type subject: str, optional
-    :param to: Comma-separated email addresses for primary recipients. Defaults to an empty string.
-    :type to: str, optional
-    :param cc: Comma-separated email addresses for carbon copy recipients. Defaults to an empty string.
-    :type cc: str, optional
-    :param bcc: Comma-separated email addresses for blind carbon copy recipients. Defaults to an empty string.
-    :type bcc: str, optional
-    :param message: The plain text or HTML content of the email body. Defaults to an empty string.
-    :type message: str, optional
-    :param images: File paths of inline images to include in the email body. Can be a string or a list of strings. Defaults to None.
-    :type images: Union[str, list[str]], optional
-    :param attachments: File paths of attachments to include in the email. Can be a string or a list of strings. Defaults to None.
-    :type attachments: Union[str, list[str]], optional
-    :return: A tuple containing the constructed email message (MIMEMultipart object) and list of recipient email addresses.
-    :rtype: Tuple[MIMEMultipart, list[str]]
+    Constructs multipart email with headers, body, inline images, and
+    attachments. Supports HTML/text bodies, inline CID images, and file
+    attachments.
+
+    Args:
+        param: Configuration object with sender details
+        subject: Email subject line
+        to: Comma-separated To addresses
+        cc: Comma-separated CC addresses
+        bcc: Comma-separated BCC addresses
+        message: HTML or text email body
+        images: File path(s) of inline images (str or list)
+        attachments: File path(s) of attachments (str or list)
+
+    Returns:
+        Tuple of (MIME message object, list of recipient addresses)
     """
     msg = MIMEMultipart("mixed")
-    to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)
+    to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)  # type: ignore[assignment]
 
     msg_related = MIMEMultipart("related")
-    all_inline_images = []
-    temp_dirs = []
+    all_inline_images: list[dict[str, str]] = []
+    temp_dirs: list[str] = []
 
     for img_path in [images] if isinstance(images, str) else (images or []):
         if os.path.exists(img_path):
@@ -833,7 +902,7 @@ def build_email(
     return msg, recipients
 
 
-def _build_and_send(param, addressees, row, header) -> bool:
+def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: list[str]) -> bool:
     """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs.
 
     :return: True if the message was sent, False if sending was skipped or failed.
@@ -852,11 +921,12 @@ def _build_and_send(param, addressees, row, header) -> bool:
     )
     try:
         if hasattr(param, "smtp_host"):
-            return send_mail(param=param, message=msg, recipients=recipients)
+            result = send_mail(param=param, message=msg, recipients=recipients)
+            return bool(result)
         else:
             return send_gmail(get_gmail_service(param), message=msg) is not None
     finally:
-        for d in getattr(msg, "_temp_dirs", []):  # type: ignore[attr-defined]
+        for d in getattr(msg, "_temp_dirs", []):
             try:
                 shutil.rmtree(d)
                 if param.verbose:
@@ -865,7 +935,7 @@ def _build_and_send(param, addressees, row, header) -> bool:
                 log.error(f"Erreur lors du nettoyage de {d}: {e}")
 
 
-def _skip_to_index(reader, from_index: int) -> int:
+def _skip_to_index(reader: Any, from_index: int) -> int:
     """Advance *reader* past records before *from_index* and return the updated row index."""
     log.info(f"Reprise à l'index {from_index}")
     idx = 1
@@ -944,7 +1014,7 @@ def generate_mailing(param):
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
-            _build_and_send(param, addressees, row, header)
+            _build_and_send(param, addressees, row, header)  # type: ignore[arg-type]
             mail_batch_count += 1
 
         log.info(
@@ -1011,7 +1081,7 @@ def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
         log.warning(f"Invalid filter value for field '{k}: {tv_raw}'")
         return False
 
-    operators = {
+    operators: dict[str, Any] = {
         "ge": lambda a, b: a >= b,
         "greater or equal to": lambda a, b: a >= b,
         _OP_GREATER_THAN_OR_EQUAL: lambda a, b: a >= b,
@@ -1029,19 +1099,20 @@ def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
         "ne": lambda a, b: a != b,
         _OP_IS_NOT_EQUAL_TO: lambda a, b: a != b,
     }
-    return operators.get(op, lambda a, b: True)(fv, tv)
+    result: bool = operators.get(op, lambda a, b: True)(fv, tv)  # noqa: ARG005
+    return result
 
 
 def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
     """Evaluate a string/membership comparison."""
     if op in ("in", "one of", _OP_ONE_OF):
-        return field_value in test_value  # type: ignore[operator]
+        return bool(field_value in test_value)
     if op in ("not in", "none of", _OP_NOT_ONE_OF):
-        return field_value not in test_value  # type: ignore[operator]
+        return bool(field_value not in test_value)
     if op in ("is", _OP_IS_EQUAL_TO, _OP_IS):
-        return field_value == test_value
+        return bool(field_value == test_value)
     if op in ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT):
-        return field_value != test_value
+        return bool(field_value != test_value)
     if op in (_OP_IS_NOT_EMPTY, "is not empty"):
         return field_value != "" and field_value is not None
     if op in ("is empty", ):
@@ -1057,57 +1128,22 @@ def _evaluate_condition(field_value: str, op: str, test_value: Any, k: str) -> b
         return _eval_string(field_value, test_value, op)
 
 
-def filter(filter, row, indices):
-    """
-    Evaluates a set of filtering conditions on a given row of data using field indices.
+def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> bool:  # noqa: A001,A002
+    """Filter row: return True if should be EXCLUDED, False if INCLUDED.
 
-    This function checks each field-value pair in a filter dictionary against a row of
-    data by performing the specified operations. Only rows that do not match the filter
-    criteria will pass (return `False`). The function supports a variety of comparison
-    operations, such as equality, inequality, greater-than, less-than, and membership.
+    Applies filter conditions to subscriber row. All filter conditions must
+    match for row to be included (AND logic).
 
-    Supported operations:
-    - "is"
-    - "is not"
-    - "gt" (greater than)
-    - "lt" (less than)
-    - "ge" (greater than or equal)
-    - "le" (less than or equal)
-    - "in"
-    - "not in"
-    - "is empty"
-    - "is not empty"
-    - "greater than" (alias for "gt")
-    - "less than" (alias for "lt")
-    - "greater or equal to" (alias for "ge")
-    - "less or equal to" (alias for "le")
-    - "one of" (alias for "in")
-    - "none of" (alias for "not in")
-    - "is equal to" (alias for "is")
-    - "is not equal to" (alias for "is not")
-    - "eq" (alias for "is equal to")
-    - "ne" (alias for "is not equal to")
+    Supported operations: is, is not, gt, lt, ge, le, in, not in,
+    is empty, is not empty, and their aliases (e.g., "greater than", "one of").
 
-    Filter values can specify further conditions through implicit parsing. For example:
-    - Comma-separated values for membership tests (e.g., "in").
-    - Empty string values to test for emptiness.
+    Args:
+        filter: Dict of {field_name: "operator value"} (e.g., {"status": "is active"})
+        row: List of subscriber field values
+        indices: Dict mapping field names to column indices
 
-    The function logs warnings for invalid operations or values encountered in the filter.
-
-    :param filter: Dictionary containing filter conditions, where each key represents
-                   a field name, and the value is a string describing the operation
-                   and target value (e.g., "gt 10").
-    :type filter: dict
-    :param row: A list of field values representing a single data row that will be
-                checked against the filtering criteria.
-    :type row: list
-    :param indices: Dictionary mapping filter field names to their respective column
-                    index positions in the `row` list. Used to retrieve field values
-                    for comparison.
-    :type indices: dict
-    :return: `True` if the given row does not satisfy the filter criteria, `False`
-             otherwise.
-    :rtype: bool
+    Returns:
+        True if row should be filtered OUT (excluded), False if INCLUDED
     """
     if not filter:
         return False
@@ -1116,7 +1152,7 @@ def filter(filter, row, indices):
     for k, v in filter.items():
         field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
-            log.warning(f"Invalid field '{k}'")
+            log.debug(f"Invalid field '{k}' - field not found in database schema")
             return True
         try:
             op, test_value = _parse_filter_expr(v, k)
@@ -1144,17 +1180,17 @@ def send_gmail(service, message=None):
     :return: The sent message resource if successful, None otherwise.
     :rtype: dict or None
     """
-    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()  # type: ignore[union-attr]
+    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()  # pyright: ignore
 
     body = {"raw": encoded_message}
     try:
         return service.users().messages().send(userId="me", body=body).execute()
     except errors.HttpError as error:
-        log.error(f"Error sending message: {error} to {message['To']}")  # type: ignore[index]
+        log.error(f"Error sending message: {error} to {message['To']}")  # pyright: ignore
         return None
 
 
-def send_mail(param=None, message=None, recipients=None):
+def send_mail(param: Any = None, message: Any = None, recipients: Any = None) -> bool:
     """
     Send an email message to specified recipients using SMTP.
 
@@ -1164,29 +1200,25 @@ def send_mail(param=None, message=None, recipients=None):
     settings provided in the `param` object. The email is saved to the sent records
     if it is successfully sent.
 
-    :param param: A configuration object that determines the behavior of the
-        email-sending process, such as verbosity for logging.
-    :type param: Any
-    :param message: The email message to be sent, where the "From" field is
-        mandatory and expected to be correctly populated.
-    :type message: email.message.EmailMessage
-    :param recipients: A list of recipient email addresses to whom the message
-        should be sent.
-    :type recipients: list[str]
-    :return: A boolean indicating whether the email was successfully sent.
-    :rtype: bool
+    Args:
+        param: Configuration object that determines the behavior of the email-sending process
+        message: The email message to be sent with "From" field populated
+        recipients: List of recipient email addresses
+
+    Returns:
+        Boolean indicating whether the email was successfully sent
     """
-    if param.verbose:  # type: ignore[union-attr]
+    if param.verbose:  # pyright: ignore
         log.info(f"Sending email to {recipients}")
     success = False
     for attempt in range(2):
         conn = get_smtp_connection(param)
         if conn:
             try:
-                conn.sendmail(message["From"], recipients, message.as_string())  # type: ignore[union-attr,index]
+                conn.sendmail(message["From"], recipients, message.as_string())  # pyright: ignore
                 conn.quit()
                 success = True
-                if param.verbose:  # type: ignore[union-attr]
+                if param.verbose:  # pyright: ignore
                     log.info("sent")
                 break
             except SMTPException as e:
@@ -1194,7 +1226,7 @@ def send_mail(param=None, message=None, recipients=None):
                 if attempt == 0:
                     sleep(10)
 
-    if success:
+    if success and message:
         save_to_sent(param, message)
     return success
 
@@ -1234,7 +1266,7 @@ def get_newsletter_name(files, args):
     return args
 
 
-def _load_config_with_secrets(args) -> dict:
+def _load_config_with_secrets(args: Any) -> dict[str, Any]:
     """Merge the profile config with any vault secrets and CLI overrides."""
     config = args.conf[args.profile]
     try:
@@ -1304,6 +1336,10 @@ def process_profile(args):
     if param.test:
         param.filter = param.filter_test
 
+    # T036, T037: Use session-active filter if provided (from editor dialog)
+    if hasattr(args, "session_filter") and isinstance(args.session_filter, dict):
+        param.filter = args.session_filter
+
     if generate_mailing(param) == "OK":
         if param.test:
             log.info("Test mode: mailing sent successfully.")
@@ -1313,7 +1349,7 @@ def process_profile(args):
     return "Error"
 
 
-def _check_common_params(param) -> bool:
+def _check_common_params(param: Any) -> bool:
     """Return False and log errors for any missing common mandatory parameters."""
     ret = True
     for p in ("sender", "sendername"):
@@ -1323,7 +1359,7 @@ def _check_common_params(param) -> bool:
     return ret
 
 
-def _check_data_source(param) -> bool:
+def _check_data_source(param: Any) -> bool:
     """Return False if neither a database path nor a (SA + sheetid) pair is configured."""
     if not hasattr(param, "database") and not (
             hasattr(param, "sa") and hasattr(param, "sheetid")
@@ -1333,7 +1369,7 @@ def _check_data_source(param) -> bool:
     return True
 
 
-def _check_smtp_imap_params(param) -> bool:
+def _check_smtp_imap_params(param: Any) -> bool:
     """Return False and log errors for missing SMTP/IMAP mandatory parameters."""
     required = ["smtp_port", "imap_host", "imap_port", "username", "password", "sent_folder"]
     ret = True
@@ -1344,7 +1380,7 @@ def _check_smtp_imap_params(param) -> bool:
     return ret
 
 
-def _check_gmail_params(param) -> bool:
+def _check_gmail_params(param: Any) -> bool:
     """Return False and log errors for missing Gmail mandatory parameters."""
     ret = True
     for p in ("token_file", "scopes", "credentials_id"):
@@ -1354,7 +1390,7 @@ def _check_gmail_params(param) -> bool:
     return ret
 
 
-def check_mandatory_param(param):
+def check_mandatory_param(param: Any) -> bool:
     """
     Validates that all mandatory parameters are present and correctly configured.
 

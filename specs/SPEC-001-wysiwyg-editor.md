@@ -299,47 +299,47 @@ _save()
 3. Copy `qwebchannel.js` from Qt install into `editor_assets/`
 
 ### Phase 2 — Editor page
-4. Write `editor_assets/editor.html` — Quill toolbar, QWebChannel bootstrap, content sync, image/link handlers
+1. Write `editor_assets/editor.html` — Quill toolbar, QWebChannel bootstrap, content sync, image/link handlers
 
 ### Phase 3 — Python shell
-5. Write `EditorBridge` class with all slots
-6. Write `EditorWindow.__init__`, `_load_editor_page`, `_inject_initial_content`
-7. Implement `_build_menus` (File / Format / Insert)
-8. Implement `open_file`, `_md_to_body_html`, `_html_to_body_html`
-9. Implement `_save`, `_save_as`, `_write_html_file`, `_write_md_file`
-10. Implement `new_document`, `_ask_save_if_dirty`, `closeEvent`
+1. Write `EditorBridge` class with all slots
+2. Write `EditorWindow.__init__`, `_load_editor_page`, `_inject_initial_content`
+3. Implement `_build_menus` (File / Format / Insert)
+4. Implement `open_file`, `_md_to_body_html`, `_html_to_body_html`
+5. Implement `_save`, `_save_as`, `_write_html_file`, `_write_md_file`
+6. Implement `new_document`, `_ask_save_if_dirty`, `closeEvent`
 
 ### Phase 4 — Media insertion
-11. Implement `request_image_insert` (file dialog → base64 data URI)
-12. Implement `_LinkDialog` and `request_link_insert` (URL + text dialog)
+1. Implement `request_image_insert` (file dialog → base64 data URI)
+2. Implement `_LinkDialog` and `request_link_insert` (URL + text dialog)
 
 ### Phase 5 — Testing and packaging
-13. Write `tests/test_editor.py` (24 unit tests, all headless)
-14. Write `editor.spec` (PyInstaller, separate from sendMail.spec)
-15. Update `CLAUDE.md` with editor launch instructions
+1. Write `tests/test_editor.py` (24 unit tests, all headless)
+2. Write `editor.spec` (PyInstaller, separate from sendMail.spec)
+3. Update `CLAUDE.md` with editor launch instructions
 
 ### Phase 7 — Enhancements (rev 3)
-28. Update `_html_to_body_html()` to call `sm.make_html_images_inline()` before extracting body; add `_inline_images_fallback()` for stdlib-only path
-29. Register custom `HrBlot` (BlockEmbed) and `VAlignStyle` (Parchment style attributor) before Quill init in `editor.html`
-30. Fix `window.applyCSS()` to propagate `body { background-color }` to `#editor-container`
-31. Add `window.insertHR()` and `window.setVAlign(align)` global functions in `editor.html`
-32. Add HR and vertical-alignment toolbar buttons (with wiring) to `editor.html`
-33. Update Insert menu HR action to call `insertHR()`; add Vertical Alignment submenus to Format and Table menus in `editor.py`
-34. Add `TestLocalImageInlining`, `TestHrInsertion`, `TestVerticalAlignment` test classes (6 new tests, total 33)
+1. Update `_html_to_body_html()` to call `sm.make_html_images_inline()` before extracting body; add `_inline_images_fallback()` for stdlib-only path
+2. Register custom `HrBlot` (BlockEmbed) and `VAlignStyle` (Parchment style attributor) before Quill init in `editor.html`
+3. Fix `window.applyCSS()` to propagate `body { background-color }` to `#editor-container`
+4. Add `window.insertHR()` and `window.setVAlign(align)` global functions in `editor.html`
+5. Add HR and vertical-alignment toolbar buttons (with wiring) to `editor.html`
+6. Update Insert menu HR action to call `insertHR()`; add Vertical Alignment submenus to Format and Table menus in `editor.py`
+7. Add `TestLocalImageInlining`, `TestHrInsertion`, `TestVerticalAlignment` test classes (6 new tests, total 33)
 
 ### Phase 6 — Enhancements (rev 2)
-16. Add Quill `table: true` module to `editor.html` Quill config
-17. Add 8-button table toolbar group and table cell CSS to `editor.html`
-18. Add `tableOp` dispatcher and button wiring to `editor.html` JS
-19. Add `_TableDialog` class to `editor.py`
-20. Add `request_table_insert` slot to `EditorBridge`
-21. Add Table menu to `_build_menus` with full row/col/table operations
-22. Add floating image resize toolbar HTML + CSS + JS to `editor.html`
-23. Add `_css_path`, `css_changed` signal, `_on_css_changed`, `_menu_apply_css` to `editor.py`
-24. Update `_inject_initial_content` to re-apply CSS on every page load
-25. Update `_write_html_file` to use `self._css_path` when set
-26. Add "Apply Stylesheet…" item to Format menu
-27. Update `tests/test_editor.py`: `QSpinBox` mock, `_TableDialog` import, `_FakeWindow` fix, new test classes (27 tests total)
+1. Add Quill `table: true` module to `editor.html` Quill config
+2. Add 8-button table toolbar group and table cell CSS to `editor.html`
+3. Add `tableOp` dispatcher and button wiring to `editor.html` JS
+4. Add `_TableDialog` class to `editor.py`
+5. Add `request_table_insert` slot to `EditorBridge`
+6. Add Table menu to `_build_menus` with full row/col/table operations
+7. Add floating image resize toolbar HTML + CSS + JS to `editor.html`
+8. Add `_css_path`, `css_changed` signal, `_on_css_changed`, `_menu_apply_css` to `editor.py`
+9. Update `_inject_initial_content` to re-apply CSS on every page load
+10. Update `_write_html_file` to use `self._css_path` when set
+11. Add "Apply Stylesheet…" item to Format menu
+12. Update `tests/test_editor.py`: `QSpinBox` mock, `_TableDialog` import, `_FakeWindow` fix, new test classes (27 tests total)
 
 ---
 

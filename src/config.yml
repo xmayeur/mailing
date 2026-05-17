@@ -16,7 +16,6 @@
 
 artscroises:
   MAILCONFIG: 'artscroisesmailing'
-  database: data/Subscribers.csv
   SHEETID: "artscroisesDBmembreID"
   SA: "artscroisesServiceAccount"
   domain: "artscroises.be"
@@ -59,6 +58,36 @@ cambristi:
   SHEETID: 'cambristiMemberSheetID'
   filter:
     title: in member, participant, inactive
+    email: is not empty
+    emailBounced: is not True
+  filter_test:
+    title: in test, Test
+    email: is not empty
+  styles: "./css/styles.css"
+  default_message: ''
+
+
+cambristiEffective:
+  SCOPES:
+    - 'https://www.googleapis.com/auth/gmail.readonly'
+    - 'https://www.googleapis.com/auth/gmail.modify'
+    - 'https://www.googleapis.com/auth/gmail.send'
+  TOKEN_FILE: 'token.json'
+  TOKEN_ID: "GmailToken"
+  CREDENTIALS_ID: "GmailCredentials"
+  WIX_API_TOKEN_ID: "cambristiApiToken"
+  FOLDER: "news_to_send"
+  MAIL: 'icambristi@gmail.com'
+  SA: 'cambristiGoogleServiceAccount'
+  max_addr_per_mail: 50
+  max_mails_per_hour: 100
+  pause: 1
+  sendername: "I Cambristi ASBL"
+  sender: "icambristi@gmail.com"   # "x@gmailapi.google.com"
+  members: https://www.cambristi.com/_functions/members/
+  SHEETID: 'cambristiMemberSheetID'
+  filter:
+    membreEffectif: is True
     email: is not empty
     emailBounced: is not True
   filter_test:

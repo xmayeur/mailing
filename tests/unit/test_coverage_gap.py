@@ -1,11 +1,11 @@
 import os
 import sys
-from unittest.mock import Mock, MagicMock, patch, mock_open
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
 # Add source directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 # Mock external dependencies before importing sendMail
 mock_get_secret = MagicMock(return_value={"key": "value"})
@@ -325,20 +325,20 @@ class TestCoverageGap:
     def test_filter_cambristi_errors(self):
         """Cover lines 757-759 and 765-766: IndexError in _filter_cambristi"""
         # Test mode with missing title index but valid nom/prenom indices to avoid secondary errors
-        filter = {
+        filter_rules = {
             "title": "in member, participant, inactive",
             "email": "is not empty",
             "emailBounced": "if False",
         }
         with patch("sendMail.log") as mock_log:
             res = sendMail.filter(
-                filter, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2}
+                filter_rules, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2}
             )
             assert res is True
-            mock_log.warning.assert_called_once()
+            mock_log.debug.assert_called_once()
 
         # Normal mode with missing title index
-        res = sendMail.filter(filter, ["member"], {"title": 50})
+        res = sendMail.filter(filter_rules, ["member"], {"title": 50})
         assert res is True
 
     def test_send_gmail_error(self):

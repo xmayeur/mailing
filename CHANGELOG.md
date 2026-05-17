@@ -1,3 +1,13 @@
+## 1.6.0 (2026-04-29)
+
+### Feat
+
+- **editor**: introduce Markdown fallback and enhance stylesheet loading
+
+### Fix
+
+- **sonarqube**: address critical security and code quality issues
+
 ## 1.5.0 (2026-04-29)
 
 ### Feat
