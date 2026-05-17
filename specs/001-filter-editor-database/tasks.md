@@ -157,22 +157,22 @@ update preview
 
 **Purpose**: Handle boundary conditions and error scenarios
 
-- [ ] T040 [P] Handle database connection failures:
+- [x] T040 [P] Handle database connection failures:
   - Show error in record preview area
   - Provide retry button
-- [ ] T041 [P] Handle profile switching while filter editor is open:
+- [x] T041 [P] Handle profile switching while filter editor is open:
   - Update filter field
   - Update record preview
   - Maintain any pending edits (ask user for confirmation if switching)
-- [ ] T042 [P] Handle databases with zero records:
+- [x] T042 [P] Handle databases with zero records:
   - Display "0 records" count
   - Show empty list
-- [ ] T043 [P] Handle Unicode/special characters in filter values:
+- [x] T043 [P] Handle Unicode/special characters in filter values:
   - Ensure no corruption or encoding errors
-- [ ] T044 [P] Handle malformed YAML with missing colons/quotes:
+- [x] T044 [P] Handle malformed YAML with missing colons/quotes:
   - Identify exact line number in error message
 
-**Checkpoint**: Edge cases handled, system resilient to errors
+**Checkpoint**: Edge cases handled, system resilient to errors ✓
 
 ---
 
@@ -180,24 +180,24 @@ update preview
 
 **Purpose**: Comprehensive testing and final QA
 
-- [ ] T045 [P] Full manual QA:
+- [x] T045 [P] Full manual QA:
   - Test all user stories end-to-end
   - Verify all edge cases
   - Check UI layout and responsiveness
-- [ ] T046 [P] Performance testing:
+- [x] T046 [P] Performance testing:
   - Validation feedback latency (<200ms)
   - Record list rendering (<300ms)
   - Large database handling (1000+ records)
-- [ ] T047 [P] Test with various databases:
+- [x] T047 [P] Test with various databases:
   - CSV files (different encodings, large files)
   - Google Sheets (various data types)
-- [ ] T048 [P] Test with various filter definitions:
+- [x] T048 [P] Test with various filter definitions:
   - Complex nested YAML (if supported)
   - Multiple conditions
   - Edge case field names (underscores, numbers, etc.)
-- [ ] T049 Final code review and documentation
+- [x] T049 Final code review and documentation
 
-**Checkpoint**: Feature ready for merge - all tests passing, all edge cases handled, QA approved
+**Checkpoint**: Feature ready for merge - all tests passing, all edge cases handled, QA approved ✓
 
 ---
 
