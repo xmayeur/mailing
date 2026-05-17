@@ -699,6 +699,7 @@ class _SendDialog(QDialog):
         """Load database records from CSV or Google Sheets (T026)."""
         db_path = self.database_input.text().strip()
         if not db_path:
+            log.debug("No database path set")
             return [], []
 
         try:
@@ -710,6 +711,7 @@ class _SendDialog(QDialog):
                     reader = csv.reader(f)
                     headers = next(reader, [])
                     rows = list(reader)
+                    log.debug(f"Loaded {len(rows)} records from {db_path}")
                     return rows, headers
         except Exception as e:
             log.warning("Could not load database: %s", e)
@@ -735,8 +737,10 @@ class _SendDialog(QDialog):
 
                 filter_dict = yaml.safe_load(filter_text) or {}
                 filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
+                log.debug(f"Filter applied: {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
             else:
                 filtered_rows = rows
+                log.debug(f"No filter, showing all {len(rows)} records")
 
             self._update_record_display(filtered_rows, headers, len(rows))
         except Exception as e:
