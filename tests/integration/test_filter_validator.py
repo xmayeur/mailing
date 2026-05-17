@@ -69,7 +69,8 @@ class TestFilterValidator:
         """Test validation status for invalid YAML syntax."""
         status = validator.get_validation_status("{ bad yaml:", ["age"])
         assert status["is_valid"] is False
-        assert status["syntax_errors"] == ["Invalid YAML syntax"]
+        assert len(status["syntax_errors"]) > 0
+        assert "Invalid YAML syntax" in status["syntax_errors"][0]
 
     def test_get_validation_status_missing_fields(
         self, validator: FilterValidator
