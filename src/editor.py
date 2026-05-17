@@ -680,7 +680,7 @@ class _SendDialog(QDialog):
                     if hasattr(sm, "get_google_sheets_schema"):
                         return sm.get_google_sheets_schema(str(sa), str(sheet_id))
                 except Exception as e:
-                    log.warning("Could not load Google Sheets schema: %s", e)
+                    log.debug("Could not load Google Sheets schema: %s", e)
             return []
 
         if not db_path:
@@ -691,7 +691,7 @@ class _SendDialog(QDialog):
 
             return DatabaseSchemaProvider.detect_and_extract(db_path)
         except Exception as e:
-            log.warning("Could not extract database schema: %s", e)
+            log.debug("Could not extract database schema: %s", e)
             return []
 
     def _update_validation_ui(self, status: dict[str, Any]) -> None:
@@ -752,7 +752,7 @@ class _SendDialog(QDialog):
                             log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id}")
                             return rows, headers
                 except Exception as e:
-                    log.warning("Could not load Google Sheets records: %s", e)
+                    log.debug("Could not load Google Sheets records: %s", e)
             return [], []
 
         if not db_path:
@@ -779,7 +779,7 @@ class _SendDialog(QDialog):
                 # If all encodings fail, raise error
                 raise ValueError(f"Could not decode {db_path} with any supported encoding")
         except Exception as e:
-            log.warning("Could not load database: %s", e)
+            log.debug("Could not load database: %s", e)
 
         return [], []
 
@@ -832,7 +832,7 @@ class _SendDialog(QDialog):
             self.record_count_label.setStyleSheet("font-weight: bold;")
             self.retry_load_btn.hide()  # T040: Hide retry button when successful
         except Exception as e:
-            log.warning("Could not filter records: %s", e)
+            log.debug("Could not filter records: %s", e)
             self._update_record_display(rows, headers, len(rows))
 
     def _update_record_display(self, rows: list[list[str]], headers: list[str], total: int) -> None:

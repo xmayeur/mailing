@@ -14,6 +14,9 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 import pytest
 from googleapiclient import errors
 
+# Save real yaml module to restore after tests (prevent pollution of other tests)
+import yaml as _real_yaml
+
 # Add source directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
@@ -60,6 +63,9 @@ import sendMail  # noqa: E402
 # Use the same HttpError class in the test module's namespace and in sendMail
 errors.HttpError = MockHttpError
 sendMail.errors.HttpError = MockHttpError
+
+# Restore real yaml module immediately to prevent pollution of other test modules
+sys.modules["yaml"] = _real_yaml
 
 
 class TestDict2Class:
