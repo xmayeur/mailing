@@ -1,3 +1,17 @@
+## v1.9.0 (2026-05-17)
+
+### Feat
+
+- add support for string filter operations (contains, starts with, matches)
+
+### Fix
+
+- use correct type: ignore syntax for mypy
+- resolve SonarQube issues
+- handle None filter values to eliminate repetitive NoneType error
+- suppress logging during filter editing in editor
+- integrate SchemaCacheProvider into editor to prevent Google Sheets quota hits
+
 ## v1.8.0 (2026-05-17)
 
 ### Feat
