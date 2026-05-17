@@ -43,13 +43,13 @@ git merge develop         # fast-forward master to develop HEAD
 ### 4. Review AI.md for accuracy
 
 ```bash
-claude -p "Review @AI.md for accuracy since the last release tag version." --dangerously-skip-permissions
+# claude -p "Review @AI.md for accuracy since the last release tag version." --dangerously-skip-permissions
 ```
 
 ### 5. Build Sphinx documentation
 
 ```bash
-poetry run scripts/create_documentation.sh
+poetry run scripts/build_docs_release.sh
 # or: cd docs && poetry run make html
 ```
 
@@ -60,8 +60,8 @@ poetry run scripts/create_documentation.sh
 git status --porcelain
 
 # If there are changes:
-git add docs/diagrams/ AI.md docs/
-git commit -m "docs: regenerate diagrams, AI.md, and Sphinx docs pre-release"
+# git add docs/diagrams/ AI.md docs/
+# git commit -m "docs: regenerate diagrams, AI.md, and Sphinx docs pre-release"
 ```
 
 ### 7. Run the full test suite
@@ -75,15 +75,15 @@ poetry run scripts/pre_push_checks.sh
 `poetry export` requires the export plugin (one-time install):
 
 ```bash
-poetry self add poetry-plugin-export
+# poetry self add poetry-plugin-export
 ```
 
 Then regenerate:
 
 ```bash
-poetry export --without-hashes -f requirements.txt --with docs -o requirements.txt
-git add requirements.txt
-git diff --cached --quiet || git commit -m "chore: regenerate requirements files"
+# poetry export --without-hashes -f requirements.txt --with docs -o requirements.txt
+# git add requirements.txt
+# git diff --cached --quiet || git commit -m "chore: regenerate requirements files"
 ```
 
 ### 9. Bump version and update changelog
@@ -116,7 +116,7 @@ Then review the draft and publish:
 gh release create v<NEW_VERSION> --title "v<NEW_VERSION>" --notes "<PASTE NOTES>"
 ```
 
-Or create directly on GitHub at https://github.com/pyArchimate/pyArchimate/releases/new,
+Or create directly on GitHub at https://github.com/xmayeur/mailing/releases/new,
 selecting the version tag and pasting the draft.
 
 ### 12. Merge master back into develop
