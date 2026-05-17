@@ -36,7 +36,8 @@ class FilterValidator:
             if not isinstance(result, dict):
                 return None
             return result
-        except yaml.YAMLError:
+        except yaml.YAMLError as e:
+            log.debug("YAML parse error: %s", e)
             return None
 
     def validate_field_names(
@@ -76,10 +77,11 @@ class FilterValidator:
         if not filter_text or not filter_text.strip():
             return status
 
+        # T044: Parse and check for YAML syntax errors
         filter_dict = self.parse_yaml_filter(filter_text)
         if filter_dict is None:
             status["is_valid"] = False
-            status["syntax_errors"] = ["Invalid YAML syntax"]
+            status["syntax_errors"] = ["Invalid YAML syntax (check colons, quotes, indentation)"]
             return status
 
         missing = self.validate_field_names(filter_dict, database_schema)
