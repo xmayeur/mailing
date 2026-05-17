@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Build and Release Executables](https://github.com/xmayeur/mailing/actions/workflows/main.yml/badge.svg)](https://github.com/xmayeur/mailing/actions/workflows/main.yml)
+[![Docs](https://readthedocs.org/projects/mailing/badge/?version=master)](https://pyarchimate.readthedocs.io)
 
 A comprehensive email campaign management system for organizations managing mailing lists, newsletters, and membership communications.
 
