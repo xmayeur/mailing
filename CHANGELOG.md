@@ -1,7 +1,7 @@
 ## 1.6.0 (2026-04-29)
 
 ### Feat
-
+  
 - **editor**: introduce Markdown fallback and enhance stylesheet loading
 
 ### Fix
