@@ -20,7 +20,7 @@ Classes:
     SchemaCacheProvider: Session-scoped schema cache (in-memory, not persistent)
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 
 class SchemaCacheProvider:
