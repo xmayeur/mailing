@@ -9,7 +9,7 @@ Classes:
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -22,10 +22,11 @@ class FilterValidator:
     def __init__(self) -> None:
         pass
 
-    def parse_yaml_filter(self, text: str) -> dict[str, str] | None:
+    def parse_yaml_filter(self, text: str) -> dict[str, Any] | None:
         """Parse YAML filter text into dict.
 
         Returns dict on success, None on parse error.
+        Can contain None values for incomplete YAML entries (e.g., "email:" with no value).
         """
         if not text or not text.strip():
             return {}
@@ -40,7 +41,7 @@ class FilterValidator:
             return None
 
     def validate_field_names(
-        self, filter_dict: dict[str, str], database_schema: list[str]
+        self, filter_dict: dict[str, Any], database_schema: list[str]
     ) -> list[str]:
         """Validate filter field names exist in database schema.
 
@@ -81,6 +82,15 @@ class FilterValidator:
         if filter_dict is None:
             status["is_valid"] = False
             status["syntax_errors"] = ["Invalid YAML syntax (check colons, quotes, indentation)"]
+            return status
+
+        # Check for None filter values (incomplete entries like "email:" with no value)
+        for field, value in filter_dict.items():
+            if value is None:
+                status["is_valid"] = False
+                cast(list[str], status["syntax_errors"]).append(f"Field '{field}' is missing a filter condition")
+
+        if status["syntax_errors"]:
             return status
 
         missing = self.validate_field_names(filter_dict, database_schema)
