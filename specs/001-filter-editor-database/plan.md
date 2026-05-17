@@ -1,85 +1,37 @@
-# Bug Fix Plan: Filter Validation Shows "All Fields Not Found" After Profile Selection
+# Implementation Plan: [FEATURE]
 
-**Branch**: `001-filter-editor-database` | **Date**: 2026-05-17 | **Issue**: Filter validation fails with missing fields after profile selection
-**Input**: Bug report: "Filter box reports 'all fields not found' after selecting profile. Profiles 'cambristi' and 'artscroises' have been tested and work."
+**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+
+**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 
 ## Summary
 
-Bug: When user selects a profile in _SendDialog, the filter validation immediately reports all filter fields as "not found". The profiles 'cambristi' and 'artscroises' are known to have valid filters in config.yml. Root cause: database schema is not being loaded/updated when profile changes, so validation runs against empty schema. Fix: ensure database path is loaded before running validation when profile changes.
+[Extract from feature spec: primary requirement + technical approach from research]
 
 ## Technical Context
 
-**Language/Version**: Python 3.12  
-**Primary Dependencies**: PyQt6 (for _SendDialog UI), YAML parsing (yaml.safe_load)  
-**Storage**: CSV files, config.yml (YAML profiles)
-**Testing**: pytest with 40+ passing tests (test_editor_filter.py, test_filter_validator.py, test_schema_provider.py)
-**Target Platform**: Desktop (PyQt6 GUI)
-**Project Type**: Desktop application (bulk email tool)
-**Performance Goals**: Validation <200ms, record preview <300ms for 1000+ records  
-**Constraints**: Session-only filter (no modification to config.yml)
-**Scale/Scope**: Multiple profiles with different databases, filters with various field names
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
 
-### Root Cause Analysis
-
-**Current Flow in _load_profile_defaults()** (line 548-579):
-1. Get profile config from self._config_data
-2. Update database_input text field
-3. Load current filter via load_current_filter()
-4. Call filter_and_display_records()
-
-**Problem**: filter_and_display_records() calls _get_database_schema() which reads from self.database_input.text() to get the path. But the timing is:
-- database_input text is SET at line 564
-- filter_and_display_records() is called at line 579
-- BUT validation runs with schema extracted from database_input.text()
-- If database path was empty before, schema is still empty on first profile load
-
-**Hypothesis**: Database schema extraction fails because:
-1. Profile change updates filter field first
-2. Validation triggers via textChanged signal
-3. But database path in database_input might not be set yet
-4. Schema comes back empty []
-5. All fields marked "not found"
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
+**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research.*
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-✓ PASS: Bug fix is isolated to filter validation timing in _SendDialog
-✓ PASS: No changes to config.yml or core sendMail.py logic required
-✓ PASS: Fix uses existing validation infrastructure (FilterValidator, DatabaseSchemaProvider)
-✓ PASS: Will include regression tests (existing 40 tests + new timing test)
-
-## Fix Strategy
-
-### Diagnosis (Phase 0)
-1. Verify exact timing of events in _load_profile_defaults()
-2. Check if database_input is updated BEFORE filter_and_display_records()
-3. Test schema extraction with known working profiles (cambristi, artscroises)
-4. Confirm validation is called before database schema is available
-
-### Solution (Phase 1)
-**Option A**: Set database_input BEFORE calling load_current_filter()
-- Ensures schema is available when filter_text_edit triggers textChanged
-- Minimal change, preserves existing flow
-
-**Option B**: Disable validation timer during profile load
-- Prevent premature validation while transitioning profiles
-- Enable after everything is loaded
-- More explicit control over timing
-
-**Option C**: Cache schema per profile in _load_profile_defaults()
-- Load schema once, pass to validation
-- Avoids file I/O during validation
-- Most efficient but requires refactoring
-
-### Recommended: Option A (minimal change)
-Move database_input.setText() from line 564 to line 549 (before load_current_filter)
-
-### Test Approach
-- Add timing test to test_editor_filter.py
-- Verify all profiles load filter without "fields not found" errors
-- Test with cambristi and artscroises (known working)
-- Test with profile that has no database defined
+[Gates determined based on constitution file]
 
 ## Project Structure
 
