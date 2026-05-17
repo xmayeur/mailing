@@ -20,14 +20,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, TypeAlias
 
 import yaml
 
 # Type aliases for complex config structures
-type ConfigValue = str | int | list[str] | dict[str, str]
-type ConfigData = dict[str, ConfigValue]
-type ConfigProfile = dict[str, ConfigData]
+# Using TypeAlias for Python 3.10/3.11 compatibility (PEP 695 'type' requires 3.12+)
+ConfigValue: TypeAlias = str | int | list[str] | dict[str, str]  # noqa: UP040
+ConfigData: TypeAlias = dict[str, ConfigValue]  # noqa: UP040
+ConfigProfile: TypeAlias = dict[str, ConfigData]  # noqa: UP040
 
 # ---------------------------------------------------------------------------
 # PyInstaller-safe asset path resolution
