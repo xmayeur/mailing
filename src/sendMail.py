@@ -1061,6 +1061,9 @@ def _parse_filter_expr(v: str, _k: str) -> tuple[str, Any]:
 
     Raises ValueError when the operator is unrecognised.
     """
+    if not v or not isinstance(v, str):
+        raise ValueError("Filter value is empty or invalid")
+
     try:
         op = _FILTER_OPS[[v.find(x + " ") for x in _FILTER_OPS].index(0)]
     except ValueError:
