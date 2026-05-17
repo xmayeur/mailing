@@ -2820,6 +2820,7 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("sendMail Editor")
     app.setOrganizationName("sendMail")
+    app.setStyle("Fusion")  # Use light Fusion style (not dark)
 
     file_arg = sys.argv[1] if len(sys.argv) > 1 else None
     window = EditorWindow(file_path=file_arg)
