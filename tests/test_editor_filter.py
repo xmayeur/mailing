@@ -603,3 +603,70 @@ test:
             assert args.session_filter == {"status": "is active"}
         finally:
             Path(csv_path).unlink()
+
+    def test_profile_load_timing_no_missing_fields(self, qapp: Any, temp_attachment: str) -> None:
+        """Verify database schema loaded before validation when profile changes.
+
+        Regression test for: filter validation reported "all fields not found"
+        after profile selection because database path was not available during
+        validation. This test ensures database_input.setText() is called before
+        load_current_filter() so schema is available for validation.
+        """
+        # Create CSV files for cambristi and artscroises profiles
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f_camb:
+            f_camb.write("email,name,status\n")
+            f_camb.write("user1@example.com,User One,active\n")
+            camb_path = f_camb.name
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f_arts:
+            f_arts.write("email,recipient,type\n")
+            f_arts.write("art1@example.com,Artist One,featured\n")
+            arts_path = f_arts.name
+
+        try:
+            config_data = {
+                "cambristi": {
+                    "sender": "camb@example.com",
+                    "database": camb_path,
+                    "filter": {"status": "is active"},
+                },
+                "artscroises": {
+                    "sender": "arts@example.com",
+                    "database": arts_path,
+                    "filter": {"type": "is featured"},
+                },
+            }  # type: ignore[assignment]
+
+            dialog = _SendDialog(
+                attachment_path=temp_attachment,
+                config_path="",
+                config_data=config_data,
+                initial_profile="cambristi",
+            )
+
+            # Load cambristi profile - validate filter (timing test)
+            dialog._load_profile_defaults("cambristi")
+            # Process any pending Qt signals
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            # Check status label doesn't contain "not found"
+            label_text = dialog.filter_status_label.text()
+            assert "not found" not in label_text.lower(), (
+                f"cambristi: filter reported missing fields: {label_text}"
+            )
+
+            # Switch to artscroises profile - validate filter
+            dialog._load_profile_defaults("artscroises")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+            label_text = dialog.filter_status_label.text()
+            assert "not found" not in label_text.lower(), (
+                f"artscroises: filter reported missing fields: {label_text}"
+            )
+        finally:
+            Path(camb_path).unlink()
+            Path(arts_path).unlink()
