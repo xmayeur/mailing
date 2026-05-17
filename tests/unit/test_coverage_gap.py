@@ -335,7 +335,7 @@ class TestCoverageGap:
                 filter_rules, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2}
             )
             assert res is True
-            mock_log.warning.assert_called_once()
+            mock_log.debug.assert_called_once()
 
         # Normal mode with missing title index
         res = sendMail.filter(filter_rules, ["member"], {"title": 50})

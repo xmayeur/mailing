@@ -16,7 +16,6 @@
 
 artscroises:
   MAILCONFIG: 'artscroisesmailing'
-  database: data/Subscribers.csv
   SHEETID: "artscroisesDBmembreID"
   SA: "artscroisesServiceAccount"
   domain: "artscroises.be"

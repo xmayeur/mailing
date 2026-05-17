@@ -38,6 +38,7 @@ them through `sendMail`.
 - 📝 **Detailed logging** for monitoring and debugging
 - 🔒 **Secure credential management** via secrets vault
 - ✍️ **Standalone newsletter editor** with live HTML preview and sendMail-compatible output
+- 🔍 **Advanced filter validation** with real-time syntax checking and field verification
 
 ## Editor
 
@@ -168,6 +169,23 @@ where:
                         "is equal to", "is not equal to"
 <value>: is the value to compare with
 ```
+
+### Filter Validation and Editor
+
+The editor includes real-time filter validation to help you get filters right before sending:
+
+- **Syntax checking**: Validates YAML filter syntax
+- **Field verification**: Confirms all filter fields exist in your subscriber database
+- **Live preview**: See how many subscribers match your filter criteria
+- **Field suggestions**: Get autocomplete suggestions from your database headers
+
+The validation modules (`filter_validator`, `schema_provider`, `filter_matcher`) provide:
+- YAML filter parsing and syntax validation
+- CSV and Google Sheets schema extraction
+- Real-time filter preview on sample data
+
+See [Filter Validator](docs/filter_validator.rst), [Schema Provider](docs/schema_provider.rst),
+and [Filter Matcher](docs/filter_matcher.rst) modules for API details.
 
 ### Secrets Management
 
