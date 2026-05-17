@@ -4,6 +4,7 @@ Unit tests for src/editor.py
 All PyQt6 modules are mocked before import so these tests run headlessly
 on CI without a display server, following the same pattern used in test_sendMail.py.
 """
+# pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
 
 # ---------------------------------------------------------------------------
 # Mock all Qt modules BEFORE importing editor
@@ -33,7 +34,7 @@ for _mod in _qt_mocks:
 
 
 # pyqtSlot: use inspect.isfunction to distinguish @pyqtSlot(str) from @pyqtSlot
-def _make_pyqtSlot(*args, **kwargs):
+def _make_pyqtSlot(*args, **kwargs):  # noqa: N802, ARG001
     """Fake @pyqtSlot that is a no-op decorator."""
     if len(args) == 1 and _inspect.isfunction(args[0]) and not kwargs:
         # Bare @pyqtSlot — args[0] is the function being decorated
@@ -44,7 +45,7 @@ def _make_pyqtSlot(*args, **kwargs):
     return _decorator
 
 
-def _make_pyqtSignal(*args, **kwargs):
+def _make_pyqtSignal(*args, **kwargs):  # noqa: N802, ARG001
     """Fake pyqtSignal instance with connect/disconnect/emit."""
     sig = MagicMock()
     sig.connect = MagicMock()
@@ -68,33 +69,33 @@ class _FakeQObject:
 
 class _FakeQMainWindow(_FakeQObject):
     """Stand-in for QMainWindow."""
-    def menuBar(self):
+    def menuBar(self):  # noqa: N802
         return MagicMock()
 
-    def addToolBar(self, toolbar):
+    def addToolBar(self, toolbar):  # noqa: N802
         pass
 
     def style(self):
         return MagicMock(standardIcon=MagicMock(return_value="icon"))
 
-    def setStatusBar(self, bar):
+    def setStatusBar(self, bar):  # noqa: N802
         pass
 
-    def statusBar(self):
+    def statusBar(self):  # noqa: N802
         sb = MagicMock()
         sb.showMessage = MagicMock()
         return sb
 
-    def setMinimumSize(self, w, h):
+    def setMinimumSize(self, w, h):  # noqa: N802
         pass
 
-    def setWindowTitle(self, t):
+    def setWindowTitle(self, t):  # noqa: N802
         pass
 
-    def centralWidget(self):
+    def centralWidget(self):  # noqa: N802
         return None
 
-    def setCentralWidget(self, w):
+    def setCentralWidget(self, w):  # noqa: N802
         pass
 
     def show(self):
@@ -120,23 +121,22 @@ class _FakeQDialog(_FakeQObject):
         pass
 
 
-sys.modules["PyQt6.QtCore"].pyqtSlot = _make_pyqtSlot
-sys.modules["PyQt6.QtCore"].pyqtSignal = _make_pyqtSignal
-sys.modules["PyQt6.QtCore"].QObject = _FakeQObject
-sys.modules["PyQt6.QtCore"].QUrl = MagicMock()
-sys.modules["PyQt6.QtCore"].Qt = MagicMock()
+sys.modules["PyQt6.QtCore"].pyqtSlot = _make_pyqtSlot  # pyright: ignore
+sys.modules["PyQt6.QtCore"].pyqtSignal = _make_pyqtSignal  # pyright: ignore
+sys.modules["PyQt6.QtCore"].QObject = _FakeQObject  # pyright: ignore
+sys.modules["PyQt6.QtCore"].QUrl = MagicMock()  # pyright: ignore
+sys.modules["PyQt6.QtCore"].Qt = MagicMock()  # pyright: ignore
 
-sys.modules["PyQt6.QtWidgets"].QMainWindow = _FakeQMainWindow
-sys.modules["PyQt6.QtWidgets"].QDialog = _FakeQDialog
-sys.modules["PyQt6.QtWidgets"].QDialog.DialogCode = _FakeQDialog.DialogCode
-sys.modules["PyQt6.QtWidgets"].QSpinBox = MagicMock()
+sys.modules["PyQt6.QtWidgets"].QMainWindow = _FakeQMainWindow  # pyright: ignore
+sys.modules["PyQt6.QtWidgets"].QDialog = _FakeQDialog  # pyright: ignore
+sys.modules["PyQt6.QtWidgets"].QDialog.DialogCode = _FakeQDialog.DialogCode  # pyright: ignore
+sys.modules["PyQt6.QtWidgets"].QSpinBox = MagicMock()  # pyright: ignore
 
 # Add source directory to path so editor can be imported
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 import editor  # noqa: E402  (must come after sys.modules patching)
 from editor import EditorBridge  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -741,7 +741,7 @@ class _LineEditLike:
     def text(self):
         return self._text
 
-    def setText(self, value):
+    def setText(self, value):  # noqa: N802
         self._text = value
 
 
@@ -752,7 +752,7 @@ class _SpinBoxLike:
     def value(self):
         return self._value
 
-    def setValue(self, value):
+    def setValue(self, value):  # noqa: N802
         self._value = value
 
 
@@ -760,10 +760,10 @@ class _CheckBoxLike:
     def __init__(self, checked=False):
         self._checked = checked
 
-    def isChecked(self):
+    def isChecked(self):  # noqa: N802
         return self._checked
 
-    def setChecked(self, value):
+    def setChecked(self, value):  # noqa: N802
         self._checked = bool(value)
 
 
@@ -771,10 +771,10 @@ class _PlainTextLike:
     def __init__(self, text=""):
         self._text = text
 
-    def toPlainText(self):
+    def toPlainText(self):  # noqa: N802
         return self._text
 
-    def setPlainText(self, value):
+    def setPlainText(self, value):  # noqa: N802
         self._text = value
 
 
@@ -819,27 +819,27 @@ class _FakeCombo:
         self.blocked = False
         self.index = -1
 
-    def blockSignals(self, value):
+    def blockSignals(self, value):  # noqa: N802
         self.blocked = value
 
     def clear(self):
         self.items = []
 
-    def addItems(self, items):
+    def addItems(self, items):  # noqa: N802
         self.items.extend(items)
 
-    def findText(self, text):
+    def findText(self, text):  # noqa: N802
         try:
             return self.items.index(text)
         except ValueError:
             return -1
 
-    def setCurrentIndex(self, index):
+    def setCurrentIndex(self, index):  # noqa: N802
         self.index = index
         if 0 <= index < len(self.items):
             self.current = self.items[index]
 
-    def currentText(self):
+    def currentText(self):  # noqa: N802
         return self.current
 
     def count(self):
@@ -851,10 +851,10 @@ class _FakeTabs:
         self._title = title
         self._index = 0
 
-    def currentIndex(self):
+    def currentIndex(self):  # noqa: N802
         return self._index
 
-    def tabText(self, index):
+    def tabText(self, index):  # noqa: N802
         return self._title
 
 
