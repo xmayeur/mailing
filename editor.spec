@@ -11,7 +11,7 @@
 
 import sys
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 block_cipher = None
 
@@ -20,6 +20,8 @@ block_cipher = None
 qt_webengine_datas = collect_data_files("PyQt6.QtWebEngineCore", include_py_files=False)
 
 base_dir = Path(SPECPATH).resolve() / "src"
+project_dir = Path(SPECPATH).resolve()
+
 editor_asset_datas = [
     (str(path), "editor_assets")
     for path in (base_dir / "editor_assets").rglob("*")
@@ -27,35 +29,42 @@ editor_asset_datas = [
 ]
 css_datas = [
     (str(path), "css")
-    for path in (base_dir / "css").rglob("*")
+    for path in (project_dir / "css").rglob("*")
     if path.is_file()
 ]
 
+# Bundle src/ .py files as data so they can be imported at runtime
+src_module_files = [
+    (str(base_dir / "sendMail.py"), "."),
+    (str(base_dir / "googleDriveLib.py"), "."),
+    (str(base_dir / "filter_validator.py"), "."),
+]
+
+gs_datas, gs_binaries, gs_imports = collect_all("getSecrets")
+
 a = Analysis(
     ["src/editor.py"],
-    pathex=[],
-    binaries=[],
-    datas=editor_asset_datas + css_datas + qt_webengine_datas,
-    hiddenimports=[
+    pathex=["src"],
+    binaries=gs_binaries,
+    datas=editor_asset_datas + css_datas + src_module_files + gs_datas + qt_webengine_datas,
+    hiddenimports=gs_imports + [
         "PyQt6.QtWebEngineWidgets",
         "PyQt6.QtWebEngineCore",
         "PyQt6.QtWebChannel",
+        "PyQt6.QtCore",
+        "PyQt6.QtGui",
+        "PyQt6.QtWidgets",
         "PyQt6.sip",
         "html2text",
         "bs4",
         "markdown2",
-        "sendMail",
+        "yaml",
+        "getSecrets",
     ] + collect_submodules("PyQt6"),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        # Exclude sendMail's heavy cloud deps to keep the editor binary lean.
-        # Editor uses sendMail for markdown conversion and local operations only.
-        "gspread",
-        "googleapiclient",
-        "oauth2client",
-    ],
+    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

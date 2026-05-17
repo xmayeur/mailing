@@ -40,6 +40,7 @@ import ssl
 import sys
 import tempfile
 import urllib.parse
+from pathlib import Path
 from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -168,7 +169,9 @@ def init_log(log_file: str | None = None) -> logging.Logger:
     return logger
 
 
-log = init_log(log_file="sendMail.log")
+# Use absolute path for log file to work in bundled app
+_log_path = str(Path.home() / "sendMail.log")
+log = init_log(log_file=_log_path)
 
 
 # for artscroises profile

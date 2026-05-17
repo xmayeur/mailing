@@ -31,14 +31,34 @@ ConfigData: TypeAlias = dict[str, ConfigValue]  # noqa: UP040
 ConfigProfile: TypeAlias = dict[str, ConfigData]  # noqa: UP040
 
 # ---------------------------------------------------------------------------
-# PyInstaller-safe asset path resolution
+# PyInstaller-safe asset & module path resolution
 # ---------------------------------------------------------------------------
-if getattr(sys, "frozen", False):
-    _BASE = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+_IS_FROZEN = getattr(sys, "frozen", False)
+
+if _IS_FROZEN:
+    _MEIPASS = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    # For macOS BUNDLE, sys._MEIPASS is Contents/Frameworks/
+    # Correct to Contents/ for asset/module resolution
+    if _MEIPASS.name == "Frameworks" and _MEIPASS.parent.name == "Contents":
+        _BASE = _MEIPASS.parent  # Contents/
+    else:
+        _BASE = _MEIPASS
+
+    # In bundled macOS app, modules/assets are in Contents/Resources/ and Contents/Frameworks/
+    _MODULES_PATH = [
+        _BASE / "Resources",
+        _BASE / "Frameworks",
+    ]
 else:
     _BASE = Path(__file__).parent
+    _MODULES_PATH = [_BASE]
 
-ASSETS_DIR = _BASE / "editor_assets"
+# Add module paths so local modules (sendMail, googleDriveLib, etc.) can be imported
+for mod_path in _MODULES_PATH:
+    if str(mod_path) not in sys.path:
+        sys.path.insert(0, str(mod_path))
+
+ASSETS_DIR = _BASE / "Resources" / "editor_assets" if _IS_FROZEN else _BASE / "editor_assets"
 
 FONT_CHOICES = [
     "Arial",
@@ -115,12 +135,15 @@ from PyQt6.QtWidgets import (  # noqa: E402
 # ---------------------------------------------------------------------------
 # sendMail utility imports (reuse existing functions)
 # ---------------------------------------------------------------------------
+_SM_AVAILABLE = False
 try:
     import sendMail as sm  # noqa: E402,N813  (import after path setup, camelCase module name)
     _SM_AVAILABLE = True
 except Exception as exc:  # pragma: no cover
     log.warning("sendMail module not importable: %s", exc)
-    _SM_AVAILABLE = False
+    import traceback
+
+    log.warning("sendMail import traceback:\n%s", traceback.format_exc())
 
 try:
     from filter_validator import FilterValidator  # noqa: E402
@@ -2248,7 +2271,8 @@ class EditorWindow(QMainWindow):
     def _write_html_file(self, path: str, body_html: str) -> None:
         """Write a complete HTML document file from body HTML."""
         # Use user-selected CSS if set; otherwise fall back to project default
-        css_source = Path(self._css_path) if self._css_path else (_BASE / "css" / "styles.css")
+        css_path = (_BASE / "Resources" / "css" / "styles.css") if _IS_FROZEN else (_BASE / "css" / "styles.css")
+        css_source = Path(self._css_path) if self._css_path else css_path
         if css_source.exists():
             with open(css_source, encoding="utf-8") as f:
                 css_content = f.read()
@@ -2708,7 +2732,8 @@ class EditorWindow(QMainWindow):
 
     def _menu_apply_css(self) -> None:
         """Open a CSS file picker and apply the stylesheet to the editor canvas."""
-        initial = str(Path(self._css_path).parent) if self._css_path else str(_BASE / "css")
+        css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
+        initial = str(Path(self._css_path).parent) if self._css_path else str(css_dir)
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Apply Stylesheet",
