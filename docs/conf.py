@@ -130,7 +130,6 @@ MOCK_MODULES = [
     "oauth2client",
     "oauth2client.service_account",
     "PIL",
-    "requests",
     "markdown2",
 ]
 
@@ -193,7 +192,6 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
-    "sphinx.ext.coverage",
 ]
 
 templates_path = ["_templates"]

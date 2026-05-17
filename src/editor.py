@@ -24,6 +24,11 @@ from typing import Any
 
 import yaml
 
+# Type aliases for complex config structures
+type ConfigValue = str | int | list[str] | dict[str, str]
+type ConfigData = dict[str, ConfigValue]
+type ConfigProfile = dict[str, ConfigData]
+
 # ---------------------------------------------------------------------------
 # PyInstaller-safe asset path resolution
 # ---------------------------------------------------------------------------
@@ -51,7 +56,13 @@ log = logging.getLogger("editor")
 
 
 class _LogCapture(logging.Handler):
-    """Captures log records into a list for display in the session log dialog."""
+    """Capture log records for display in session log dialog.
+
+    Appends formatted log messages to a list as they occur.
+
+    Args:
+        log_list: List to append log messages to
+    """
 
     def __init__(self, log_list: list[str]) -> None:
         super().__init__()
@@ -68,7 +79,7 @@ class _LogCapture(logging.Handler):
 # ---------------------------------------------------------------------------
 # Qt imports
 # ---------------------------------------------------------------------------
-from PyQt6.QtCore import QByteArray, QObject, QSize, QUrl, pyqtSignal, pyqtSlot  # noqa: E402
+from PyQt6.QtCore import QByteArray, QObject, QSize, QTimer, QUrl, pyqtSignal, pyqtSlot  # noqa: E402
 from PyQt6.QtGui import QIcon, QPixmap  # noqa: E402
 from PyQt6.QtWebChannel import QWebChannel  # noqa: E402
 from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
@@ -91,6 +102,8 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QSpinBox,
     QStatusBar,
     QStyle,
+    QTableWidget,
+    QTableWidgetItem,
     QTabWidget,
     QTextBrowser,
     QToolBar,
@@ -107,6 +120,13 @@ try:
 except Exception as exc:  # pragma: no cover
     log.warning("sendMail module not importable: %s", exc)
     _SM_AVAILABLE = False
+
+try:
+    from filter_validator import FilterValidator  # noqa: E402
+    _VALIDATOR_AVAILABLE = True
+except Exception as exc:  # pragma: no cover
+    log.warning("FilterValidator not importable: %s", exc)
+    _VALIDATOR_AVAILABLE = False
 
 # Fallback markdown support
 try:
@@ -329,7 +349,11 @@ class _SendDialog(QDialog):
         self.setMinimumWidth(720)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
+        self._current_profile = ""
         self._attachment_path = attachment_path
+        self._initial_config_data = config_data or {}
+        self._session_filter: dict[str, str] | None = None
+        self._original_filter_text = ""
 
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 12)
@@ -380,6 +404,27 @@ class _SendDialog(QDialog):
         database_row_layout.addWidget(database_browse)
         form.addRow("Database", database_row)
 
+        # Filter editor (T009, T010, T016-T021)
+        self.filter_text_edit = QPlainTextEdit(self)
+        self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
+        self.filter_text_edit.setMinimumHeight(60)
+        self.filter_status_label = QLabel("", self)
+        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+        filter_widget = QWidget(self)
+        filter_layout = QVBoxLayout(filter_widget)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(4)
+        filter_layout.addWidget(self.filter_text_edit)
+        filter_layout.addWidget(self.filter_status_label)
+        form.addRow("Filter (YAML)", filter_widget)
+
+        # Validation setup (T016, T017)
+        self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
+        self._validation_timer = QTimer(self)
+        self._validation_timer.setSingleShot(True)
+        self._validation_timer.timeout.connect(self._run_filter_validation)
+        self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
+
         self.password_input = QLineEdit(self)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         form.addRow("Password", self.password_input)
@@ -413,6 +458,7 @@ class _SendDialog(QDialog):
         flag_layout.setContentsMargins(0, 0, 0, 0)
         flag_layout.setSpacing(10)
         self.test_check = QCheckBox("Test", flag_row)
+        self.test_check.toggled.connect(self._on_test_mode_toggled)
         self.verbose_check = QCheckBox("Verbose", flag_row)
         self.do_not_send_check = QCheckBox("Do not send", flag_row)
         self.selected_check = QCheckBox("Selected only", flag_row)
@@ -420,6 +466,36 @@ class _SendDialog(QDialog):
             flag_layout.addWidget(widget)
         flag_layout.addStretch(1)
         form.addRow("Flags", flag_row)
+
+        # Record preview (T024, T025)
+        root.addSpacing(10)
+        self.record_count_label = QLabel("Matching Records: 0", self)
+        self.record_count_label.setStyleSheet("font-weight: bold;")
+        root.addWidget(self.record_count_label)
+
+        self.records_table = QTableWidget(self)
+        self.records_table.setMinimumHeight(120)
+        self.records_table.setMaximumHeight(250)
+        self.records_table.setColumnCount(0)
+        self.records_table.setRowCount(0)
+        root.addWidget(self.records_table)
+
+        # Filter action buttons (T033)
+        filter_buttons = QWidget(self)
+        filter_buttons_layout = QHBoxLayout(filter_buttons)
+        filter_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        filter_buttons_layout.setSpacing(10)
+
+        apply_filter_btn = QPushButton("Apply Filter", filter_buttons)
+        apply_filter_btn.clicked.connect(self._apply_filter)
+        filter_buttons_layout.addWidget(apply_filter_btn)
+
+        reset_filter_btn = QPushButton("Reset Filter", filter_buttons)
+        reset_filter_btn.clicked.connect(self._reset_filter)
+        filter_buttons_layout.addWidget(reset_filter_btn)
+
+        filter_buttons_layout.addStretch(1)
+        root.addWidget(filter_buttons)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
@@ -462,7 +538,7 @@ class _SendDialog(QDialog):
 
     def _reload_profiles(self) -> None:
         path = self.config_input.text().strip()
-        self._config_data = {}
+        self._config_data = self._initial_config_data.copy()
         self.profile_combo.blockSignals(True)
         self.profile_combo.clear()
         try:
@@ -472,6 +548,8 @@ class _SendDialog(QDialog):
                 if isinstance(data, dict):
                     self._config_data = data
                     self.profile_combo.addItems(sorted(data.keys()))
+            elif self._config_data:
+                self.profile_combo.addItems(sorted(self._config_data.keys()))
         except Exception as exc:
             QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
         finally:
@@ -481,6 +559,7 @@ class _SendDialog(QDialog):
         self._load_profile_defaults(self.profile_combo.currentText())
 
     def _load_profile_defaults(self, profile: str) -> None:
+        self._current_profile = profile
         profile_cfg = self._config_data.get(profile, {})
 
         def _int_or_zero(value: object) -> int:
@@ -493,10 +572,14 @@ class _SendDialog(QDialog):
             except (ValueError, TypeError):
                 return 0
 
+        self.database_input.setText(str(profile_cfg.get("database", "")))
+        # Process any pending Qt events to ensure database path is set before validation
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
         self.body_input.setText("")
-        self.database_input.setText(str(profile_cfg.get("database", "")))
         self.password_input.setText(str(profile_cfg.get("password", "")))
 
         self.from_index_input.setValue(_int_or_zero(profile_cfg.get("from_index")))
@@ -509,6 +592,269 @@ class _SendDialog(QDialog):
         self.verbose_check.setChecked(bool(profile_cfg.get("verbose", False)))
         self.do_not_send_check.setChecked(bool(profile_cfg.get("doNotSend", False)))
         self.selected_check.setChecked(bool(profile_cfg.get("selected", False)))
+
+        self.load_current_filter(profile)
+        self.filter_and_display_records()
+
+    def load_current_filter(self, profile: str) -> None:
+        """Load filter from profile config and display in filter field."""
+        profile_cfg = self._config_data.get(profile, {})
+        # Use filter_test if test mode enabled, otherwise use filter
+        filter_key = "filter_test" if self.test_check.isChecked() else "filter"
+        filter_obj = profile_cfg.get(filter_key)
+
+        if not filter_obj:
+            self.filter_text_edit.setPlainText("")
+            self.filter_status_label.setText("")
+            self._original_filter_text = ""
+            self._session_filter = None
+            return
+
+        # Format filter dict as YAML string for display
+        filter_str = ""
+        if isinstance(filter_obj, dict):  # type: ignore[unreachable]
+            for key, value in filter_obj.items():  # type: ignore[unreachable]
+                filter_str += f"{key}: {value}\n"
+            filter_str = filter_str.rstrip()
+        else:
+            filter_str = str(filter_obj)
+
+        self.filter_text_edit.setPlainText(filter_str)
+        self.filter_status_label.setText("")
+        self._original_filter_text = filter_str
+        self._session_filter = None
+
+    def _on_test_mode_toggled(self, _checked: bool) -> None:
+        """Update filter when test mode is toggled (T041)."""
+        # Reload filter to show filter_test when in test mode, filter otherwise
+        self.load_current_filter(self._current_profile)
+        # Clear session filter since we're switching filter mode
+        self._session_filter = None
+
+    def _on_filter_text_changed(self) -> None:
+        """Handle filter text change with debounced validation (T016, T017)."""
+        self._validation_timer.stop()
+        self._validation_timer.start(200)
+
+    def _run_filter_validation(self) -> None:
+        """Run filter validation and update UI (T018-T021)."""
+        if not self._filter_validator:
+            return
+
+        filter_text = self.filter_text_edit.toPlainText()
+        schema = self._get_database_schema()
+
+        # T018: Get validation status
+        status = self._filter_validator.get_validation_status(filter_text, schema)
+
+        # T019, T021: Update status indicator and visual
+        self._update_validation_ui(status)
+
+    def _get_database_schema(self) -> list[str]:
+        """Get database schema (field names) from active database or Google Sheets."""
+        db_path = self.database_input.text().strip()
+
+        # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
+        profile_cfg = self._config_data.get(self._current_profile, {})
+        if not db_path and profile_cfg.get("SHEETID"):
+            # Google Sheets profile - try to load schema from Google Sheets
+            sa = profile_cfg.get("SA")
+            sheet_id = profile_cfg.get("SHEETID")
+            if sa and sheet_id:
+                try:
+                    import sendMail as sm  # noqa: N813
+
+                    if hasattr(sm, "get_google_sheets_schema"):
+                        return sm.get_google_sheets_schema(str(sa), str(sheet_id))
+                except Exception as e:
+                    log.warning("Could not load Google Sheets schema: %s", e)
+            return []
+
+        if not db_path:
+            return []
+
+        try:
+            from schema_provider import DatabaseSchemaProvider
+
+            return DatabaseSchemaProvider.detect_and_extract(db_path)
+        except Exception as e:
+            log.warning("Could not extract database schema: %s", e)
+            return []
+
+    def _update_validation_ui(self, status: dict[str, Any]) -> None:
+        """Update filter field UI based on validation status (T019, T020, T021)."""
+        is_valid = status.get("is_valid", True)
+        syntax_errors = status.get("syntax_errors", [])
+        missing_fields = status.get("missing_fields", [])
+
+        # T021: Visual distinction (green/red border)
+        if is_valid:
+            self.filter_text_edit.setStyleSheet(
+                "QPlainTextEdit { border: 1px solid #4CAF50; background: #f1f8f6; }"
+            )
+        else:
+            self.filter_text_edit.setStyleSheet(
+                "QPlainTextEdit { border: 1px solid #f44336; background: #ffebee; }"
+            )
+
+        # T020: Error message display
+        error_msg = ""
+        if syntax_errors:
+            error_msg += "Syntax: " + "; ".join(syntax_errors)
+        if missing_fields:
+            if error_msg:
+                error_msg += " | "
+            error_msg += f"Fields not found: {', '.join(missing_fields)}"
+
+        self.filter_status_label.setText(error_msg)
+        if is_valid:
+            self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+        else:
+            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+
+        # T027, T028: Update record preview on validation change
+        if is_valid:
+            self.filter_and_display_records()
+
+    def load_database_records(self) -> tuple[list[list[str]], list[str]]:
+        """Load database records from CSV or Google Sheets (T026)."""
+        db_path = self.database_input.text().strip()
+
+        # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
+        profile_cfg = self._config_data.get(self._current_profile, {})
+        if not db_path and profile_cfg.get("SHEETID"):
+            # Google Sheets profile - try to load records from Google Sheets
+            sa = profile_cfg.get("SA")
+            sheet_id = profile_cfg.get("SHEETID")
+            if sa and sheet_id:
+                try:
+                    import sendMail as sm  # noqa: N813
+
+                    if hasattr(sm, "open_google_db_members_sheet") and hasattr(sm, "read_all_sheet"):
+                        wb = sm.open_google_db_members_sheet(str(sa), str(sheet_id))
+                        data = sm.read_all_sheet(wb)
+                        if data and len(data) > 0:
+                            headers = [h.strip() for h in data[0] if h.strip()]
+                            rows = data[1:]  # Skip header row
+                            log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id}")
+                            return rows, headers
+                except Exception as e:
+                    log.warning("Could not load Google Sheets records: %s", e)
+            return [], []
+
+        if not db_path:
+            log.debug("No database path set")
+            return [], []
+
+        try:
+            import csv
+
+            # Try CSV
+            if db_path.endswith(".csv"):
+                with open(db_path, encoding="utf-8") as f:
+                    reader = csv.reader(f)
+                    headers = next(reader, [])
+                    rows = list(reader)
+                    log.debug(f"Loaded {len(rows)} records from {db_path}")
+                    return rows, headers
+        except Exception as e:
+            log.warning("Could not load database: %s", e)
+
+        return [], []
+
+    def filter_and_display_records(self) -> None:
+        """Load, filter, and display database records (T027, T028)."""
+        filter_text = self.filter_text_edit.toPlainText()
+        rows, headers = self.load_database_records()
+
+        if not headers or not rows:
+            self._update_record_display([], headers, 0)
+            return
+
+        # T028: Apply filter using FilterMatcher
+        try:
+            from filter_matcher import FilterMatcher
+
+            matcher = FilterMatcher()
+            if filter_text and filter_text.strip():
+                import yaml
+
+                filter_dict = yaml.safe_load(filter_text) or {}
+                filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
+                log.debug(f"Filter applied: {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+            else:
+                filtered_rows = rows
+                log.debug(f"No filter, showing all {len(rows)} records")
+
+            self._update_record_display(filtered_rows, headers, len(rows))
+        except Exception as e:
+            log.warning("Could not filter records: %s", e)
+            self._update_record_display(rows, headers, len(rows))
+
+    def _update_record_display(self, rows: list[list[str]], headers: list[str], total: int) -> None:
+        """Update record table display (T025)."""
+        self.records_table.setColumnCount(len(headers))
+        self.records_table.setHorizontalHeaderLabels(headers)
+        self.records_table.setRowCount(len(rows))
+
+        for row_idx, row in enumerate(rows):
+            for col_idx, value in enumerate(row):
+                item = QTableWidgetItem(str(value) if value else "")
+                self.records_table.setItem(row_idx, col_idx, item)
+
+        # T029: Update count label
+        self.record_count_label.setText(f"Matching Records: {len(rows)} / {total}")
+
+    def _apply_filter(self) -> None:
+        """Apply edited filter as session-active filter (T034)."""
+        filter_text = self.filter_text_edit.toPlainText().strip()
+
+        if not filter_text:
+            self._session_filter = None
+            self.filter_status_label.setText("(Filter cleared - will use profile default)")
+            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            self.filter_and_display_records()
+            return
+
+        if not self._filter_validator:
+            self.filter_status_label.setText("Filter validator not available")
+            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            return
+
+        schema = self._get_database_schema()
+        status = self._filter_validator.get_validation_status(filter_text, schema)
+
+        if not status.get("is_valid"):
+            errors = status.get("syntax_errors", []) + status.get("missing_fields", [])
+            self.filter_status_label.setText(f"Cannot apply: {', '.join(errors)}")
+            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            return
+
+        import yaml
+
+        try:
+            filter_dict = yaml.safe_load(filter_text) or {}
+            if isinstance(filter_dict, dict):
+                self._session_filter = filter_dict
+                self.filter_status_label.setText("✓ Session filter applied")
+                self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+                self.filter_and_display_records()
+            else:
+                self.filter_status_label.setText("Filter must be YAML mapping (key: value)")
+                self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+        except Exception as e:
+            self.filter_status_label.setText(f"Parse error: {e}")
+            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+
+    def _reset_filter(self) -> None:
+        """Reset filter to original from profile config (T035)."""
+        self._session_filter = None
+        if self._original_filter_text:
+            self.filter_text_edit.setPlainText(self._original_filter_text)
+        else:
+            self.filter_text_edit.setPlainText("")
+        self.filter_status_label.setText("(Filter reset to profile default)")
+        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
 
     def build_args(self, config_data: dict[str, dict[str, str | int]]) -> SimpleNamespace:
         profile = self.profile_combo.currentText().strip() or "default"
@@ -531,6 +877,7 @@ class _SendDialog(QDialog):
         namespace.max_mails_per_hour = self.max_mails_input.value()
         namespace.max_addr_per_mail = self.max_addr_input.value()
         namespace.pause = self.pause_input.value()
+        namespace.session_filter = self._session_filter  # T036: Pass session-active filter if set
         return namespace
 
 
@@ -549,7 +896,15 @@ class _LineFieldSpec:
 # Settings / config editor
 # ---------------------------------------------------------------------------
 class _ConfigDialog(QDialog):
-    """Dialog for editing the sendMail YAML configuration file by profile."""
+    """Dialog for editing sendMail YAML configuration by profile.
+
+    Provides tabbed interface for editing:
+    - Identity (sender, credentials)
+    - Delivery (SMTP/IMAP settings)
+    - Sources (subscriber database location)
+    - Templates (message templates, rate limits)
+    - Filters (filter_test and filter rules with validation)
+    """
 
     _TAB_HELP: dict[str, str] = {
         "Identity": (
@@ -586,7 +941,8 @@ class _ConfigDialog(QDialog):
             "<li><b>default_message</b> is used when no message is provided.</li>"
             "<li><b>body</b> can be injected into templates via <code>${body}</code>.</li>"
             "<li><b>styles</b> points at the CSS file used when HTML is generated from Markdown.</li>"
-            "<li><b>pause</b>, <b>from_index</b>, <b>to_index</b>, <b>wait</b>, <b>max_mails_per_hour</b>, and <b>max_addr_per_mail</b> control batch delivery.</li>"
+            "<li><b>pause</b>, <b>from_index</b>, <b>to_index</b>, <b>wait</b>, "
+            "<b>max_mails_per_hour</b>, and <b>max_addr_per_mail</b> control batch delivery.</li>"
             "</ul>"
         ),
         "Filters": (
@@ -621,7 +977,7 @@ class _ConfigDialog(QDialog):
         self.setMinimumWidth(1080)
         self.setMinimumHeight(780)
 
-        self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = self._normalize_config_data(config_data or {})
+        self._config_data: ConfigProfile = self._normalize_config_data(config_data or {})
         self._current_profile = ""
         self._widgets: dict[str, QWidget] = {}
         self._yaml_keys = {"filter", "filter_test"}
@@ -707,8 +1063,10 @@ class _ConfigDialog(QDialog):
 
         self._reload_profiles(initial_profile)
 
-    def _normalize_config_data(self, data: dict[str, dict[str, str | int | list[str] | dict[str, str]]]) -> dict[str, dict[str, str | int | list[str] | dict[str, str]]]:
-        normalized: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
+    def _normalize_config_data(
+        self, data: ConfigProfile
+    ) -> ConfigProfile:
+        normalized: ConfigProfile = {}
         for name, profile in data.items():
             if isinstance(profile, dict):
                 normalized[str(name)] = dict(profile)
@@ -1126,14 +1484,18 @@ class _ConfigDialog(QDialog):
         else:
             widget.setPlainText("")
 
-    def _get_config_value_for_widget(self, key: str, widget: QWidget, cfg: dict[str, str | int | list[str] | dict[str, str]], defaults: dict[str, str | int | list[str] | dict[str, str]]) -> object:
+    def _get_config_value_for_widget(
+        self, key: str, widget: QWidget, cfg: ConfigData, defaults: ConfigData
+    ) -> object:
         if key in cfg:
             return cfg[key]
         if isinstance(widget, QSpinBox):
             return defaults.get(key, "")
         return None
 
-    def _get_spinbox_default_value(self, key: str, cfg: dict[str, str | int | list[str] | dict[str, str]], defaults: dict[str, str | int | list[str] | dict[str, str]]) -> int:
+    def _get_spinbox_default_value(
+        self, key: str, cfg: ConfigData, defaults: ConfigData
+    ) -> int:
         val = defaults.get(key, 0) if key in cfg else 0
         if isinstance(val, int):
             return val
@@ -1144,7 +1506,9 @@ class _ConfigDialog(QDialog):
                 return 0
         return 0
 
-    def _load_widget_by_type(self, widget: QWidget, key: str, value: object, cfg: dict[str, str | int | list[str] | dict[str, str]], defaults: dict[str, str | int | list[str] | dict[str, str]]) -> None:
+    def _load_widget_by_type(
+        self, widget: QWidget, key: str, value: object, cfg: ConfigData, defaults: ConfigData
+    ) -> None:
         if isinstance(widget, QLineEdit):
             self._load_widget_line_edit(widget, value)
         elif isinstance(widget, QSpinBox):
@@ -1297,9 +1661,14 @@ class _ConfigDialog(QDialog):
 # JS ↔ Python bridge
 # ---------------------------------------------------------------------------
 class EditorBridge(QObject):
-    """
-    Registered with QWebChannel as "bridge".
-    Provides slots callable from Quill's JavaScript context.
+    """QWebChannel bridge for communication with Quill.js editor.
+
+    Registered with QWebChannel as "bridge". Provides slots callable from
+    JavaScript for image insertion, file operations, and content changes.
+
+    Signals:
+        dirty_changed: Emitted when content modification state changes
+        css_changed: Emitted when user selects custom CSS stylesheet
     """
 
     dirty_changed = pyqtSignal(bool)
@@ -1421,7 +1790,15 @@ class EditorBridge(QObject):
 # Main editor window
 # ---------------------------------------------------------------------------
 class EditorWindow(QMainWindow):
-    """Main WYSIWYG editor window."""
+    """Main WYSIWYG newsletter editor window.
+
+    Desktop application for composing and editing HTML newsletters.
+    Uses Quill.js for rich text editing in QWebEngineView.
+    Supports inline images, attachments, CSS customization, and sendMail output.
+
+    Args:
+        file_path: Optional markdown or HTML file to open on startup
+    """
 
     def __init__(self, file_path: str | None = None) -> None:
         super().__init__()
@@ -1911,7 +2288,8 @@ class EditorWindow(QMainWindow):
 
         underline_action = fmt_menu.addAction("&Underline")
         underline_action.setShortcut("Ctrl+U")
-        underline_action.triggered.connect(lambda: self._run_js("quill.format('underline', !quill.getFormat().underline)"))
+        underline_fmt = "quill.format('underline', !quill.getFormat().underline)"
+        underline_action.triggered.connect(lambda: self._run_js(underline_fmt))
 
         strike_action = fmt_menu.addAction("&Strikethrough")
         strike_action.setShortcut("Ctrl+Shift+X")
