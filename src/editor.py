@@ -447,6 +447,7 @@ class _SendDialog(QDialog):
         flag_layout.setContentsMargins(0, 0, 0, 0)
         flag_layout.setSpacing(10)
         self.test_check = QCheckBox("Test", flag_row)
+        self.test_check.toggled.connect(self._on_test_mode_toggled)
         self.verbose_check = QCheckBox("Verbose", flag_row)
         self.do_not_send_check = QCheckBox("Do not send", flag_row)
         self.selected_check = QCheckBox("Selected only", flag_row)
@@ -587,7 +588,9 @@ class _SendDialog(QDialog):
     def load_current_filter(self, profile: str) -> None:
         """Load filter from profile config and display in filter field."""
         profile_cfg = self._config_data.get(profile, {})
-        filter_obj = profile_cfg.get("filter")
+        # Use filter_test if test mode enabled, otherwise use filter
+        filter_key = "filter_test" if self.test_check.isChecked() else "filter"
+        filter_obj = profile_cfg.get(filter_key)
 
         if not filter_obj:
             self.filter_text_edit.setPlainText("")
@@ -608,6 +611,13 @@ class _SendDialog(QDialog):
         self.filter_text_edit.setPlainText(filter_str)
         self.filter_status_label.setText("")
         self._original_filter_text = filter_str
+        self._session_filter = None
+
+    def _on_test_mode_toggled(self, _checked: bool) -> None:
+        """Update filter when test mode is toggled (T041)."""
+        # Reload filter to show filter_test when in test mode, filter otherwise
+        self.load_current_filter(self._current_profile)
+        # Clear session filter since we're switching filter mode
         self._session_filter = None
 
     def _on_filter_text_changed(self) -> None:
