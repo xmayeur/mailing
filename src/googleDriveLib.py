@@ -40,7 +40,10 @@ def _init_log() -> logging.Logger:
     stdout_handler.setLevel(logging.DEBUG)
     stdout_handler.setFormatter(formatter)
 
-    file_handler = logging.FileHandler("sendMail.log")
+    # Use absolute path for log file to work in bundled app
+    from pathlib import Path
+    log_path = Path.home() / "sendMail.log"
+    file_handler = logging.FileHandler(str(log_path))
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
 
