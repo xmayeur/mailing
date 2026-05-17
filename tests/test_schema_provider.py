@@ -3,8 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from src.schema_provider import DatabaseSchemaProvider
 
 

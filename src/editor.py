@@ -558,10 +558,14 @@ class _SendDialog(QDialog):
             except (ValueError, TypeError):
                 return 0
 
+        self.database_input.setText(str(profile_cfg.get("database", "")))
+        # Process any pending Qt events to ensure database path is set before validation
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
         self.body_input.setText("")
-        self.database_input.setText(str(profile_cfg.get("database", "")))
         self.password_input.setText(str(profile_cfg.get("password", "")))
 
         self.from_index_input.setValue(_int_or_zero(profile_cfg.get("from_index")))
