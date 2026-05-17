@@ -1306,6 +1306,10 @@ def process_profile(args):
     if param.test:
         param.filter = param.filter_test
 
+    # T036, T037: Use session-active filter if provided (from editor dialog)
+    if hasattr(args, "session_filter") and isinstance(args.session_filter, dict):
+        param.filter = args.session_filter
+
     if generate_mailing(param) == "OK":
         if param.test:
             log.info("Test mode: mailing sent successfully.")
