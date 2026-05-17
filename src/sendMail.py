@@ -413,18 +413,19 @@ def get_subscriber_reader(param):
         return None, None
 
 
-def get_indices(header):
+def get_indices(header: list[Any]) -> dict[str, int]:
     """
     Create a dictionary that maps each header element to its corresponding
     index in the list of headers.
 
-    :param header: List of header strings.
-    :type header: list
-    :return: A dictionary where keys are elements from the header list and
-             values are their corresponding indices.
-    :rtype: dict
+    Args:
+        header: List of header values (strings or other types from CSV/sheets).
+
+    Returns:
+        Dictionary where keys are string representations of header elements
+        and values are their corresponding indices.
     """
-    return {h: i for i, h in enumerate(header)}
+    return {str(h): i for i, h in enumerate(header)}
 
 
 def get_smtp_connection(param: Any) -> SMTP | None:
@@ -729,13 +730,14 @@ def md2html(file_path, styles=None, embed_styles=False):
             data = f.read()
 
     converter = md.Markdown(extras=["tables", "header-ids", "cuddled-lists"])
+    csp = f"default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;"
 
     if styles is None:
         head = f"""
     <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
+        <meta http-equiv="Content-Security-Policy" content="{csp}">
         <style>{default_styles}</style>
     </head>
 
@@ -747,7 +749,8 @@ def md2html(file_path, styles=None, embed_styles=False):
                 <!-- Add locale and title header -->
                 <head>
                     <meta charset="UTF-8">
-                    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
+                    <meta http-equiv="Content-Security-Policy"
+                          content="{csp}">
                     <style>{default_styles}</style>
                 </head>
 
@@ -757,7 +760,7 @@ def md2html(file_path, styles=None, embed_styles=False):
    <!-- Add locale and title header -->
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' {_CSP_IMG_DOMAIN} data:;">
+        <meta http-equiv="Content-Security-Policy" content="{csp}">
         <link rel="stylesheet" href="{styles}">
     </head>
 """
@@ -769,7 +772,14 @@ def md2html(file_path, styles=None, embed_styles=False):
     return file_path
 
 
-def _set_email_headers(msg: MIMEMultipart, param: Any, subject: str, to: str, cc: str, bcc: str | None) -> tuple[str | None, str | None]:
+def _set_email_headers(
+    msg: MIMEMultipart,
+    param: Any,
+    subject: str,
+    to: str,
+    cc: str,
+    bcc: str | None,
+) -> tuple[str | None, str | None]:
     """Populate standard headers on *msg* and return the (possibly swapped) to/bcc pair."""
     msg["Subject"] = subject
     msg["From"] = formataddr((param.sendername, param.sender))
@@ -777,7 +787,7 @@ def _set_email_headers(msg: MIMEMultipart, param: Any, subject: str, to: str, cc
     msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"
     msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     if param.max_addr_per_mail == 1:
-        to = bcc
+        to = bcc  # type: ignore[assignment]
         bcc = None
         msg["To"] = to
     else:
@@ -867,7 +877,7 @@ def build_email(
         Tuple of (MIME message object, list of recipient addresses)
     """
     msg = MIMEMultipart("mixed")
-    to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)
+    to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)  # type: ignore[assignment]
 
     msg_related = MIMEMultipart("related")
     all_inline_images: list[dict[str, str]] = []
@@ -1180,7 +1190,7 @@ def send_gmail(service, message=None):
         return None
 
 
-def send_mail(param=None, message=None, recipients=None):
+def send_mail(param: Any = None, message: Any = None, recipients: Any = None) -> bool:
     """
     Send an email message to specified recipients using SMTP.
 
@@ -1190,17 +1200,13 @@ def send_mail(param=None, message=None, recipients=None):
     settings provided in the `param` object. The email is saved to the sent records
     if it is successfully sent.
 
-    :param param: A configuration object that determines the behavior of the
-        email-sending process, such as verbosity for logging.
-    :type param: Any
-    :param message: The email message to be sent, where the "From" field is
-        mandatory and expected to be correctly populated.
-    :type message: email.message.EmailMessage
-    :param recipients: A list of recipient email addresses to whom the message
-        should be sent.
-    :type recipients: list[str]
-    :return: A boolean indicating whether the email was successfully sent.
-    :rtype: bool
+    Args:
+        param: Configuration object that determines the behavior of the email-sending process
+        message: The email message to be sent with "From" field populated
+        recipients: List of recipient email addresses
+
+    Returns:
+        Boolean indicating whether the email was successfully sent
     """
     if param.verbose:  # pyright: ignore
         log.info(f"Sending email to {recipients}")
@@ -1220,7 +1226,7 @@ def send_mail(param=None, message=None, recipients=None):
                 if attempt == 0:
                     sleep(10)
 
-    if success:
+    if success and message:
         save_to_sent(param, message)
     return success
 
