@@ -1056,15 +1056,14 @@ _FILTER_OPS = [
 ]
 
 
-def _parse_filter_expr(v: str, k: str) -> tuple[str, Any]:
+def _parse_filter_expr(v: str, _k: str) -> tuple[str, Any]:
     """Parse operator and test value from a filter expression string.
 
-    Raises ValueError (already logged) when the operator is unrecognised.
+    Raises ValueError when the operator is unrecognised.
     """
     try:
         op = _FILTER_OPS[[v.find(x + " ") for x in _FILTER_OPS].index(0)]
     except ValueError:
-        log.warning(f"Invalid filter operation for field '{k}: {v}'")
         raise
 
     test_value: Any = v.split(op)[1].strip()
@@ -1079,12 +1078,11 @@ def _parse_filter_expr(v: str, k: str) -> tuple[str, Any]:
     return op, test_value
 
 
-def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
+def _eval_numeric(fv: float, tv_raw: Any, op: str, _k: str) -> bool:
     """Evaluate a numeric comparison between *fv* and *tv_raw* using *op*."""
     try:
         tv = float(tv_raw)
     except (ValueError, TypeError):
-        log.warning(f"Invalid filter value for field '{k}: {tv_raw}'")
         return False
 
     operators: dict[str, Any] = {
@@ -1116,8 +1114,7 @@ def _eval_regex(test_value: Any, field_value: str, negate: bool = False) -> bool
     try:
         match = bool(re.search(test_value, field_value))
         return (not match) if negate else match
-    except re.error as e:
-        log.warning(f"Invalid regex pattern '{test_value}': {e}")
+    except re.error:
         return True if negate else False
 
 
@@ -1150,10 +1147,10 @@ def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
     return True
 
 
-def _evaluate_condition(field_value: str, op: str, test_value: Any, k: str) -> bool:
+def _evaluate_condition(field_value: str, op: str, test_value: Any, _k: str) -> bool:
     """Return True when *field_value* satisfies *op* against *test_value*."""
     try:
-        return _eval_numeric(float(field_value), test_value, op, k)
+        return _eval_numeric(float(field_value), test_value, op, _k)
     except ValueError:
         return _eval_string(field_value, test_value, op)
 
@@ -1183,7 +1180,6 @@ def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> b
     for k, v in filter.items():
         field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
-            log.debug(f"Invalid field '{k}' - field not found in database schema")
             return True
         try:
             op, test_value = _parse_filter_expr(v, k)

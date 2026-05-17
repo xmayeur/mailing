@@ -36,8 +36,7 @@ class FilterValidator:
             if not isinstance(result, dict):
                 return None
             return result
-        except yaml.YAMLError as e:
-            log.debug("YAML parse error: %s", e)
+        except yaml.YAMLError:
             return None
 
     def validate_field_names(
