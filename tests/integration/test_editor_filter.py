@@ -414,7 +414,7 @@ test:
 
             # Table should be empty
             assert dialog.records_table.rowCount() == 0
-            assert "0 / 0" in dialog.record_count_label.text()
+            assert "0 records in database" in dialog.record_count_label.text()
         finally:
             Path(csv_path).unlink()
 
