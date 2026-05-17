@@ -12,6 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
+
 # Save real yaml module to restore after tests (prevent pollution of other tests)
 import yaml as _real_yaml
 from googleapiclient import errors
