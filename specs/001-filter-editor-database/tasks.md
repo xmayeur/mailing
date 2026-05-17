@@ -120,16 +120,34 @@
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] Add "Apply Filter" button and "Cancel" button to SendNewsletterWindow
-- [ ] T034 [US4] Implement apply_filter() slot to:
-  - Validate filter one final time
-  - Store edited filter as session-active filter (module-level or instance variable)
-  - Signal SendNewsletterWindow that filter was updated
-- [ ] T035 [US4] Implement cancel() slot to close dialog/reset filter to original (no side effects)
-- [ ] T036 [US4] Modify email send operation in SendNewsletterWindow.send_email() to use session-active filter (if set) instead of config.yml filter
-- [ ] T037 [US4] Pass session-active filter to sendMail.py email sending logic
-- [ ] T038 [P] [US4] Write unit tests for apply_filter() behavior in tests/test_editor.py
-- [ ] T039 [P] [US4] Write integration tests for session-active filter usage in email send in tests/test_editor.py
+- [X] T033 [US4] Add "Apply Filter" button and "Cancel" button to SendNewsletterWindow
+- [✓🐛] T034 [US4] Implement apply_filter() slot to:
+  - [X] Validate filter one final time
+  - [X] Store edited filter as session-active filter (module-level or instance variable)
+  - [✗ BUG] NOT updating record preview display after filter application
+- [X] T035 [US4] Implement cancel() slot to close dialog/reset filter to original (no side effects)
+- [X] T036 [US4] Modify email send operation in SendNewsletterWindow.send_email() to use session-active filter (if set)
+  instead of config.yml filter
+- [X] T037 [US4] Pass session-active filter to sendMail.py email sending logic
+- [X] T038 [P] [US4] Write unit tests for apply_filter() behavior in tests/test_editor.py
+- [X] T039 [P] [US4] Write integration tests for session-active filter usage in email send in tests/test_editor.py
+
+## Bug Fix: T034 - Apply Filter Record Display Update
+
+**Bug**: After filter validation, "Apply Filter" button returns no records (record preview doesn't update)
+
+**Root Cause**: `_SendDialog._apply_filter()` stores session filter but doesn't call `filter_and_display_records()` to
+update preview
+
+**Fix**:
+
+- [X] T034-FIX-1 [BUG] Add `self.filter_and_display_records()` call in `_apply_filter()` after successful filter
+  validation (src/editor.py:791)
+- [X] T034-FIX-2 [BUG] Write test `test_apply_filter_updates_display()` to verify record list updates after Apply Filter
+  click
+- [X] T034-FIX-3 [BUG] Verify all 23 filter editor tests pass after fix ✓
+
+**Status**: COMPLETE. Commit: 79cc9b5
 
 **Checkpoint**: All user stories complete - filter can be edited, previewed, and applied for session
 
