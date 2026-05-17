@@ -698,6 +698,29 @@ class _SendDialog(QDialog):
     def load_database_records(self) -> tuple[list[list[str]], list[str]]:
         """Load database records from CSV or Google Sheets (T026)."""
         db_path = self.database_input.text().strip()
+
+        # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
+        profile_cfg = self._config_data.get(self._current_profile, {})
+        if not db_path and profile_cfg.get("SHEETID"):
+            # Google Sheets profile - try to load records from Google Sheets
+            sa = profile_cfg.get("SA")
+            sheet_id = profile_cfg.get("SHEETID")
+            if sa and sheet_id:
+                try:
+                    import sendMail as sm  # noqa: N813
+
+                    if hasattr(sm, "open_google_db_members_sheet") and hasattr(sm, "read_all_sheet"):
+                        wb = sm.open_google_db_members_sheet(str(sa), str(sheet_id))
+                        data = sm.read_all_sheet(wb)
+                        if data and len(data) > 0:
+                            headers = [h.strip() for h in data[0] if h.strip()]
+                            rows = data[1:]  # Skip header row
+                            log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id}")
+                            return rows, headers
+                except Exception as e:
+                    log.warning("Could not load Google Sheets records: %s", e)
+            return [], []
+
         if not db_path:
             log.debug("No database path set")
             return [], []
@@ -705,7 +728,7 @@ class _SendDialog(QDialog):
         try:
             import csv
 
-            # Try CSV first
+            # Try CSV
             if db_path.endswith(".csv"):
                 with open(db_path, encoding="utf-8") as f:
                     reader = csv.reader(f)
