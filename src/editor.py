@@ -630,16 +630,23 @@ class _SendDialog(QDialog):
         self._update_validation_ui(status)
 
     def _get_database_schema(self) -> list[str]:
-        """Get database schema (field names) from active database.
-
-        Returns empty list for Google Sheets profiles (field validation skipped).
-        """
+        """Get database schema (field names) from active database or Google Sheets."""
         db_path = self.database_input.text().strip()
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
         if not db_path and profile_cfg.get("SHEETID"):
-            # Google Sheets profile - validation not available without authentication
+            # Google Sheets profile - try to load schema from Google Sheets
+            sa = profile_cfg.get("SA")
+            sheet_id = profile_cfg.get("SHEETID")
+            if sa and sheet_id:
+                try:
+                    import sendMail as sm  # noqa: N813
+
+                    if hasattr(sm, "get_google_sheets_schema"):
+                        return sm.get_google_sheets_schema(str(sa), str(sheet_id))
+                except Exception as e:
+                    log.warning("Could not load Google Sheets schema: %s", e)
             return []
 
         if not db_path:
@@ -659,10 +666,6 @@ class _SendDialog(QDialog):
         syntax_errors = status.get("syntax_errors", [])
         missing_fields = status.get("missing_fields", [])
 
-        # Check if using Google Sheets (no CSV database but has SHEETID)
-        profile_cfg = self._config_data.get(self._current_profile, {})
-        is_gsheet_profile = not self.database_input.text().strip() and profile_cfg.get("SHEETID")
-
         # T021: Visual distinction (green/red border)
         if is_valid:
             self.filter_text_edit.setStyleSheet(
@@ -677,13 +680,7 @@ class _SendDialog(QDialog):
         error_msg = ""
         if syntax_errors:
             error_msg += "Syntax: " + "; ".join(syntax_errors)
-
-        # For Google Sheets profiles, skip field validation (can't extract without auth)
-        if is_gsheet_profile and missing_fields:
-            if error_msg:
-                error_msg += " | "
-            error_msg += "Field validation unavailable (Google Sheets)"
-        elif missing_fields:
+        if missing_fields:
             if error_msg:
                 error_msg += " | "
             error_msg += f"Fields not found: {', '.join(missing_fields)}"

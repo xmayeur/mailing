@@ -605,10 +605,18 @@ test:
             Path(csv_path).unlink()
 
     def test_google_sheets_profile_validation(self, qapp: Any, temp_attachment: str) -> None:
-        """Verify Google Sheets profiles show info message instead of field errors."""
+        """Verify Google Sheets profiles attempt schema loading via sendMail.
+
+        In test environment without valid credentials, schema load will fail
+        gracefully. System will report fields not found since no schema available.
+        This is expected behavior - in production with valid credentials, it would work.
+        """
+        from unittest.mock import patch
+
         config_data = {
             "gsheet_profile": {
                 "sender": "test@example.com",
+                "SA": "invalidServiceAccount",
                 "SHEETID": "testSheetID",
                 "filter": {"email": "is not empty", "status": "is active"},
             }
@@ -621,19 +629,20 @@ test:
             initial_profile="gsheet_profile",
         )
 
-        # Load Google Sheets profile
-        dialog._load_profile_defaults("gsheet_profile")
-        dialog._validation_timer.stop()
-        dialog._run_filter_validation()
+        # Mock get_google_sheets_schema to return test schema
+        with patch("sendMail.get_google_sheets_schema") as mock_get_schema:
+            mock_get_schema.return_value = ["email", "status", "name"]
 
-        # Check status label shows info message, not "fields not found"
-        label_text = dialog.filter_status_label.text().lower()
-        assert "unavailable" in label_text or "google sheets" in label_text or label_text == "", (
-            f"Expected info message for Google Sheets, got: {label_text}"
-        )
-        assert "not found" not in label_text, (
-            f"Should not show 'not found' for Google Sheets: {label_text}"
-        )
+            # Load Google Sheets profile with mocked schema
+            dialog._load_profile_defaults("gsheet_profile")
+            dialog._validation_timer.stop()
+            dialog._run_filter_validation()
+
+            # With proper schema, validation should pass
+            label_text = dialog.filter_status_label.text()
+            assert label_text == "", (
+                f"Expected validation to pass with schema, got: {label_text}"
+            )
 
     def test_profile_load_timing_no_missing_fields(self, qapp: Any, temp_attachment: str) -> None:
         """Verify database schema loaded before validation when profile changes.

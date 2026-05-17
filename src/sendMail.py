@@ -196,6 +196,29 @@ def read_all_sheet(wb: Any, sheet_name: str = "") -> list[list[Any]]:
     return list(ws.get_all_values())
 
 
+def get_google_sheets_schema(sa: str, sheet_id: str) -> list[str]:
+    """Extract field names (header row) from Google Sheet for validation.
+
+    Args:
+        sa: Service account entry name in secret vault
+        sheet_id: Google Sheet ID entry name in secret vault
+
+    Returns:
+        List of field names from first row of Google Sheet, or empty list on error
+    """
+    try:
+        wb = open_google_db_members_sheet(sa, sheet_id)
+        data = read_all_sheet(wb)
+        if data and len(data) > 0:
+            # First row contains field names
+            headers = [h.strip() for h in data[0] if h.strip()]
+            return headers
+        return []
+    except Exception as e:  # noqa: BLE001
+        log.warning("Could not extract Google Sheets schema: %s", e)
+        return []
+
+
 class Dict2Class:
     """
     Convert a dict to a class
