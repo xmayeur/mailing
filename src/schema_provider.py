@@ -1,6 +1,11 @@
-"""Database schema extraction utilities for filter validation.
+"""Database schema extraction for filter validation.
 
-Extracts field names from CSV and Google Sheets databases.
+Extracts field names (headers) from CSV and Google Sheets databases.
+Used by filter editor to provide field name suggestions and validate
+that filter fields exist in the subscriber database.
+
+Classes:
+    DatabaseSchemaProvider: Detects database type and extracts schema
 """
 
 import csv
