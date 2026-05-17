@@ -18,10 +18,44 @@ email: is not empty
 
 **Attributes**:
 - `field`: Column name from database
-- `operator`: "is", "is not", "gt", "in", etc.
+- `operator`: Filter operation (see Supported Operations below)
 - `value`: Target value for comparison
 - `valid`: Boolean (syntax & field validation status)
 - `session_active`: Boolean (overrides config.yml when true)
+
+**Supported Filter Operations**:
+
+| Category | Operations |
+|----------|-----------|
+| **Equality** | is, is not, is equal to, is not equal to |
+| **Comparison** | gt (greater than), lt (less than), ge (greater or equal), le (less or equal) |
+| **Text Matching** | contains, does not contain, starts with, ends with, matches (regex), does not match |
+| **List Membership** | in, not in, one of, not one of |
+| **Empty/Null** | is empty, is not empty |
+| **Email-specific** | is bounced, is not bounced |
+
+**Format**: `{field_name: "operator value"}` (YAML key-value pairs)
+
+**Examples**:
+```yaml
+# Equality
+email: is john@example.com
+status: is not pending
+
+# Text matching
+name: contains John
+domain: starts with mail.
+country: ends with .uk
+message: matches .*urgent.*
+
+# List membership
+id: in 1,2,3
+role: one of admin,manager
+
+# Empty
+notes: is empty
+address: is not empty
+```
 
 **State Transitions**:
 ```

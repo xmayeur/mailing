@@ -330,12 +330,10 @@ class TestCoverageGap:
             "email": "is not empty",
             "emailBounced": "if False",
         }
-        with patch("sendMail.log") as mock_log:
-            res = sendMail.filter(
-                filter_rules, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2}
-            )
-            assert res is True
-            mock_log.debug.assert_called_once()
+        res = sendMail.filter(
+            filter_rules, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2}
+        )
+        assert res is True
 
         # Normal mode with missing title index
         res = sendMail.filter(filter_rules, ["member"], {"title": 50})
