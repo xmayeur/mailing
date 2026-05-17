@@ -51,7 +51,13 @@ log = logging.getLogger("editor")
 
 
 class _LogCapture(logging.Handler):
-    """Captures log records into a list for display in the session log dialog."""
+    """Capture log records for display in session log dialog.
+
+    Appends formatted log messages to a list as they occur.
+
+    Args:
+        log_list: List to append log messages to
+    """
 
     def __init__(self, log_list: list[str]) -> None:
         super().__init__()
@@ -885,7 +891,15 @@ class _LineFieldSpec:
 # Settings / config editor
 # ---------------------------------------------------------------------------
 class _ConfigDialog(QDialog):
-    """Dialog for editing the sendMail YAML configuration file by profile."""
+    """Dialog for editing sendMail YAML configuration by profile.
+
+    Provides tabbed interface for editing:
+    - Identity (sender, credentials)
+    - Delivery (SMTP/IMAP settings)
+    - Sources (subscriber database location)
+    - Templates (message templates, rate limits)
+    - Filters (filter_test and filter rules with validation)
+    """
 
     _TAB_HELP: dict[str, str] = {
         "Identity": (
@@ -1633,9 +1647,14 @@ class _ConfigDialog(QDialog):
 # JS ↔ Python bridge
 # ---------------------------------------------------------------------------
 class EditorBridge(QObject):
-    """
-    Registered with QWebChannel as "bridge".
-    Provides slots callable from Quill's JavaScript context.
+    """QWebChannel bridge for communication with Quill.js editor.
+
+    Registered with QWebChannel as "bridge". Provides slots callable from
+    JavaScript for image insertion, file operations, and content changes.
+
+    Signals:
+        dirty_changed: Emitted when content modification state changes
+        css_changed: Emitted when user selects custom CSS stylesheet
     """
 
     dirty_changed = pyqtSignal(bool)
@@ -1757,7 +1776,15 @@ class EditorBridge(QObject):
 # Main editor window
 # ---------------------------------------------------------------------------
 class EditorWindow(QMainWindow):
-    """Main WYSIWYG editor window."""
+    """Main WYSIWYG newsletter editor window.
+
+    Desktop application for composing and editing HTML newsletters.
+    Uses Quill.js for rich text editing in QWebEngineView.
+    Supports inline images, attachments, CSS customization, and sendMail output.
+
+    Args:
+        file_path: Optional markdown or HTML file to open on startup
+    """
 
     def __init__(self, file_path: str | None = None) -> None:
         super().__init__()

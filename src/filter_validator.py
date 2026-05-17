@@ -1,6 +1,11 @@
-"""Filter validation utilities for editor filter editing UI.
+"""Filter validation for editor UI.
 
-Provides YAML filter syntax checking and field name validation.
+Validates YAML filter syntax and subscriber database field names.
+Detects parsing errors and missing fields to provide user feedback
+when editing filters in the newsletter editor.
+
+Classes:
+    FilterValidator: Validates filter syntax and field references
 """
 
 import logging

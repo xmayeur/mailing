@@ -1,12 +1,28 @@
 #!/usr/bin/env python
-"""
-Utilities to handle logging, Google Sheets, file manipulation, and API interactions.
+"""Bulk email campaign management system for organizations.
 
-This module provides functions and classes for initializing logging, working with Google Sheets,
-manipulating files (e.g., determining MIME types or encoding files in Base64), and API interactions
-such as those for invoicing with a third-party service. It also includes utilities for processing
-HTML content and converting data structures.
+Provides functionality for sending email campaigns to subscribers via SMTP or Gmail API,
+with support for:
+- Google Sheets and CSV subscriber databases
+- HTML email templates with inline image support
+- Rate limiting and batch processing
+- Google Drive integration for attachments
+- Markdown to HTML conversion
+- Flexible filtering based on subscriber attributes
+- Email profiles with IMAP/SMTP configuration
 
+Main usage:
+    python src/sendMail.py --profile <profile_name> -s "Subject" [files...]
+
+Key classes:
+    Dict2Class: Convert dictionaries to objects
+
+Key functions:
+    build_email: Build MIME email message
+    send_mail: Send email via SMTP
+    send_gmail: Send email via Gmail API
+    filter: Filter subscriber rows based on criteria
+    generate_mailing: Generate and send campaign emails
 """
 from __future__ import annotations
 
@@ -80,17 +96,11 @@ _OP_IS_NOT_BOUNCED = "is not bounced"
 
 
 def get_default_config_path():
-    """
-    Determines the home directory of the current user based on the operating system.
+    """Get default configuration file path based on OS home directory.
 
-    This function checks the operating system and retrieves the appropriate
-    environment variable that represents the user's home directory. For Windows,
-    it uses the `USERPROFILE` environment variable. For other operating systems,
-    it uses the `HOME` environment variable.
-
-    :return: The path to the user's home directory as a string, or None if it
-        cannot be determined.
-    :rtype: Optional[str]
+    Returns:
+        str: Path to sendMail.yml in user's .config directory,
+             e.g., ~/.config/sendMail.yml
     """
     home = getenv("USERPROFILE") if os.name == "nt" else getenv("HOME")
     home = home or ""
@@ -133,18 +143,16 @@ def get_default_config_path():
     return cfg
 
 
-def init_log(log_file=None):
-    """
-    Initializes and configures a logger for logging messages. The logger writes
-    messages to the console and optionally to a log file, using a predefined
-    format for log messages. This function sets the logger's default level to
-    INFO and the file handler's level to DEBUG if a file logger is enabled.
+def init_log(log_file: str | None = None) -> logging.Logger:
+    """Initialize logging configuration.
 
-    :param log_file: Path to the file where log messages will be stored. If None,
-        no file logging is enabled. Optional.
-    :type log_file: str, optional
-    :return: Configured logger instance.
-    :rtype: logging.Logger
+    Sets up logging with default format, level, and optional file handler.
+
+    Args:
+        log_file: Path to log file. If None, logs to console only (default: None)
+
+    Returns:
+        Configured Logger instance
     """
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -164,12 +172,15 @@ log = init_log(log_file="sendMail.log")
 
 
 # for artscroises profile
-def open_google_db_members_sheet(sa, sheet_id):
-    """
-    Open  a Google Sheet and return it as a spreadsheet object
-    :param sa: Service Account entry name in secret vault
-    :param sheet_id: Google Sheet ID entry name in secret vault
-    :return: a workbook spreadsheet object
+def open_google_db_members_sheet(sa: str, sheet_id: str) -> Any:
+    """Open Google Sheet and return spreadsheet object.
+
+    Args:
+        sa: Service account entry name in secret vault
+        sheet_id: Google Sheet ID entry name in secret vault
+
+    Returns:
+        gspread Spreadsheet object for reading/writing data
     """
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -186,11 +197,14 @@ def open_google_db_members_sheet(sa, sheet_id):
 
 
 def read_all_sheet(wb: Any, sheet_name: str = "") -> list[list[Any]]:
-    """
-    Read all ranges of a sheet
-    :param wb: workbook object
-    :param sheet_name: sheet name - default=sheet1
-    :return: range of value (array of arrays)
+    """Read all values from a Google Sheet.
+
+    Args:
+        wb: gspread Spreadsheet object
+        sheet_name: Sheet name to read. If empty, reads first sheet
+
+    Returns:
+        List of lists containing all sheet values (array of arrays)
     """
     ws = wb.sheet1 if not sheet_name else wb.worksheet(sheet_name)
     return list(ws.get_all_values())
@@ -220,8 +234,18 @@ def get_google_sheets_schema(sa: str, sheet_id: str) -> list[str]:
 
 
 class Dict2Class:
-    """
-    Convert a dict to a class
+    """Convert dictionary to object with lowercase attribute names.
+
+    Allows dict-like configs to be accessed as objects (obj.key instead of dict['key']).
+    All keys are converted to lowercase attribute names.
+
+    Args:
+        my_dict: Dictionary to convert to object
+
+    Example:
+        config = Dict2Class({'Name': 'John', 'Email': 'j@example.com'})
+        config.name  # 'John'
+        config.email  # 'j@example.com'
     """
 
     def __init__(self, my_dict: dict[str, Any]) -> None:
@@ -236,15 +260,16 @@ class Dict2Class:
 
 
 def guess_type(filepath: str) -> str | None:
-    """
-    Return the mimetype of a file, given its path.
-    This is a wrapper around two alternative methods - Unix 'file'-style
-    magic which guesses the type based on file content (if available),
-    and simple guessing based on the file extension (eg .jpg).
-    :param filepath: Path to the file.
-    :type filepath: str
-    :return: Mimetype string.
-    :rtype: str
+    """Detect MIME type of a file by content or extension.
+
+    Tries magic-based detection first (file content), falls back to
+    extension-based guessing if magic not available.
+
+    Args:
+        filepath: Path to file to identify
+
+    Returns:
+        MIME type string (e.g., 'image/png') or None if detection fails
     """
     try:
         import magic  # type: ignore[import-not-found]
@@ -258,12 +283,15 @@ def guess_type(filepath: str) -> str | None:
 
 
 def file_to_base64(filepath: str) -> str:
-    """
-    Returns the content of a file as a Base64 encoded string.
-    :param filepath: Path to the file.
-    :type filepath: str
-    :return: The file content, Base64 encoded.
-    :rtype: str
+    """Encode file contents as base64 string.
+
+    Handles both local files and HTTP URLs.
+
+    Args:
+        filepath: Local file path or HTTP URL
+
+    Returns:
+        Base64 encoded file content as string, or empty string on error
     """
     import base64
 
@@ -399,11 +427,20 @@ def get_indices(header):
     return {h: i for i, h in enumerate(header)}
 
 
-def get_smtp_connection(param):
-    """
-    Open a connection to the SMTP server.
-    :param param:
-    :return:
+def get_smtp_connection(param: Any) -> SMTP | None:
+    """Open SMTP connection with TLS.
+
+    Creates connection to SMTP server, upgrades to TLS, and authenticates
+    with provided credentials.
+
+    Args:
+        param: Configuration object with smtp_host, smtp_port, username, password
+
+    Returns:
+        SMTP connection object, or None if connection failed
+
+    Raises:
+        SystemExit: On authentication failure (logs critical error)
     """
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
@@ -460,12 +497,16 @@ def get_gmail_service(param):
     return build("gmail", "v1", credentials=creds)
 
 
-def save_to_sent(param, msg):
-    """
-    Store the message in the Sent folder using IMAP.
-    :param param:
-    :param msg:
-    :return:
+def save_to_sent(param: Any, msg: MIMEMultipart) -> None:
+    """Store message in IMAP Sent folder.
+
+    Saves sent email to Sent folder for archival. Retries up to 3 times
+    on failure with 10-second delays.
+
+    Args:
+        param: Configuration object with imap_host, imap_port, username,
+               password, sent_folder, verbose
+        msg: Email message (MIMEMultipart) to store
     """
     n = 3
     for attempt in range(n):
@@ -573,26 +614,19 @@ def prepare_html_and_get_images(in_filepath, max_width=800):
     return str(soup), inline_images, temp_dir
 
 
-def format_message(template, row, header):
-    """
-    Formats a message template by replacing placeholders with corresponding values
-    from the `row` list, based on the column names provided in the `header`.
+def format_message(template: str, row: list[Any], header: list[str]) -> str:
+    """Format message by replacing ${field} placeholders with row values.
 
-    The placeholders within the template follow the syntax `${column_name}`,
-    where `column_name` corresponds to an entry in the `header` list. If any
-    error occurs during formatting, the original template is returned unchanged.
+    Substitutes template placeholders with subscriber data. Placeholders use
+    syntax ${column_name} which maps to header column names.
 
-    :param template: The template string containing placeholders to be replaced.
-    :type template: str
-    :param row: A list of values where indexes correspond to the column names in the
-        `header`.
-    :type row: list
-    :param header: A list of column names, where the index of each column
-        corresponds to positional values in `row`.
-    :type header: list
-    :return: A formatted string with placeholders substituted with values from the
-        `row` list, or the original template in case of an error.
-    :rtype: str
+    Args:
+        template: Template string with ${field_name} placeholders
+        row: List of subscriber values (one per column)
+        header: List of column/field names (indices match row)
+
+    Returns:
+        Formatted message with values substituted, or original template on error
     """
     try:
         def _replace(m: re.Match[str]) -> str:
@@ -735,7 +769,7 @@ def md2html(file_path, styles=None, embed_styles=False):
     return file_path
 
 
-def _set_email_headers(msg, param, subject, to, cc, bcc):
+def _set_email_headers(msg: MIMEMultipart, param: Any, subject: str, to: str, cc: str, bcc: str | None) -> tuple[str | None, str | None]:
     """Populate standard headers on *msg* and return the (possibly swapped) to/bcc pair."""
     msg["Subject"] = subject
     msg["From"] = formataddr((param.sendername, param.sender))
@@ -804,31 +838,33 @@ def _attach_body(msg, msg_related, message, all_inline_images):
 
 
 def build_email(
-        param, subject="", to="", cc="", bcc="", message="", images=None, attachments=None
-):
-    """
-    Constructs an email message with specified subject, recipients, message body,
-    attachments, or inline images. The email includes advanced configurations such as
-    List-Unsubscribe headers and inline attachment handling. Designed to
-    support both simple and complex email requirements with flexibility.
+        param: Any,
+        subject: str = "",
+        to: str = "",
+        cc: str = "",
+        bcc: str | None = None,
+        message: str = "",
+        images: str | list[str] | None = None,
+        attachments: str | list[str] | None = None
+) -> tuple[MIMEMultipart, list[str]]:
+    """Build MIME email message with attachments and inline images.
 
-    :param param: A configuration object containing sender details, profiles, and rules.
-    :param subject: The subject of the email. Defaults to an empty string.
-    :type subject: str, optional
-    :param to: Comma-separated email addresses for primary recipients. Defaults to an empty string.
-    :type to: str, optional
-    :param cc: Comma-separated email addresses for carbon copy recipients. Defaults to an empty string.
-    :type cc: str, optional
-    :param bcc: Comma-separated email addresses for blind carbon copy recipients. Defaults to an empty string.
-    :type bcc: str, optional
-    :param message: The plain text or HTML content of the email body. Defaults to an empty string.
-    :type message: str, optional
-    :param images: File paths of inline images to include in the email body. Can be a string or a list of strings. Defaults to None.
-    :type images: Union[str, list[str]], optional
-    :param attachments: File paths of attachments to include in the email. Can be a string or a list of strings. Defaults to None.
-    :type attachments: Union[str, list[str]], optional
-    :return: A tuple containing the constructed email message (MIMEMultipart object) and list of recipient email addresses.
-    :rtype: Tuple[MIMEMultipart, list[str]]
+    Constructs multipart email with headers, body, inline images, and
+    attachments. Supports HTML/text bodies, inline CID images, and file
+    attachments.
+
+    Args:
+        param: Configuration object with sender details
+        subject: Email subject line
+        to: Comma-separated To addresses
+        cc: Comma-separated CC addresses
+        bcc: Comma-separated BCC addresses
+        message: HTML or text email body
+        images: File path(s) of inline images (str or list)
+        attachments: File path(s) of attachments (str or list)
+
+    Returns:
+        Tuple of (MIME message object, list of recipient addresses)
     """
     msg = MIMEMultipart("mixed")
     to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)
@@ -1082,57 +1118,22 @@ def _evaluate_condition(field_value: str, op: str, test_value: Any, k: str) -> b
         return _eval_string(field_value, test_value, op)
 
 
-def filter(filter, row, indices):  # noqa: A001,A002
-    """
-    Evaluates a set of filtering conditions on a given row of data using field indices.
+def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> bool:  # noqa: A001,A002
+    """Filter row: return True if should be EXCLUDED, False if INCLUDED.
 
-    This function checks each field-value pair in a filter dictionary against a row of
-    data by performing the specified operations. Only rows that do not match the filter
-    criteria will pass (return `False`). The function supports a variety of comparison
-    operations, such as equality, inequality, greater-than, less-than, and membership.
+    Applies filter conditions to subscriber row. All filter conditions must
+    match for row to be included (AND logic).
 
-    Supported operations:
-    - "is"
-    - "is not"
-    - "gt" (greater than)
-    - "lt" (less than)
-    - "ge" (greater than or equal)
-    - "le" (less than or equal)
-    - "in"
-    - "not in"
-    - "is empty"
-    - "is not empty"
-    - "greater than" (alias for "gt")
-    - "less than" (alias for "lt")
-    - "greater or equal to" (alias for "ge")
-    - "less or equal to" (alias for "le")
-    - "one of" (alias for "in")
-    - "none of" (alias for "not in")
-    - "is equal to" (alias for "is")
-    - "is not equal to" (alias for "is not")
-    - "eq" (alias for "is equal to")
-    - "ne" (alias for "is not equal to")
+    Supported operations: is, is not, gt, lt, ge, le, in, not in,
+    is empty, is not empty, and their aliases (e.g., "greater than", "one of").
 
-    Filter values can specify further conditions through implicit parsing. For example:
-    - Comma-separated values for membership tests (e.g., "in").
-    - Empty string values to test for emptiness.
+    Args:
+        filter: Dict of {field_name: "operator value"} (e.g., {"status": "is active"})
+        row: List of subscriber field values
+        indices: Dict mapping field names to column indices
 
-    The function logs warnings for invalid operations or values encountered in the filter.
-
-    :param filter: Dictionary containing filter conditions, where each key represents
-                   a field name, and the value is a string describing the operation
-                   and target value (e.g., "gt 10").
-    :type filter: dict
-    :param row: A list of field values representing a single data row that will be
-                checked against the filtering criteria.
-    :type row: list
-    :param indices: Dictionary mapping filter field names to their respective column
-                    index positions in the `row` list. Used to retrieve field values
-                    for comparison.
-    :type indices: dict
-    :return: `True` if the given row does not satisfy the filter criteria, `False`
-             otherwise.
-    :rtype: bool
+    Returns:
+        True if row should be filtered OUT (excluded), False if INCLUDED
     """
     if not filter:
         return False

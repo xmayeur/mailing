@@ -1,6 +1,10 @@
-"""Filter matching wrapper for editor filter application.
+"""Filter matching wrapper for editor filter preview.
 
-Wraps sendMail.filter() function for use in filter editor preview.
+Wraps sendMail.filter() to apply filters in the newsletter editor UI.
+Provides live preview of how filters will affect subscriber lists.
+
+Classes:
+    FilterMatcher: Applies filters to rows for preview in editor UI
 """
 
 import logging
