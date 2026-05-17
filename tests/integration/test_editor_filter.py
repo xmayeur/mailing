@@ -11,9 +11,9 @@ from PyQt6.QtWidgets import QApplication
 from src.editor import _SendDialog
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def qapp() -> Any:
-    """Session-scope QApplication fixture."""
+    """QApplication fixture."""
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
