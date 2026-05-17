@@ -467,11 +467,24 @@ class _SendDialog(QDialog):
         flag_layout.addStretch(1)
         form.addRow("Flags", flag_row)
 
-        # Record preview (T024, T025)
+        # Record preview (T024, T025, T040: retry button for errors)
         root.addSpacing(10)
+        record_header_layout = QHBoxLayout()
         self.record_count_label = QLabel("Matching Records: 0", self)
         self.record_count_label.setStyleSheet("font-weight: bold;")
-        root.addWidget(self.record_count_label)
+        record_header_layout.addWidget(self.record_count_label)
+
+        # T040: Retry button for database connection failures
+        self.retry_load_btn = QPushButton("Retry", self)
+        self.retry_load_btn.setMaximumWidth(80)
+        self.retry_load_btn.clicked.connect(self.filter_and_display_records)
+        self.retry_load_btn.hide()  # Hidden by default, shown on error
+        record_header_layout.addWidget(self.retry_load_btn)
+        record_header_layout.addStretch()
+
+        record_header_widget = QWidget(self)
+        record_header_widget.setLayout(record_header_layout)
+        root.addWidget(record_header_widget)
 
         self.records_table = QTableWidget(self)
         self.records_table.setMinimumHeight(120)
@@ -749,26 +762,54 @@ class _SendDialog(QDialog):
         try:
             import csv
 
-            # Try CSV
+            # Try CSV with robust encoding handling (T043: Unicode support)
             if db_path.endswith(".csv"):
-                with open(db_path, encoding="utf-8") as f:
-                    reader = csv.reader(f)
-                    headers = next(reader, [])
-                    rows = list(reader)
-                    log.debug(f"Loaded {len(rows)} records from {db_path}")
-                    return rows, headers
+                # Try UTF-8 first, fall back to latin-1 if needed
+                encodings = ["utf-8", "latin-1", "utf-8-sig"]
+                for encoding in encodings:
+                    try:
+                        with open(db_path, encoding=encoding) as f:
+                            reader = csv.reader(f)
+                            headers = next(reader, [])
+                            rows = list(reader)
+                            log.debug(f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})")
+                            return rows, headers
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+                # If all encodings fail, raise error
+                raise ValueError(f"Could not decode {db_path} with any supported encoding")
         except Exception as e:
             log.warning("Could not load database: %s", e)
 
         return [], []
 
     def filter_and_display_records(self) -> None:
-        """Load, filter, and display database records (T027, T028)."""
+        """Load, filter, and display database records (T027, T028, T040, T041, T042)."""
+        # T041: Handle profile switching by tracking current profile
+        if not hasattr(self, "_last_profile"):
+            self._last_profile = self._current_profile
+
         filter_text = self.filter_text_edit.toPlainText()
         rows, headers = self.load_database_records()
 
-        if not headers or not rows:
-            self._update_record_display([], headers, 0)
+        # T040, T042: Better error and zero-record handling
+        if not headers:
+            # Database load failed - show error message with retry button
+            self.record_count_label.setText("Matching Records: Error loading database")
+            self.record_count_label.setStyleSheet("color: #f44336; font-weight: bold;")
+            self.retry_load_btn.show()  # T040: Show retry button on error
+            self.records_table.setColumnCount(0)
+            self.records_table.setRowCount(0)
+            return
+
+        if not rows:
+            # T042: Zero records - show clear message
+            self.record_count_label.setText("Matching Records: 0 records in database")
+            self.record_count_label.setStyleSheet("color: #666; font-weight: bold;")
+            self.retry_load_btn.hide()  # No retry needed for zero records
+            self.records_table.setColumnCount(len(headers))
+            self.records_table.setHorizontalHeaderLabels(headers)
+            self.records_table.setRowCount(0)
             return
 
         # T028: Apply filter using FilterMatcher
@@ -787,6 +828,9 @@ class _SendDialog(QDialog):
                 log.debug(f"No filter, showing all {len(rows)} records")
 
             self._update_record_display(filtered_rows, headers, len(rows))
+            # Reset error state on success
+            self.record_count_label.setStyleSheet("font-weight: bold;")
+            self.retry_load_btn.hide()  # T040: Hide retry button when successful
         except Exception as e:
             log.warning("Could not filter records: %s", e)
             self._update_record_display(rows, headers, len(rows))
