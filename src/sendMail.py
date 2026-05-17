@@ -49,6 +49,7 @@ from getpass import getpass
 from glob import glob
 from os import getenv, mkdir
 from os.path import exists, join
+from pathlib import Path
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 from time import sleep, time
 from typing import Any
@@ -58,6 +59,7 @@ import gspread
 import markdown2 as md
 import requests
 import yaml
+from PIL import Image
 from bs4 import BeautifulSoup
 from getSecrets import get_secret
 from google.auth.transport.requests import Request
@@ -66,7 +68,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient import errors
 from googleapiclient.discovery import build
 from oauth2client.service_account import ServiceAccountCredentials
-from PIL import Image
 
 import googleDriveLib as gd  # noqa: N813
 
@@ -168,7 +169,9 @@ def init_log(log_file: str | None = None) -> logging.Logger:
     return logger
 
 
-log = init_log(log_file="sendMail.log")
+# Use absolute path for log file to work in bundled app
+_log_path = str(Path.home() / "sendMail.log")
+log = init_log(log_file=_log_path)
 
 
 # for artscroises profile
