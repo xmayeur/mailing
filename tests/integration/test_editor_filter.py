@@ -1,6 +1,8 @@
 """Tests for _SendDialog filter functionality."""
 
 # pyright: ignore[reportArgumentType]
+import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -9,6 +11,12 @@ import pytest
 from PyQt6.QtWidgets import QApplication
 
 from src.editor import _SendDialog
+
+# Skip all tests on Linux CI (Qt GUI tests require display server)
+pytestmark = pytest.mark.skipif(
+    sys.platform.startswith("linux") and "GITHUB_ACTIONS" in os.environ,
+    reason="Qt GUI tests require display server, not available on Linux CI"
+)
 
 
 @pytest.fixture

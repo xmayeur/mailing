@@ -44,6 +44,8 @@ them through `sendMail`.
 
 The editor is a separate desktop app for creating and editing newsletter content visually.
 
+📖 **[Read the Editor Tutorial](TUTORIAL.md)** for a complete guide on using the editor.
+
 ### Main Features
 
 - Open blank documents or existing `.md` and `.html` files
@@ -52,6 +54,9 @@ The editor is a separate desktop app for creating and editing newsletter content
 - Insert links, tables, horizontal rules, and named anchors
 - Apply custom CSS to preview and exported HTML
 - Preserve sendMail-ready HTML output for direct campaign use
+- Advanced filter validation with real-time syntax checking
+- Database preview showing filtered subscriber records
+- Google Sheets and CSV database integration
 
 ### Launching the Editor
 
