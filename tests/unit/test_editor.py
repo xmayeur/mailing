@@ -5,6 +5,7 @@ All PyQt6 modules are mocked before import so these tests run headlessly
 on CI without a display server, following the same pattern used in test_sendMail.py.
 """
 # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
+# mypy: ignore-errors
 
 # ---------------------------------------------------------------------------
 # Mock all Qt modules BEFORE importing editor
@@ -171,7 +172,7 @@ class TestEditorBridgeContentTracking:
         bridge.on_content_changed("<p>A</p>")
         bridge.on_content_changed("<p>B</p>")
         # Signal should emit True exactly once (first change only)
-        bridge.dirty_changed.emit.assert_called_once_with(True)
+        bridge.dirty_changed.emit.assert_called_once_with(True)  # pyright: ignore
 
     def test_get_current_html_returns_last_content(self):
         bridge = _make_bridge()
@@ -197,7 +198,7 @@ class TestEditorBridgeContentTracking:
         bridge.on_content_changed("<p>x</p>")
         bridge.dirty_changed.emit.reset_mock()
         bridge.reset()
-        bridge.dirty_changed.emit.assert_called_once_with(False)
+        bridge.dirty_changed.emit.assert_called_once_with(False)  # pyright: ignore
 
     def test_log_js_error_does_not_raise(self):
         bridge = _make_bridge()
@@ -457,7 +458,7 @@ class TestLocalImageInlining:
         ):
             result = win._html_to_body_html("/fake/file.html")
 
-        mock_inline.assert_called_once_with("/fake/file.html")
+        mock_inline.assert_called_once_with("/fake/file.html")  # pyright: ignore
         assert "data:image/png;base64,abc" in result
 
     def test_fallback_when_sm_unavailable(self):
@@ -497,7 +498,7 @@ class TestHrInsertion:
         win = self._make_window_with_run_js()
         # Simulate what the menu action's triggered lambda does
         win._run_js("insertHR()")
-        win._run_js.assert_called_once_with("insertHR()")
+        win._run_js.assert_called_once_with("insertHR()")  # pyright: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -515,17 +516,17 @@ class TestVerticalAlignment:
     def test_valign_top_runjs(self):
         win = self._make_window_with_run_js()
         win._run_js("setVAlign('top')")
-        win._run_js.assert_called_with("setVAlign('top')")
+        win._run_js.assert_called_with("setVAlign('top')")  # pyright: ignore
 
     def test_valign_middle_runjs(self):
         win = self._make_window_with_run_js()
         win._run_js("setVAlign('middle')")
-        win._run_js.assert_called_with("setVAlign('middle')")
+        win._run_js.assert_called_with("setVAlign('middle')")  # pyright: ignore
 
     def test_valign_bottom_runjs(self):
         win = self._make_window_with_run_js()
         win._run_js("setVAlign('bottom')")
-        win._run_js.assert_called_with("setVAlign('bottom')")
+        win._run_js.assert_called_with("setVAlign('bottom')")  # pyright: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -899,7 +900,7 @@ def _make_config_dialog_stub():
         }
     }
     dlg._current_profile = "alpha"
-    dlg._widgets = {
+    dlg._widgets = {  # pyright: ignore
         "MAILCONFIG": _LineEditLike("secret"),
         "sender": _LineEditLike("alpha@example.com"),
         "sendername": _LineEditLike("Alpha"),
@@ -937,9 +938,9 @@ def _make_config_dialog_stub():
     }
     dlg._yaml_keys = {"filter", "filter_test"}
     dlg._list_keys = {"scopes"}
-    dlg.tabs = _FakeTabs()
+    dlg.tabs = _FakeTabs()  # pyright: ignore
     dlg.help_view = MagicMock()
-    dlg.config_input = _LineEditLike("")
+    dlg.config_input = _LineEditLike("")  # pyright: ignore
     dlg.profile_combo = _FakeCombo()
     return dlg
 
@@ -1028,7 +1029,7 @@ class TestConfigDialogHelpers:
         dlg._reload_profiles("alpha")
         assert dlg.profile_combo.items[0] == "alpha"
         assert "default" in dlg.profile_combo.items
-        dlg._load_profile.assert_called_with("alpha")
+        dlg._load_profile.assert_called_with("alpha")  # pyright: ignore
 
         with patch.object(editor.QInputDialog, "getText", return_value=("beta", True)):
             assert dlg._new_profile_name("Add", "beta") == "beta"
@@ -1054,11 +1055,11 @@ class TestConfigDialogHelpers:
 
         dlg.tabs = _FakeTabs("Templates")
         dlg._update_help(0)
-        dlg.help_view.setHtml.assert_called_once()
+        dlg.help_view.setHtml.assert_called_once()  # pyright: ignore
 
         with patch.object(editor.QMessageBox, "information") as mock_info:
             dlg._show_help()
-            mock_info.assert_called_once()
+            mock_info.assert_called_once()  # pyright: ignore
 
 
 class TestEditorWindowHelpers:
@@ -1086,15 +1087,15 @@ class TestEditorWindowHelpers:
         ) as mock_open:
             window = editor.EditorWindow()
             assert window._file_path is None
-            mock_load.assert_called_once_with(window, "")
-            mock_open.assert_not_called()
+            mock_load.assert_called_once_with(window, "")  # pyright: ignore
+            mock_open.assert_not_called()  # pyright: ignore
 
         with patch.object(editor.EditorWindow, "_load_editor_page", autospec=True) as mock_load, patch.object(
                 editor.EditorWindow, "open_file", autospec=True
         ) as mock_open:
             window = editor.EditorWindow(file_path="sample.md")
-            mock_open.assert_called_once_with(window, "sample.md")
-            mock_load.assert_not_called()
+            mock_open.assert_called_once_with(window, "sample.md")  # pyright: ignore
+            mock_load.assert_not_called()  # pyright: ignore
 
     def test_resolve_load_and_format_helpers(self, monkeypatch, tmp_path):
         win = self._make_window()
@@ -1124,12 +1125,12 @@ class TestEditorWindowHelpers:
         win._file_path = str(tmp_path / "doc.html")
         win._bridge.is_dirty = True
         win._update_title()
-        win.setWindowTitle.assert_called_with("sendMail Editor — doc.html *")
+        win.setWindowTitle.assert_called_with("sendMail Editor — doc.html *")  # pyright: ignore
 
         win._file_path = None
         win._bridge.is_dirty = False
         win._update_title()
-        win.setWindowTitle.assert_called_with("sendMail Editor — New Document")
+        win.setWindowTitle.assert_called_with("sendMail Editor — New Document")  # pyright: ignore
 
         win._run_js("quill.format('font', 'Arial')")
         assert "Arial" in win._view.page().runJavaScript.call_args.args[0]
@@ -1143,27 +1144,27 @@ class TestEditorWindowHelpers:
 
         with patch.object(win, "_ask_save_if_dirty", return_value=False):
             win._menu_open()
-        win.open_file.assert_not_called()
+        win.open_file.assert_not_called()  # pyright: ignore
 
         with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(editor.QFileDialog,
                                                                                       "getOpenFileName", return_value=(
                         str(tmp_path / "doc.md"), "")):
             win._menu_open()
-        win.open_file.assert_called_with(str(tmp_path / "doc.md"))
+        win.open_file.assert_called_with(str(tmp_path / "doc.md"))  # pyright: ignore
 
         template_dir = tmp_path / "data"
         template_dir.mkdir()
         (template_dir / "template.md").write_text("# t", encoding="utf-8")
         with patch.object(win, "_ask_save_if_dirty", return_value=True):
             win._open_template()
-        win.open_file.assert_called_with(str(template_dir / "template.md"))
+        win.open_file.assert_called_with(str(template_dir / "template.md"))  # pyright: ignore
 
         (template_dir / "template.md").unlink()
         with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(editor.QFileDialog,
                                                                                       "getOpenFileName", return_value=(
                         str(tmp_path / "fallback.md"), "")):
             win._open_template()
-        win.open_file.assert_called_with(str(tmp_path / "fallback.md"))
+        win.open_file.assert_called_with(str(tmp_path / "fallback.md"))  # pyright: ignore
 
         win._run_js = MagicMock()
         win._bridge.request_image_insert = MagicMock(return_value="data:image/png;base64,abc")
@@ -1176,7 +1177,7 @@ class TestEditorWindowHelpers:
 
         with patch.object(editor.QFileDialog, "getOpenFileName", return_value=(str(tmp_path / "style.css"), "")):
             win._menu_apply_css()
-        win._bridge.css_changed.emit.assert_called_once()
+        win._bridge.css_changed.emit.assert_called_once()  # pyright: ignore
 
     def test_send_menu_and_dirty_flow(self, monkeypatch, tmp_path):
         win = self._make_window()
@@ -1197,8 +1198,8 @@ class TestEditorWindowHelpers:
             log_dialog = mock_log_dialog.return_value
             log_dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
             win._menu_send()
-            mock_send.assert_called_once()
-            mock_log_dialog.assert_called_once()
+            mock_send.assert_called_once()  # pyright: ignore
+            mock_log_dialog.assert_called_once()  # pyright: ignore
 
         with patch.object(editor, "_SendDialog") as mock_dialog, patch.object(editor,
                                                                               "_SessionLogDialog") as mock_log_dialog, patch.object(
@@ -1213,18 +1214,18 @@ class TestEditorWindowHelpers:
             log_dialog = mock_log_dialog.return_value
             log_dialog.exec.return_value = editor.QDialog.DialogCode.Accepted
             win._menu_send()
-            mock_log_dialog.assert_called_once()
+            mock_log_dialog.assert_called_once()  # pyright: ignore
 
         win._send_in_progress = True
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
             win._menu_send()
-            mock_warning.assert_not_called()
+            mock_warning.assert_not_called()  # pyright: ignore
 
         win._send_in_progress = False
         monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
             win._menu_send()
-            mock_warning.assert_called_once()
+            mock_warning.assert_called_once()  # pyright: ignore
 
     def test_css_change_and_prompt_paths(self, monkeypatch, tmp_path):
         win = self._make_window()
@@ -1233,13 +1234,13 @@ class TestEditorWindowHelpers:
         win._run_js = MagicMock()
         win._on_css_changed(str(css_path))
         assert win._css_path == str(css_path)
-        win._css_status_label.setText.assert_called_with("CSS: style.css")
+        win._css_status_label.setText.assert_called_with("CSS: style.css")  # pyright: ignore
         assert "applyCSS" in win._run_js.call_args.args[0]
 
         bad = tmp_path / "missing.css"
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
             win._on_css_changed(str(bad))
-            mock_warning.assert_called_once()
+            mock_warning.assert_called_once()  # pyright: ignore
 
         win._bridge.is_dirty = False
         assert win._ask_save_if_dirty() is True
@@ -1249,7 +1250,7 @@ class TestEditorWindowHelpers:
                           return_value=editor.QMessageBox.StandardButton.Save), patch.object(win, "_save",
                                                                                              return_value=True) as mock_save:
             assert win._ask_save_if_dirty() is True
-            mock_save.assert_called_once()
+            mock_save.assert_called_once()  # pyright: ignore
 
         with patch.object(editor.QMessageBox, "question", return_value=editor.QMessageBox.StandardButton.Discard):
             assert win._ask_save_if_dirty() is True
@@ -1260,12 +1261,12 @@ class TestEditorWindowHelpers:
         event = MagicMock()
         win._bridge.is_dirty = False
         win.closeEvent(event)
-        event.accept.assert_called_once()
+        event.accept.assert_called_once()  # pyright: ignore
 
         event = MagicMock()
         win._ask_save_if_dirty = MagicMock(return_value=False)
         win.closeEvent(event)
-        event.ignore.assert_called_once()
+        event.ignore.assert_called_once()  # pyright: ignore
 
     def test_window_load_save_toolbar_and_dialog_paths(self, monkeypatch, tmp_path):
         win = self._make_window()
@@ -1295,7 +1296,7 @@ class TestEditorWindowHelpers:
         assert win._view.load.called
         assert win._view.loadFinished.connected
         win._view.loadFinished.connected[0](True)
-        win._inject_initial_content.assert_called_once_with("<p>hello</p>")
+        win._inject_initial_content.assert_called_once_with("<p>hello</p>")  # pyright: ignore
 
         css_path = tmp_path / "style.css"
         css_path.write_text("body { color: blue; }", encoding="utf-8")
@@ -1317,8 +1318,8 @@ class TestEditorWindowHelpers:
         editor.EditorWindow._save(win)
         assert win._write_html_file.called
         assert win._file_path.endswith(".html")
-        win._bridge.reset.assert_called_once()
-        status_bar.showMessage.assert_called_once()
+        win._bridge.reset.assert_called_once()  # pyright: ignore
+        status_bar.showMessage.assert_called_once()  # pyright: ignore
 
         with patch.object(editor.QFileDialog, "getSaveFileName", return_value=(str(tmp_path / "custom.html"), "")):
             win._file_path = None
@@ -1345,7 +1346,7 @@ class TestEditorWindowHelpers:
             patch("editor._ConfigDialog", return_value=mock_cfg_dialog),
         ):
             win._menu_edit_config()
-        mock_cfg_dialog.exec.assert_called_once()
+        mock_cfg_dialog.exec.assert_called_once()  # pyright: ignore
 
         added = []
 
@@ -1355,7 +1356,7 @@ class TestEditorWindowHelpers:
         win.addToolBar = MagicMock(side_effect=_add_toolbar)
         win._build_toolbars()
         assert added
-        win.style.assert_called_once()
+        win.style.assert_called_once()  # pyright: ignore
 
     def test_md_and_html_conversion_paths(self, monkeypatch, tmp_path):
         win = self._make_window()
@@ -1372,13 +1373,13 @@ class TestEditorWindowHelpers:
             output = win._md_to_body_html(str(md_path))
             assert output == "<p>ok</p>"
             assert not output_html.exists()
-            mock_convert.assert_called_once()
+            mock_convert.assert_called_once()  # pyright: ignore
 
         monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
         monkeypatch.setattr(editor, "_MD2_AVAILABLE", False)
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
             assert win._md_to_body_html(str(md_path)) == ""
-            mock_warning.assert_called_once()
+            mock_warning.assert_called_once()  # pyright: ignore
 
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
         monkeypatch.setattr(editor.sm, "make_html_images_inline",
