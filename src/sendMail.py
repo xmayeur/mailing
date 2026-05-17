@@ -40,7 +40,6 @@ import ssl
 import sys
 import tempfile
 import urllib.parse
-from pathlib import Path
 from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -50,6 +49,7 @@ from getpass import getpass
 from glob import glob
 from os import getenv, mkdir
 from os.path import exists, join
+from pathlib import Path
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 from time import sleep, time
 from typing import Any
@@ -59,6 +59,7 @@ import gspread
 import markdown2 as md
 import requests
 import yaml
+from PIL import Image
 from bs4 import BeautifulSoup
 from getSecrets import get_secret
 from google.auth.transport.requests import Request
@@ -67,7 +68,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient import errors
 from googleapiclient.discovery import build
 from oauth2client.service_account import ServiceAccountCredentials
-from PIL import Image
 
 import googleDriveLib as gd  # noqa: N813
 
