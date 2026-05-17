@@ -604,6 +604,37 @@ test:
         finally:
             Path(csv_path).unlink()
 
+    def test_google_sheets_profile_validation(self, qapp: Any, temp_attachment: str) -> None:
+        """Verify Google Sheets profiles show info message instead of field errors."""
+        config_data = {
+            "gsheet_profile": {
+                "sender": "test@example.com",
+                "SHEETID": "testSheetID",
+                "filter": {"email": "is not empty", "status": "is active"},
+            }
+        }  # type: ignore[assignment]
+
+        dialog = _SendDialog(
+            attachment_path=temp_attachment,
+            config_path="",
+            config_data=config_data,
+            initial_profile="gsheet_profile",
+        )
+
+        # Load Google Sheets profile
+        dialog._load_profile_defaults("gsheet_profile")
+        dialog._validation_timer.stop()
+        dialog._run_filter_validation()
+
+        # Check status label shows info message, not "fields not found"
+        label_text = dialog.filter_status_label.text().lower()
+        assert "unavailable" in label_text or "google sheets" in label_text or label_text == "", (
+            f"Expected info message for Google Sheets, got: {label_text}"
+        )
+        assert "not found" not in label_text, (
+            f"Should not show 'not found' for Google Sheets: {label_text}"
+        )
+
     def test_profile_load_timing_no_missing_fields(self, qapp: Any, temp_attachment: str) -> None:
         """Verify database schema loaded before validation when profile changes.
 
