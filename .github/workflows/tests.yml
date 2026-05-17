@@ -34,15 +34,18 @@ jobs:
         pip install pytest pytest-cov pytest-mock
         pip install -r requirements.txt || echo "No requirements.txt found"
 
-    - name: Run tests with pytest
+    - name: Run unit tests with pytest
       run: |
-        pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+        pytest tests/unit --cov=src --cov-fail-under=60 --cov-report=xml --cov-report=term-missing
+
+    - name: Run integration tests with pytest
+      run: |
+        pytest tests/integration/ -v --tb=short
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        # file: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
