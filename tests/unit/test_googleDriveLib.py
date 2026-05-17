@@ -4,12 +4,12 @@ Unit tests for src/googleDriveLib.py module
 
 import os
 import sys
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 # Add source directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 # Mock external dependencies before importing
 mock_get_secret = MagicMock(return_value={"key": "value"})
@@ -30,7 +30,7 @@ sys.modules["googleapiclient.http"] = MagicMock()
 sys.modules["oauth2client"] = MagicMock()
 sys.modules["oauth2client.service_account"] = MagicMock()
 
-import googleDriveLib as gd  # noqa: E402
+import googleDriveLib as gd  # noqa: E402,N813
 
 
 class TestConnectGoogleDriver:

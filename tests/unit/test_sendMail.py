@@ -9,14 +9,13 @@ import shutil
 import sys
 import tempfile
 from email.mime.multipart import MIMEMultipart
-from unittest.mock import MagicMock, patch, mock_open
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 from googleapiclient import errors
 
 # Add source directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 # Mock external dependencies
 # Note: googleDriveLib is tested separately in test_googleDriveLib.py
@@ -1304,7 +1303,7 @@ def test_md2html_custom_styles():
         assert html_file is not None
         assert os.path.exists(html_file)
         assert os.path.exists(styles_file)
-        with open(html_file, "r") as f:
+        with open(html_file) as f:
             html_content = f.read()
             assert "color: red" in html_content
 
@@ -1856,7 +1855,7 @@ def test_make_html_images_inline():
         with patch("sendMail.file_to_base64", return_value="YWJj"), patch("sendMail.guess_type",
                                                                           return_value="image/png"):
             sendMail.make_html_images_inline(html_file, html_file)
-        with open(html_file, "r", encoding="utf-8") as f:
+        with open(html_file, encoding="utf-8") as f:
             html_content = f.read()
             assert "data:image/png;base64," in html_content
             assert 'src="data:image/png;base64,' in html_content

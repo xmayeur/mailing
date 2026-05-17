@@ -24,13 +24,12 @@ Based on : https://medium.com/@matheodaly.md/using-google-drive-api-with-python-
 import io
 import logging
 import sys
-from os.path import join, basename
+from os.path import basename, join
 
 from getSecrets import get_secret
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaFileUpload
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from oauth2client.service_account import ServiceAccountCredentials
 
 
@@ -77,7 +76,7 @@ def connect_google_driver(service_account_id="artscroisesServiceAccount"):
     creds = get_secret(service_account_id)
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)  # type: ignore[arg-type]
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)  # pyright: ignore
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
         _log.error(e)

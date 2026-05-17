@@ -36,44 +36,90 @@ chmod +x .git/hooks/pre-push
 ## Script Catalog
 
 ### `pre_commit_checks.sh`
-
 The primary developer workflow script. It performs:
-
 - Dependency synchronization via Poetry.
 - Markdown linting (`pymarkdownlnt`).
 - Python linting and formatting (`ruff`).
 - Static type checking (`pyright` and `mypy`).
-- Unit tests (`pytest tests/unit/`).
+- Unit tests (`pytest tests/`).
 
 ### `pre_push_checks.sh`
-
 A heavier suite intended for CI or pre-push gates. It includes:
-
 - All checks from `pre_commit_checks.sh`.
 - Architectural boundary enforcement.
 - Acceptance tests (`behave`).
 - Integration, API, and Security test suites.
 - Code coverage reporting.
 
-### `check_layer_boundaries.py`
+### `build_docs.sh`
 
-Enforces the project's architectural layering rules (e.g., Layer 2 must not import from Layers 3 or 4). This is called
-automatically by `pre_push_checks.sh`.
+Quick incremental build for development. Generates HTML documentation in `docs/build/html/`.
 
-### `render_diagrams.sh`
+**Usage:**
 
-Renders all `.puml` files in `docs/diagrams/` to `.png` using the PlantUML web service. Requires `curl`.
+```bash
+./scripts/build_docs.sh [--clean] [--open]
+```
+
+**Options:**
+
+- `--clean` — Remove old build and rebuild from scratch
+- `--open` — Open documentation in your default browser
+
+**When to use:** During documentation development for fast iteration.
+
+### `build_docs_release.sh`
+
+Full release build with validation. Performs a clean build and validates:
+
+- No broken cross-references
+- All documents included in toctree
+- No RST syntax errors
+- Proper HTML generation
+
+**Usage:**
+
+```bash
+./scripts/build_docs_release.sh [--deploy]
+```
+
+**When to use:** Before releasing or publishing documentation to ensure quality.
 
 ### `create_documentation.sh`
 
-Builds the project's Sphinx documentation into `build/html`.
+Legacy script. Builds the project's Sphinx documentation into `build/html`.
+
+**Recommendation:** Use `build_docs.sh` or `build_docs_release.sh` instead for better features and validation.
+
+### `generate_ai_docs.py`
+
+Regenerates `AI.md` from the current state of `docs/` using the Claude CLI.
+
+**When to run:** Re-run whenever the `docs/` folder is updated to keep `AI.md`
+in sync with the library.
+
+**Prerequisites:**
+
+- Python 3.10+
+- `claude` CLI in `PATH` (install via `pip install claude-code`)
+- `ANTHROPIC_API_KEY` environment variable set
+
+**Usage:**
+
+```bash
+export ANTHROPIC_API_KEY=<your-key>
+python scripts/generate_ai_docs.py
+```
+
+The script validates the generated content (required sections and Markdown
+syntax) before overwriting `AI.md`. If validation fails, `AI.md` is not
+modified and an error is printed to stderr.
 
 ---
 
 ## Prerequisites
 
 Ensure you have the following installed:
-
 - [Poetry](https://python-poetry.org/) for dependency management.
 - Python 3.10+
 - `bash` shell.
