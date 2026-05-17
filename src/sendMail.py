@@ -1064,10 +1064,7 @@ def _parse_filter_expr(v: str, _k: str) -> tuple[str, Any]:
     if not v or not isinstance(v, str):
         raise ValueError("Filter value is empty or invalid")
 
-    try:
-        op = _FILTER_OPS[[v.find(x + " ") for x in _FILTER_OPS].index(0)]
-    except ValueError:
-        raise
+    op = _FILTER_OPS[[v.find(x + " ") for x in _FILTER_OPS].index(0)]
 
     test_value: Any = v.split(op)[1].strip()
     if "not " in test_value:
@@ -1123,6 +1120,11 @@ def _eval_regex(test_value: Any, field_value: str, negate: bool = False) -> bool
 
 def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
     """Evaluate a string/membership comparison."""
+    return _do_string_eval(field_value, test_value, op)
+
+
+def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
+    """Helper to evaluate string operations."""
     if op in ("in", "one of", _OP_ONE_OF):
         return bool(field_value in test_value)
     if op in ("not in", "none of", _OP_NOT_ONE_OF):
