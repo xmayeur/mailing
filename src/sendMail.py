@@ -272,7 +272,7 @@ def guess_type(filepath: str) -> str | None:
         MIME type string (e.g., 'image/png') or None if detection fails
     """
     try:
-        import magic  # type: ignore[import-not-found]
+        import magic  # type: ignore
 
         result: str | None = magic.from_file(filepath, mime=True)
         return result
