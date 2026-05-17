@@ -272,7 +272,7 @@ def guess_type(filepath: str) -> str | None:
         MIME type string (e.g., 'image/png') or None if detection fails
     """
     try:
-        import magic  # type: ignore[import-not-found]
+        import magic  # type: ignore
 
         result: str | None = magic.from_file(filepath, mime=True)
         return result
@@ -1047,19 +1047,24 @@ _FILTER_OPS = [
     _OP_IS_NOT_EQUAL_TO,
     "eq",
     "ne",
+    "contains",
+    "does not contain",
+    "starts with",
+    "ends with",
+    "matches",
+    "does not match",
 ]
 
 
-def _parse_filter_expr(v: str, k: str) -> tuple[str, Any]:
+def _parse_filter_expr(v: str, _k: str) -> tuple[str, Any]:
     """Parse operator and test value from a filter expression string.
 
-    Raises ValueError (already logged) when the operator is unrecognised.
+    Raises ValueError when the operator is unrecognised.
     """
-    try:
-        op = _FILTER_OPS[[v.find(x + " ") for x in _FILTER_OPS].index(0)]
-    except ValueError:
-        log.warning(f"Invalid filter operation for field '{k}: {v}'")
-        raise
+    if not v or not isinstance(v, str):
+        raise ValueError("Filter value is empty or invalid")
+
+    op = _FILTER_OPS[[v.find(x + " ") for x in _FILTER_OPS].index(0)]
 
     test_value: Any = v.split(op)[1].strip()
     if "not " in test_value:
@@ -1073,12 +1078,11 @@ def _parse_filter_expr(v: str, k: str) -> tuple[str, Any]:
     return op, test_value
 
 
-def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
+def _eval_numeric(fv: float, tv_raw: Any, op: str, _k: str) -> bool:
     """Evaluate a numeric comparison between *fv* and *tv_raw* using *op*."""
     try:
         tv = float(tv_raw)
     except (ValueError, TypeError):
-        log.warning(f"Invalid filter value for field '{k}: {tv_raw}'")
         return False
 
     operators: dict[str, Any] = {
@@ -1103,8 +1107,24 @@ def _eval_numeric(fv: float, tv_raw: Any, op: str, k: str) -> bool:
     return result
 
 
+def _eval_regex(test_value: Any, field_value: str, negate: bool = False) -> bool:
+    """Evaluate regex match. Returns False on error, respecting negate flag."""
+    if not test_value:
+        return True if negate else False
+    try:
+        match = bool(re.search(test_value, field_value))
+        return (not match) if negate else match
+    except re.error:
+        return True if negate else False
+
+
 def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
     """Evaluate a string/membership comparison."""
+    return _do_string_eval(field_value, test_value, op)
+
+
+def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
+    """Helper to evaluate string operations."""
     if op in ("in", "one of", _OP_ONE_OF):
         return bool(field_value in test_value)
     if op in ("not in", "none of", _OP_NOT_ONE_OF):
@@ -1117,13 +1137,25 @@ def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
         return field_value != "" and field_value is not None
     if op in ("is empty", ):
         return field_value == "" or field_value is None
+    if op in ("contains", _OP_CONTAINS):
+        return bool(test_value in field_value) if test_value else False
+    if op in ("does not contain", _OP_DOES_NOT_CONTAIN):
+        return bool(test_value not in field_value) if test_value else True
+    if op in ("starts with", _OP_STARTS_WITH):
+        return bool(field_value.startswith(test_value)) if test_value else False
+    if op in ("ends with", _OP_ENDS_WITH):
+        return bool(field_value.endswith(test_value)) if test_value else False
+    if op in ("matches", _OP_MATCHES):
+        return _eval_regex(test_value, field_value, negate=False)
+    if op in ("does not match", _OP_DOES_NOT_MATCH):
+        return _eval_regex(test_value, field_value, negate=True)
     return True
 
 
-def _evaluate_condition(field_value: str, op: str, test_value: Any, k: str) -> bool:
+def _evaluate_condition(field_value: str, op: str, test_value: Any, _k: str) -> bool:
     """Return True when *field_value* satisfies *op* against *test_value*."""
     try:
-        return _eval_numeric(float(field_value), test_value, op, k)
+        return _eval_numeric(float(field_value), test_value, op, _k)
     except ValueError:
         return _eval_string(field_value, test_value, op)
 
@@ -1135,7 +1167,8 @@ def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> b
     match for row to be included (AND logic).
 
     Supported operations: is, is not, gt, lt, ge, le, in, not in,
-    is empty, is not empty, and their aliases (e.g., "greater than", "one of").
+    is empty, is not empty, contains, does not contain, starts with, ends with,
+    matches, does not match, and their aliases (e.g., "greater than", "one of").
 
     Args:
         filter: Dict of {field_name: "operator value"} (e.g., {"status": "is active"})
@@ -1152,7 +1185,6 @@ def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> b
     for k, v in filter.items():
         field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
-            log.debug(f"Invalid field '{k}' - field not found in database schema")
             return True
         try:
             op, test_value = _parse_filter_expr(v, k)
