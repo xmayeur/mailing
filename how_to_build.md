@@ -94,6 +94,8 @@ poetry run cz bump        # bumps [project] version, updates CHANGELOG.md, creat
 
 ### 10. Push master and the new tag
 
+""
+
 ```bash
 git push origin master --tags
 ```

@@ -20,7 +20,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, TypeAlias
+from typing import Any, cast
 
 import yaml
 
@@ -421,6 +421,7 @@ class _SendDialog(QDialog):
 
         # Validation setup (T016, T017)
         self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
+        self._schema_cache: Any = None  # Initialized lazily in _get_schema_cache()
         self._validation_timer = QTimer(self)
         self._validation_timer.setSingleShot(True)
         self._validation_timer.timeout.connect(self._run_filter_validation)
@@ -664,8 +665,18 @@ class _SendDialog(QDialog):
         # T019, T021: Update status indicator and visual
         self._update_validation_ui(status)
 
+    def _get_schema_cache(self) -> Any:
+        """Get or create schema cache instance."""
+        if self._schema_cache is None:
+            from schema_cache import SchemaCacheProvider
+
+            self._schema_cache = SchemaCacheProvider()
+        return self._schema_cache
+
     def _get_database_schema(self) -> list[str]:
         """Get database schema (field names) from active database or Google Sheets."""
+        cache = self._get_schema_cache()
+        profile_name = self._current_profile or "default"
         db_path = self.database_input.text().strip()
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
@@ -675,25 +686,34 @@ class _SendDialog(QDialog):
             sa = profile_cfg.get("SA")
             sheet_id = profile_cfg.get("SHEETID")
             if sa and sheet_id:
-                try:
-                    import sendMail as sm  # noqa: N813
+                def _load_gsheet_schema() -> list[str]:
+                    try:
+                        import sendMail as sm  # noqa: N813
 
-                    if hasattr(sm, "get_google_sheets_schema"):
-                        return sm.get_google_sheets_schema(str(sa), str(sheet_id))
-                except Exception as e:
-                    log.debug("Could not load Google Sheets schema: %s", e)
+                        if hasattr(sm, "get_google_sheets_schema"):
+                            result = sm.get_google_sheets_schema(str(sa), str(sheet_id))
+                            if isinstance(result, list):
+                                return result
+                    except Exception as e:
+                        log.debug("Could not load Google Sheets schema: %s", e)
+                    return []
+
+                return cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
             return []
 
         if not db_path:
             return []
 
-        try:
-            from schema_provider import DatabaseSchemaProvider
+        def _load_csv_schema() -> list[str]:
+            try:
+                from schema_provider import DatabaseSchemaProvider
 
-            return DatabaseSchemaProvider.detect_and_extract(db_path)
-        except Exception as e:
-            log.debug("Could not extract database schema: %s", e)
-            return []
+                return DatabaseSchemaProvider.detect_and_extract(db_path)
+            except Exception as e:
+                log.debug("Could not extract database schema: %s", e)
+                return []
+
+        return cast(list[str], cache.get(f"{profile_name}_csv_{db_path}", _load_csv_schema))
 
     def _update_validation_ui(self, status: dict[str, Any]) -> None:
         """Update filter field UI based on validation status (T019, T020, T021)."""
