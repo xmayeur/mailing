@@ -112,6 +112,6 @@ if sys.platform == "darwin":
         bundle_identifier="be.sendmail.editor",
         info_plist={
             "NSHighResolutionCapable": True,
-            "NSRequiresAquaSystemAppearance": False,  # allow dark mode
+            "NSRequiresAquaSystemAppearance": True,  # force light mode
         },
     )
