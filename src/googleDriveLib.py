@@ -75,7 +75,7 @@ def connect_google_driver(service_account_id: str = "artscroisesServiceAccount")
         return None
 
 
-def get_files(service: Any = None, folder_id: str | None = None) -> dict | None:
+def get_files(service: Any = None, folder_id: str | None = None) -> dict[str, Any] | None:
     """List files from Google Drive folder (excluding published files).
 
     Args:
@@ -90,7 +90,7 @@ def get_files(service: Any = None, folder_id: str | None = None) -> dict | None:
         return None
 
     try:
-        return (
+        result = (
             service.files()
             .list(
                 pageSize=1000,
@@ -99,12 +99,13 @@ def get_files(service: Any = None, folder_id: str | None = None) -> dict | None:
             )
             .execute()
         )
+        return result  # type: ignore[no-any-return]
     except HttpError as e:
         _log.error(e)
         return None
 
 
-def rename_file(service: any = None, file_id: str | None = None, new_title: str | None = None) -> dict | None:
+def rename_file(service: Any = None, file_id: str | None = None, new_title: str | None = None) -> dict[str, Any] | None:
     """Rename file in Google Drive.
 
     Args:
@@ -116,12 +117,12 @@ def rename_file(service: any = None, file_id: str | None = None, new_title: str 
         Updated file metadata dict, or None if any parameter is missing
     """
     if service is None or file_id is None or new_title is None:
-        return
+        return None
     body = {"name": new_title}
-    return service.files().update(fileId=file_id, body=body).execute()
+    return service.files().update(fileId=file_id, body=body).execute()  # type: ignore[no-any-return]
 
 
-def download_file(service: Any = None, files: list[dict] | None = None, folder: str = "input") -> None:
+def download_file(service: Any = None, files: list[dict[str, Any]] | None = None, folder: str = "input") -> None:
     """Download files from Google Drive to local folder.
 
     Downloads each file in the list with progress reporting.

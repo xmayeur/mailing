@@ -24,6 +24,11 @@ from typing import Any
 
 import yaml
 
+# Type aliases for complex config structures
+type ConfigValue = str | int | list[str] | dict[str, str]
+type ConfigData = dict[str, ConfigValue]
+type ConfigProfile = dict[str, ConfigData]
+
 # ---------------------------------------------------------------------------
 # PyInstaller-safe asset path resolution
 # ---------------------------------------------------------------------------
@@ -936,7 +941,8 @@ class _ConfigDialog(QDialog):
             "<li><b>default_message</b> is used when no message is provided.</li>"
             "<li><b>body</b> can be injected into templates via <code>${body}</code>.</li>"
             "<li><b>styles</b> points at the CSS file used when HTML is generated from Markdown.</li>"
-            "<li><b>pause</b>, <b>from_index</b>, <b>to_index</b>, <b>wait</b>, <b>max_mails_per_hour</b>, and <b>max_addr_per_mail</b> control batch delivery.</li>"
+            "<li><b>pause</b>, <b>from_index</b>, <b>to_index</b>, <b>wait</b>, "
+            "<b>max_mails_per_hour</b>, and <b>max_addr_per_mail</b> control batch delivery.</li>"
             "</ul>"
         ),
         "Filters": (
@@ -971,7 +977,7 @@ class _ConfigDialog(QDialog):
         self.setMinimumWidth(1080)
         self.setMinimumHeight(780)
 
-        self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = self._normalize_config_data(config_data or {})
+        self._config_data: ConfigProfile = self._normalize_config_data(config_data or {})
         self._current_profile = ""
         self._widgets: dict[str, QWidget] = {}
         self._yaml_keys = {"filter", "filter_test"}
@@ -1057,8 +1063,10 @@ class _ConfigDialog(QDialog):
 
         self._reload_profiles(initial_profile)
 
-    def _normalize_config_data(self, data: dict[str, dict[str, str | int | list[str] | dict[str, str]]]) -> dict[str, dict[str, str | int | list[str] | dict[str, str]]]:
-        normalized: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
+    def _normalize_config_data(
+        self, data: ConfigProfile
+    ) -> ConfigProfile:
+        normalized: ConfigProfile = {}
         for name, profile in data.items():
             if isinstance(profile, dict):
                 normalized[str(name)] = dict(profile)
@@ -1476,14 +1484,18 @@ class _ConfigDialog(QDialog):
         else:
             widget.setPlainText("")
 
-    def _get_config_value_for_widget(self, key: str, widget: QWidget, cfg: dict[str, str | int | list[str] | dict[str, str]], defaults: dict[str, str | int | list[str] | dict[str, str]]) -> object:
+    def _get_config_value_for_widget(
+        self, key: str, widget: QWidget, cfg: ConfigData, defaults: ConfigData
+    ) -> object:
         if key in cfg:
             return cfg[key]
         if isinstance(widget, QSpinBox):
             return defaults.get(key, "")
         return None
 
-    def _get_spinbox_default_value(self, key: str, cfg: dict[str, str | int | list[str] | dict[str, str]], defaults: dict[str, str | int | list[str] | dict[str, str]]) -> int:
+    def _get_spinbox_default_value(
+        self, key: str, cfg: ConfigData, defaults: ConfigData
+    ) -> int:
         val = defaults.get(key, 0) if key in cfg else 0
         if isinstance(val, int):
             return val
@@ -1494,7 +1506,9 @@ class _ConfigDialog(QDialog):
                 return 0
         return 0
 
-    def _load_widget_by_type(self, widget: QWidget, key: str, value: object, cfg: dict[str, str | int | list[str] | dict[str, str]], defaults: dict[str, str | int | list[str] | dict[str, str]]) -> None:
+    def _load_widget_by_type(
+        self, widget: QWidget, key: str, value: object, cfg: ConfigData, defaults: ConfigData
+    ) -> None:
         if isinstance(widget, QLineEdit):
             self._load_widget_line_edit(widget, value)
         elif isinstance(widget, QSpinBox):
@@ -2274,7 +2288,8 @@ class EditorWindow(QMainWindow):
 
         underline_action = fmt_menu.addAction("&Underline")
         underline_action.setShortcut("Ctrl+U")
-        underline_action.triggered.connect(lambda: self._run_js("quill.format('underline', !quill.getFormat().underline)"))
+        underline_fmt = "quill.format('underline', !quill.getFormat().underline)"
+        underline_action.triggered.connect(lambda: self._run_js(underline_fmt))
 
         strike_action = fmt_menu.addAction("&Strikethrough")
         strike_action.setShortcut("Ctrl+Shift+X")
