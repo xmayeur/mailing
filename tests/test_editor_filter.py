@@ -530,6 +530,43 @@ test:
         finally:
             Path(csv_path).unlink()
 
+    def test_apply_filter_updates_display(self, qapp: Any, temp_attachment: Any) -> None:
+        """Test applying filter updates record preview display (T034-FIX-2)."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            f.write("name,status,email\n")
+            f.write("Alice,active,alice@test.com\n")
+            f.write("Bob,inactive,bob@test.com\n")
+            f.write("Charlie,active,charlie@test.com\n")
+            csv_path = f.name
+
+        try:
+            config_data = {  # type: ignore[assignment]
+                "test": {"sender": "test@example.com", "database": csv_path}
+            }
+
+            dialog = _SendDialog(
+                attachment_path=temp_attachment,
+                config_path="",
+                config_data=config_data,
+                initial_profile="test",
+            )
+
+            # Load initial records (all 3)
+            dialog.filter_and_display_records()
+            initial_count = dialog.records_table.rowCount()
+            assert initial_count == 3, f"Expected 3 records, got {initial_count}"
+
+            # Apply filter to show only active records
+            dialog.filter_text_edit.setPlainText("status: is active")
+            dialog._apply_filter()
+
+            # Record count should update to 2 (Alice and Charlie)
+            filtered_count = dialog.records_table.rowCount()
+            assert filtered_count == 2, f"Expected 2 filtered records, got {filtered_count}"
+            assert dialog._session_filter == {"status": "is active"}
+        finally:
+            Path(csv_path).unlink()
+
     def test_reset_filter(self, qapp: Any, temp_attachment: Any) -> None:
         """Test resetting filter restores original (T035)."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:

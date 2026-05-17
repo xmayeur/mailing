@@ -765,6 +765,7 @@ class _SendDialog(QDialog):
             self._session_filter = None
             self.filter_status_label.setText("(Filter cleared - will use profile default)")
             self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            self.filter_and_display_records()
             return
 
         if not self._filter_validator:
@@ -789,6 +790,7 @@ class _SendDialog(QDialog):
                 self._session_filter = filter_dict
                 self.filter_status_label.setText("✓ Session filter applied")
                 self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+                self.filter_and_display_records()
             else:
                 self.filter_status_label.setText("Filter must be YAML mapping (key: value)")
                 self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
