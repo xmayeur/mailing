@@ -17,7 +17,7 @@ class Mock(MagicMock):
         return MagicMock()
 
 
-def _make_pyqtSlot(*args, **kwargs):
+def _make_pyqtSlot(*args, **kwargs):  # noqa: N802, ARG001
     """Fake @pyqtSlot that behaves as a no-op decorator."""
     if len(args) == 1 and callable(args[0]) and not kwargs:
         return args[0]
@@ -28,7 +28,7 @@ def _make_pyqtSlot(*args, **kwargs):
     return _decorator
 
 
-def _make_pyqtSignal(*args, **kwargs):
+def _make_pyqtSignal(*args, **kwargs):  # noqa: N802, ARG001
     """Fake pyqtSignal instance with connect/disconnect/emit."""
     sig = MagicMock()
     sig.connect = MagicMock()
@@ -67,33 +67,33 @@ class _FakeQDialog(_FakeQObject):
 class _FakeQMainWindow(_FakeQObject):
     """Stand-in for QMainWindow."""
 
-    def menuBar(self):
+    def menuBar(self):  # noqa: N802
         return MagicMock()
 
-    def addToolBar(self, toolbar):
+    def addToolBar(self, toolbar):  # noqa: N802
         pass
 
     def style(self):
         return MagicMock(standardIcon=MagicMock(return_value="icon"))
 
-    def setStatusBar(self, bar):
+    def setStatusBar(self, bar):  # noqa: N802
         pass
 
-    def statusBar(self):
+    def statusBar(self):  # noqa: N802
         sb = MagicMock()
         sb.showMessage = MagicMock()
         return sb
 
-    def setMinimumSize(self, w, h):
+    def setMinimumSize(self, w, h):  # noqa: N802
         pass
 
-    def setWindowTitle(self, t):
+    def setWindowTitle(self, t):  # noqa: N802
         pass
 
-    def centralWidget(self):
+    def centralWidget(self):  # noqa: N802
         return None
 
-    def setCentralWidget(self, w):
+    def setCentralWidget(self, w):  # noqa: N802
         pass
 
     def show(self):
@@ -178,7 +178,7 @@ sys.modules["PyQt6.QtWebEngineWidgets"].QWebEngineView = MagicMock()
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "sendMail"
-copyright = "2025-2026, Xavier Mayeur"
+copyright = "2025-2026, Xavier Mayeur"  # noqa: A001
 author = "Xavier Mayeur"
 
 version = "1.1"
