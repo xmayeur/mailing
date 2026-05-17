@@ -2,6 +2,9 @@ import os
 import sys
 from unittest.mock import MagicMock
 
+# Save real yaml module to restore after tests (prevent pollution of other tests)
+import yaml as _real_yaml
+
 # Mock external dependencies before importing sendMail
 mock_get_secret = MagicMock(return_value={"key": "value"})
 sys.modules["gspread"] = MagicMock()
@@ -30,6 +33,9 @@ sys.modules["PIL"] = MagicMock()
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 import sendMail  # noqa: E402
+
+# Restore real yaml module immediately after importing sendMail to prevent pollution
+sys.modules["yaml"] = _real_yaml
 
 
 def test_filter():
