@@ -79,7 +79,7 @@ default:
   password: foobar
   sender: john.doe@example.com
   sendername: John Doe
-  database: subscribers.csv
+  database: Subscribers.csv
   smtp_host: smtp.example.com
   smtp_port: 587
   imap_host: imap.example.com
@@ -89,9 +89,7 @@ default:
   pause: 1
   styles: ./css/styles.css
   filter:
-    email: is not empty
-    bounced: is not bounced
-    cotisation: greater than 0
-    first_name: one of "Jean", "Xavier"
+    Email: is not empty
+    First Name: one of "Jean", "Xavier"
   filter_test:
     email: is "Toto the Tester"
