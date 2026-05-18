@@ -1,4 +1,15 @@
 #
+# Profile Configuration Guide
+#
+# default_documents_path (optional):
+#   - Absolute path to the user's preferred document folder for Save As dialogs
+#   - Per-profile: each profile maintains its own remembered folder
+#   - Updated automatically after successful file save/open
+#   - Windows default: %USERPROFILE%\Documents
+#   - macOS/Linux default: ~ (home directory)
+#   - If path is invalid/missing, editor falls back to OS default
+#   - Example: default_documents_path: "/Users/xavier/newsletters"
+#
 # Filtering options
 # if all of the conditions are met, the subscriber is added to the mailing list
 # - syntax:
@@ -15,6 +26,7 @@
 #
 
 artscroises:
+  default_documents_path: ""
   MAILCONFIG: 'artscroisesmailing'
   SHEETID: "artscroisesDBmembreID"
   SA: "artscroisesServiceAccount"
@@ -38,6 +50,7 @@ artscroises:
 
 
 cambristi:
+  default_documents_path: ""
   SCOPES:
     - 'https://www.googleapis.com/auth/gmail.readonly'
     - 'https://www.googleapis.com/auth/gmail.modify'
@@ -68,6 +81,7 @@ cambristi:
 
 
 cambristiEffective:
+  default_documents_path: ""
   SCOPES:
     - 'https://www.googleapis.com/auth/gmail.readonly'
     - 'https://www.googleapis.com/auth/gmail.modify'
@@ -97,6 +111,7 @@ cambristiEffective:
   default_message: ''
 
 default:
+  default_documents_path: ""
   username: jdoe
   password: foobar
   sender: john.doe@example.com
