@@ -845,12 +845,15 @@ class _SendDialog(QDialog):
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
-        log.info("DEBUG: _get_database_schema: profile=%s, db_path=%s, profile_cfg keys=%s, SHEETID=%s",
-                 self._current_profile, db_path, list(profile_cfg.keys()), profile_cfg.get("SHEETID"))
-        if not db_path and profile_cfg.get("SHEETID"):
+        # B047: Handle both uppercase and lowercase config keys
+        sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
+        sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
+        log.info("DEBUG: _get_database_schema: profile=%s, db_path=%s, profile_cfg keys=%s, SHEETID=%s, SA=%s",
+                 self._current_profile, db_path, list(profile_cfg.keys()), sheet_id_val, sa_val)
+        if not db_path and sheet_id_val:
             # Google Sheets profile - try to load schema from Google Sheets
-            sa = profile_cfg.get("SA")
-            sheet_id = profile_cfg.get("SHEETID")
+            sa = sa_val
+            sheet_id = sheet_id_val
             log.info("DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa, sheet_id)
             if sa and sheet_id:
                 def _load_gsheet_schema() -> list[str]:
