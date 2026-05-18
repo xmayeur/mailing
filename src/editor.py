@@ -669,6 +669,7 @@ class _SendDialog(QDialog):
         self._load_profile_defaults(self.profile_combo.currentText())
 
     def _load_profile_defaults(self, profile: str) -> None:
+        import time
         self._current_profile = profile
         profile_cfg = self._config_data.get(profile, {})
         log.info("DEBUG: _load_profile_defaults: profile=%s, config_data keys=%s, profile_cfg keys=%s",
@@ -700,14 +701,20 @@ class _SendDialog(QDialog):
         # T035: Update FilterBuilder schema when database changes
         # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
         if self._filter_builder:
+            t1 = time.time()
             schema_fields = self._get_database_schema()
+            t2 = time.time()
+            log.info("TIMING: _get_database_schema took %.2fs", t2-t1)
             log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
                      profile, self.database_input.text(), schema_fields)
             self._schema_info = DatabaseSchemaInfo(schema_fields)
             self._filter_builder.schema_info = self._schema_info
             log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
             # Call refresh_schema on table_widget to update all row dropdowns
+            t3 = time.time()
             self._filter_builder._table_widget.refresh_schema(self._schema_info)
+            t4 = time.time()
+            log.info("TIMING: refresh_schema took %.2fs", t4-t3)
             log.info("DEBUG: refresh_schema called, row_widgets=%d",
                      len(self._filter_builder._table_widget._row_widgets))
 
@@ -985,11 +992,15 @@ class _SendDialog(QDialog):
 
     def filter_and_display_records(self) -> None:
         """Load, filter, and display database records (T027, T028, T040, T041, T042)."""
+        import time
         # T041: Handle profile switching by tracking current profile
         if not hasattr(self, "_last_profile"):
             self._last_profile = self._current_profile
 
+        t1 = time.time()
         rows, headers = self.load_database_records()
+        t2 = time.time()
+        log.info("TIMING: load_database_records took %.2fs, %d rows, %d headers", t2-t1, len(rows), len(headers))
 
         # T040, T042: Better error and zero-record handling
         if not headers:
