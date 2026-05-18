@@ -2,8 +2,10 @@
 
 Tests visual filter editor interaction with Send Mailing dialog,
 including profile switching, database loading, and filter persistence.
-"""
 
+Note: Qt widget tests are skipped in headless CI environments.
+They require a display server or QT_QPA_PLATFORM environment variable.
+"""
 
 
 class TestSendDialogFilterIntegration:
