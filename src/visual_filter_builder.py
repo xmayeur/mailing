@@ -26,7 +26,15 @@ from typing import Any
 
 try:
     from PyQt6.QtCore import pyqtSignal
-    from PyQt6.QtWidgets import QPlainTextEdit, QTabWidget, QVBoxLayout, QWidget
+    from PyQt6.QtWidgets import (
+        QHBoxLayout,
+        QLineEdit,
+        QPlainTextEdit,
+        QPushButton,
+        QTabWidget,
+        QVBoxLayout,
+        QWidget,
+    )
     PYQT_AVAILABLE = True
 except ImportError:
     PYQT_AVAILABLE = False
@@ -476,6 +484,10 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
 
         tabs = QTabWidget(self)
 
+        self._table_widget = FilterTableWidget(self.schema_info)
+        self._table_widget.row_changed.connect(self._on_table_changed)
+        tabs.addTab(self._table_widget, "Visual Editor")
+
         self._yaml_edit = QPlainTextEdit(self)
         self._yaml_edit.setPlaceholderText(
             "YAML filter (optional)\nExample: email: is not empty"
@@ -510,6 +522,24 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
         """
         return self._filter_table.to_dict()
 
+    def _on_table_changed(self) -> None:
+        """Handle visual table change—update YAML and emit filter_changed."""
+        if self._syncing or not PYQT_AVAILABLE:
+            return
+
+        self._syncing = True
+        try:
+            rows = self._table_widget.get_rows()
+            self._filter_table = FilterTable(rows)
+            filter_dict = self._filter_table.to_dict()
+            yaml_text = self._dict_to_yaml(filter_dict)
+            self._yaml_edit.setPlainText(yaml_text)
+            self.filter_changed.emit(filter_dict)
+        except Exception as e:
+            log.debug("Table change error: %s", e)
+        finally:
+            self._syncing = False
+
     def _on_yaml_changed(self) -> None:
         """Handle YAML text change—parse and update filter table."""
         if self._syncing or not PYQT_AVAILABLE:
@@ -523,6 +553,7 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
                 self._filter_table = FilterTable.from_dict(filter_dict)
             else:
                 self._filter_table = FilterTable()
+            self._table_widget.set_rows(self._filter_table.rows)
             self.filter_changed.emit(self._filter_table.to_dict())
         except Exception as e:
             log.debug("YAML parse error: %s", e)
@@ -566,38 +597,204 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
 
 
 class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
-    """Visual table editor for filter rows (placeholder for Phase 3)."""
+    """Visual table editor for filter rows.
+
+    Displays filter conditions with one FilterRowWidget per row.
+    Emits row_changed signal when user modifies any row or adds/deletes.
+
+    Attributes:
+        schema_info: DatabaseSchemaInfo for field type validation
+        row_changed: Qt signal emitted when table contents change
+    """
 
     if PYQT_AVAILABLE:
         row_changed = pyqtSignal()
 
     def __init__(self, schema_info: DatabaseSchemaInfo, parent: Any = None) -> None:
-        """Placeholder—implementation in Phase 3."""
+        """Initialize table widget with schema info.
+
+        Args:
+            schema_info: DatabaseSchemaInfo for validation
+            parent: Parent Qt widget
+        """
         if PYQT_AVAILABLE:
             super().__init__(parent)
-        self.schema_info = schema_info
+            self.schema_info = schema_info
+            self._row_widgets: list[FilterRowWidget] = []
+            layout = QVBoxLayout()
+            self._container = QWidget()
+            self._container_layout = QVBoxLayout()
+            self._container.setLayout(self._container_layout)
+            layout.addWidget(self._container)
+            self._add_button = QPushButton("Add Row")
+            self._add_button.clicked.connect(self._on_add_row)
+            layout.addWidget(self._add_button)
+            self.setLayout(layout)
+        else:
+            self.schema_info = schema_info
 
     def set_rows(self, rows: list[FilterRow]) -> None:
-        """Placeholder—implementation in Phase 3."""
-        pass
+        """Populate table with filter rows.
+
+        Args:
+            rows: List of FilterRow objects to display
+        """
+        if not PYQT_AVAILABLE:
+            return
+        self._clear_rows()
+        for i, row in enumerate(rows):
+            self._add_row_widget(i, row)
 
     def get_rows(self) -> list[FilterRow]:
-        """Placeholder—implementation in Phase 3."""
-        return []
+        """Extract current rows from table.
+
+        Returns:
+            List of FilterRow objects with current table values
+        """
+        if not PYQT_AVAILABLE:
+            return []
+        return [widget.get_row() for widget in self._row_widgets]
+
+    def _add_row_widget(self, row_idx: int, row: FilterRow) -> None:
+        """Create and insert FilterRowWidget.
+
+        Args:
+            row_idx: Position in widget list
+            row: FilterRow to display
+        """
+        if not PYQT_AVAILABLE:
+            return
+        widget = FilterRowWidget(row_idx, row, self.schema_info)
+        widget.row_changed.connect(self._on_row_changed)
+        widget.delete_requested.connect(self._on_delete_row)
+        self._row_widgets.append(widget)
+        self._container_layout.insertWidget(row_idx, widget)
+
+    def _clear_rows(self) -> None:
+        """Remove all row widgets from display."""
+        if not PYQT_AVAILABLE:
+            return
+        while self._row_widgets:
+            widget = self._row_widgets.pop()
+            widget.deleteLater()
+
+    def _on_row_changed(self) -> None:
+        """Handle row change from any FilterRowWidget."""
+        if PYQT_AVAILABLE:
+            self.row_changed.emit()
+
+    def _on_add_row(self) -> None:
+        """Add empty row to table."""
+        if not PYQT_AVAILABLE:
+            return
+        row_idx = len(self._row_widgets)
+        self._add_row_widget(row_idx, FilterRow("", "", None))
+        self.row_changed.emit()
+
+    def _on_delete_row(self, row_idx: int) -> None:
+        """Delete row from table.
+
+        Args:
+            row_idx: Index of row to delete
+        """
+        if not PYQT_AVAILABLE:
+            return
+        if 0 <= row_idx < len(self._row_widgets):
+            widget = self._row_widgets.pop(row_idx)
+            widget.deleteLater()
+            self.row_changed.emit()
 
 
 class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
-    """Per-row filter editor widget (placeholder for Phase 3)."""
+    """Editor widget for a single filter row.
+
+    Contains field, operator, value inputs (all QLineEdit initially) and delete button.
+    Emits row_changed signal when any input changes.
+
+    Attributes:
+        row_index: Position of row in table
+        row: FilterRow object this widget edits
+        schema_info: DatabaseSchemaInfo for type validation
+        row_changed: Qt signal emitted on any field change
+    """
 
     if PYQT_AVAILABLE:
         row_changed = pyqtSignal()
+        delete_requested = pyqtSignal(int)
 
     def __init__(
         self, row_index: int, row: FilterRow, schema_info: DatabaseSchemaInfo, parent: Any = None
     ) -> None:
-        """Placeholder—implementation in Phase 3."""
+        """Initialize row editor with filter data.
+
+        Args:
+            row_index: Position in table (for delete operations)
+            row: FilterRow to edit
+            schema_info: Schema metadata for validation
+            parent: Parent Qt widget
+        """
         if PYQT_AVAILABLE:
             super().__init__(parent)
-        self.row_index = row_index
-        self.row = row
-        self.schema_info = schema_info
+            self.row_index = row_index
+            self.row = row
+            self.schema_info = schema_info
+            layout = QHBoxLayout()
+            self._field_edit = QLineEdit(row.field_name)
+            self._field_edit.textChanged.connect(self._on_field_changed)
+            layout.addWidget(self._field_edit)
+
+            self._operator_edit = QLineEdit(row.operator)
+            self._operator_edit.textChanged.connect(self._on_operator_changed)
+            layout.addWidget(self._operator_edit)
+
+            self._value_edit = QLineEdit(row.value if row.value else "")
+            self._value_edit.textChanged.connect(self._on_value_changed)
+            layout.addWidget(self._value_edit)
+
+            self._delete_btn = QPushButton("Delete")
+            self._delete_btn.setMaximumWidth(60)
+            self._delete_btn.clicked.connect(self._on_delete)
+            layout.addWidget(self._delete_btn)
+
+            self.setLayout(layout)
+        else:
+            self.row_index = row_index
+            self.row = row
+            self.schema_info = schema_info
+
+    def get_row(self) -> FilterRow:
+        """Get current FilterRow with edited values.
+
+        Returns:
+            FilterRow with current field/operator/value
+        """
+        if PYQT_AVAILABLE:
+            field = self._field_edit.text()
+            operator = self._operator_edit.text()
+            value = self._value_edit.text()
+            return FilterRow(field, operator, value if value else None)
+        return self.row
+
+    def _on_field_changed(self) -> None:
+        """Update row and emit signal on field change."""
+        if PYQT_AVAILABLE:
+            self.row.field_name = self._field_edit.text()
+            self.row_changed.emit()
+
+    def _on_operator_changed(self) -> None:
+        """Update row and emit signal on operator change."""
+        if PYQT_AVAILABLE:
+            self.row.operator = self._operator_edit.text()
+            self.row_changed.emit()
+
+    def _on_value_changed(self) -> None:
+        """Update row and emit signal on value change."""
+        if PYQT_AVAILABLE:
+            text = self._value_edit.text()
+            self.row.value = text if text else None
+            self.row_changed.emit()
+
+    def _on_delete(self) -> None:
+        """Request deletion of this row."""
+        if PYQT_AVAILABLE:
+            self.delete_requested.emit(self.row_index)
