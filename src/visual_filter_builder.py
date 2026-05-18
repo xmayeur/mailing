@@ -1037,6 +1037,9 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             log.debug("FilterRowWidget: No schema fields, showing placeholder")
             self._field_combo.addItem("(Load database first)")
             self._field_combo.setEnabled(True)
+        # B049: Clear stylesheet and force visual update when items populated
+        self._field_combo.setStyleSheet("")
+        self._field_combo.update()
 
     def _populate_operator_combo(self) -> None:
         """Populate operator combo with operators for current field."""
@@ -1049,6 +1052,9 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._operator_combo.addItems(operators)
         # B017: Keep operator combo enabled to match field combo behavior
         self._operator_combo.setEnabled(True)
+        # B049: Clear stylesheet and force visual update when items populated
+        self._operator_combo.setStyleSheet("")
+        self._operator_combo.update()
 
     def _operator_needs_value(self, operator: str) -> bool:
         """Check if operator requires a value (case-insensitive).
