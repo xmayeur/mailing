@@ -855,4 +855,22 @@ Fixes for remaining bugs discovered during integration testing and performance a
     - Line 690-700: Cache invalidation in _load_profile_defaults
   - **Status**: COMPLETE
 
+- [x] B054 Allow comma-separated list values in filter editor in `src/visual_filter_builder.py`:
+  - **Feature**: User can enter list values separated by commas
+    - Instead of: one value per line in multiline text box
+    - Now supports: `active, pending, inactive` as comma-separated list
+  - **Operators affected**: one of, in list, none of, not in list
+  - **Parsing**: 
+    - Splits by comma
+    - Strips whitespace from each item
+    - Filters empty entries
+    - Stores as list[str] internally
+  - **Implementation**:
+    - get_row(): Detects list operators, parses comma-separated values
+    - _on_value_changed(): Updates row.value with parsed list while editing
+    - Uses existing _operator_is_multiline() to identify list operators
+  - **Result**: More intuitive UX for entering multiple values
+  - **Files**: src/visual_filter_builder.py lines 970-989, 1165-1178
+  - **Status**: COMPLETE
+
 All fixes are **blocking** for usable filter editor experience.
