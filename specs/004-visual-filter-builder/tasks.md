@@ -830,4 +830,29 @@ Fixes for remaining bugs discovered during integration testing and performance a
 
 **Performance Impact**: B051 reduces Google Sheets profile switch time from 27+ seconds to ~2 seconds (10x improvement)
 
+- [x] B053 Prevent UI blocking during filter editing - defer record loading and cache (B053) in `src/editor.py`:
+  - **Issue**: Every filter change triggers filter_and_display_records → load_database_records
+    - Google Sheets: 1+ second per API call blocks UI
+    - User cannot edit filter without constant interruptions
+  - **Root cause**: _on_filter_changed (line 803) unconditionally calls filter_and_display_records
+  - **Fix (Part 1)**: Remove automatic filter_and_display_records from _on_filter_changed
+    - Keep validation/error highlighting (fast, no API call)
+    - Add 5-second debounce timer before loading records
+    - Only load if user hasn't changed filter for 5 seconds
+  - **Fix (Part 2)**: Add record caching per (profile, database_path) pair
+    - First load hits Google Sheets API
+    - Subsequent loads use cached records (no API call)
+    - Invalidate cache on profile change or database path change
+  - **Result**: User can freely edit filter without interruptions
+    - Records load once per profile, then use cache for previews
+    - Filter editing remains responsive even with Google Sheets (1+ sec API)
+  - **Files**: src/editor.py
+    - Line 516-520: Added cache variables (_cached_records, _cached_headers, etc.)
+    - Line 787-815: Modified _on_filter_changed to defer loading with 5s debounce
+    - Line 823-846: Added cache check and population in load_database_records
+    - Line 1115-1120: Added _deferred_filter_display callback
+    - Line 838-845: Cache invalidation in _on_database_input_changed
+    - Line 690-700: Cache invalidation in _load_profile_defaults
+  - **Status**: COMPLETE
+
 All fixes are **blocking** for usable filter editor experience.
