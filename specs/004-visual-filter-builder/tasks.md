@@ -801,7 +801,23 @@ Fixes for remaining bugs discovered during integration testing and performance a
   - **Fix**: Only emit row_changed if there are actual rows being refreshed (has_rows check)
   - **Rationale**: During profile load, there are typically 0 rows, so signal emission is unnecessary
   - **Result**: Profile switch time reduced from 27+ seconds to under 2 seconds
-  - **Files**: src/visual_filter_builder.py:787-798 (refresh_schema with has_rows check)
+  - **Files**: src/visual_filter_builder.py:791-798 (refresh_schema with has_rows check)
+  - **Status**: COMPLETE
+
+- [x] B052 Suppress combo signals during schema refresh to prevent cascading updates in `src/visual_filter_builder.py`:
+  - **Issue**: Even with B051, profiles with existing filter rows (3+) still load database 30+ times during profile switch (34 seconds)
+  - **Root cause**: Each row's refresh_schema calls setCurrentText() on field/operator combos
+    - Triggers currentTextChanged signal
+    - Calls _on_field_changed → row_changed.emit()
+    - Cascades to FilterBuilder._on_table_changed → filter_changed.emit()
+    - Calls _on_filter_changed → filter_and_display_records → load_database_records
+    - With 3 rows × multiple refresh steps = 30+ cascading calls, each taking 1+ seconds
+  - **Fix**: Temporarily disconnect field/operator combo signals during refresh_schema
+    - setCurrentText() doesn't trigger signal handlers
+    - Reconnect signals after refresh completes via try/finally
+  - **Result**: Only 1 load_database_records call during profile load (the explicit one)
+    - Profile switch time: 34 seconds → ~2 seconds (17x speedup)
+  - **Files**: src/visual_filter_builder.py:1012-1038 (refresh_schema with signal disconnect/reconnect)
   - **Status**: COMPLETE
 
 ---
