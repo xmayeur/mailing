@@ -682,10 +682,15 @@ class _SendDialog(QDialog):
         # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
         if self._filter_builder:
             schema_fields = self._get_database_schema()
+            log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
+                     profile, self.database_input.text(), schema_fields)
             self._schema_info = DatabaseSchemaInfo(schema_fields)
             self._filter_builder.schema_info = self._schema_info
+            log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
             # Call refresh_schema on table_widget to update all row dropdowns
             self._filter_builder._table_widget.refresh_schema(self._schema_info)
+            log.info("DEBUG: refresh_schema called, row_widgets=%d",
+                     len(self._filter_builder._table_widget._row_widgets))
 
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
