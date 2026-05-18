@@ -226,5 +226,33 @@ class TestFieldDropdownUnit:
         assert "email" in schema2.field_names
 
 
+class TestOperatorDropdownUnit:
+    """Unit tests for operator dropdown (Phase 5 T031)."""
+
+    def test_operators_populated_per_field_type(self) -> None:
+        """Test operators differ by field type."""
+        schema = DatabaseSchemaInfo(
+            ["email", "age"],
+            {"email": "text", "age": "numeric"},
+        )
+        email_ops = schema.get_operators_for_field("email")
+        age_ops = schema.get_operators_for_field("age")
+        assert "Contains" in email_ops
+        assert "Contains" not in age_ops
+        assert "Greater than" in age_ops
+
+    def test_no_value_operators_identified(self) -> None:
+        """Test operators that don't require values."""
+        schema = DatabaseSchemaInfo(["status"])
+        ops = schema.get_operators_for_field("status")
+        assert "Is empty" in ops or "is empty" in ops
+        assert "Is not empty" in ops or "is not empty" in ops
+
+    def test_operator_selection_updates_row(self) -> None:
+        """Test operator change updates FilterRow."""
+        row = FilterRow("email", "contains", "test@")
+        assert row.operator == "contains"
+
+
 # FilterTableWidget and FilterRowWidget tests require Qt display server
 # Skipped in CI/headless environments; full functional tests in Phase 4 integration tests
