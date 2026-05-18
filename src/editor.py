@@ -377,7 +377,8 @@ class _SendDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Send Mailing")
-        self.setMinimumWidth(720)
+        # B038: Dialog width for filter widget (900px) + margins
+        self.setMinimumWidth(950)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
         self._current_profile = ""
