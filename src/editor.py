@@ -482,13 +482,12 @@ class _SendDialog(QDialog):
             scroll = QScrollArea()
             scroll.setWidget(self._filter_builder)
             scroll.setWidgetResizable(True)
-            # B026-B027 & B031 & B035: Set explicit height for filter widget
+            # B026-B027 & B031: Set explicit height/width for filter widget
             # Height: Allow 5 rows (26px each) + button (26px) = 260px + scrollbar = 280-290px
-            # Width: Remove fixed minWidth to allow expansion when window maximized
-            # Dropdowns will wrap if needed; no minimum width constraint
+            # Width: minWidth 900px ensures dropdowns, operators, values all visible
             scroll.setMinimumHeight(280)
             scroll.setMaximumHeight(290)
-            # Don't set minWidth/maxWidth - let scroll area expand with window
+            scroll.setMinimumWidth(900)
             scroll.setWidgetResizable(True)
             filter_layout.addWidget(scroll)
             filter_layout.addWidget(self.filter_status_label)
