@@ -387,12 +387,27 @@ class _SendDialog(QDialog):
         self._original_filter_text = ""
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
+        # B036: Make dialog vertically scrollable for many form fields
+        from PyQt6.QtWidgets import QScrollArea
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+
+        # Create scrollable content widget
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(16, 16, 16, 12)
+        scroll_layout.setSpacing(10)
+        scroll.setWidget(scroll_content)
+
+        root.addWidget(scroll)
+
+        # Form layout inside scrollable area
         form = QFormLayout()
         form.setLabelAlignment(form.labelAlignment())
-        root.addLayout(form)
+        scroll_layout.addLayout(form)
 
         self.config_input = QLineEdit(config_path, self)
         self.config_input.setReadOnly(True)
@@ -467,13 +482,14 @@ class _SendDialog(QDialog):
             scroll = QScrollArea()
             scroll.setWidget(self._filter_builder)
             scroll.setWidgetResizable(True)
-            # B026-B027 & B031: Set explicit height/width for filter widget
-            # minHeight/maxHeight: Allow 5 rows (26px each) + button (26px) = 260px
-            # Plus scrollbar and borders = 280px total
-            # minWidth: 900px ensures dropdowns, operators, values all visible
+            # B026-B027 & B031 & B035: Set explicit height for filter widget
+            # Height: Allow 5 rows (26px each) + button (26px) = 260px + scrollbar = 280-290px
+            # Width: Remove fixed minWidth to allow expansion when window maximized
+            # Dropdowns will wrap if needed; no minimum width constraint
             scroll.setMinimumHeight(280)
             scroll.setMaximumHeight(290)
-            scroll.setMinimumWidth(900)
+            # Don't set minWidth/maxWidth - let scroll area expand with window
+            scroll.setWidgetResizable(True)
             filter_layout.addWidget(scroll)
             filter_layout.addWidget(self.filter_status_label)
             form.addRow("Filter", filter_widget)
