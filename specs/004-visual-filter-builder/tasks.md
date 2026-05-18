@@ -144,17 +144,17 @@ Add field dropdown to visual editor. **Prerequisite**: Phase 2-3. **Enables**: U
 
 ### Field Dropdown Implementation
 
-- [ ] T022 [P] Update FilterRowWidget.field input to QComboBox (dropdown):
+- [x] T022 [P] Update FilterRowWidget.field input to QComboBox (dropdown):
   - Populate with DatabaseSchemaInfo.field_names
   - Connect currentTextChanged → update _row.field_name, emit row_changed
   - On field change: clear value input (field type may have changed)
 
-- [ ] T023 Add schema_info parameter to FilterTableWidget:
+- [x] T023 Add schema_info parameter to FilterTableWidget:
   - Pass schema_info to each FilterRowWidget
   - Allow schema refresh (update dropdown options)
   - Test with sample database (4-5 fields)
 
-- [ ] T024 Handle no-database case (per FR-012):
+- [x] T024 Handle no-database case (per FR-012):
   - If schema_info.field_names is empty: disable field dropdown, show "Load database first"
   - Test with empty schema
 
@@ -164,7 +164,7 @@ Add field dropdown to visual editor. **Prerequisite**: Phase 2-3. **Enables**: U
   - Test field selection updates row
   - Test no-database case (dropdown disabled)
 
-- [ ] T026 Unit test for field dropdown:
+- [x] T026 Unit test for field dropdown:
   - Test QComboBox populated from schema
   - Test selection updates FilterRow
   - Test empty schema case

@@ -27,6 +27,7 @@ from typing import Any
 try:
     from PyQt6.QtCore import pyqtSignal
     from PyQt6.QtWidgets import (
+        QComboBox,
         QHBoxLayout,
         QLineEdit,
         QPlainTextEdit,
@@ -655,6 +656,18 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             return []
         return [widget.get_row() for widget in self._row_widgets]
 
+    def refresh_schema(self, schema_info: DatabaseSchemaInfo) -> None:
+        """Update schema for all rows and refresh dropdowns.
+
+        Args:
+            schema_info: Updated DatabaseSchemaInfo
+        """
+        if not PYQT_AVAILABLE:
+            return
+        self.schema_info = schema_info
+        for widget in self._row_widgets:
+            widget.refresh_schema(schema_info)
+
     def _add_row_widget(self, row_idx: int, row: FilterRow) -> None:
         """Create and insert FilterRowWidget.
 
@@ -739,9 +752,13 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self.row = row
             self.schema_info = schema_info
             layout = QHBoxLayout()
-            self._field_edit = QLineEdit(row.field_name)
-            self._field_edit.textChanged.connect(self._on_field_changed)
-            layout.addWidget(self._field_edit)
+
+            self._field_combo = QComboBox()
+            self._populate_field_combo()
+            if schema_info.field_names:
+                self._field_combo.setCurrentText(row.field_name)
+            self._field_combo.currentTextChanged.connect(self._on_field_changed)
+            layout.addWidget(self._field_combo)
 
             self._operator_edit = QLineEdit(row.operator)
             self._operator_edit.textChanged.connect(self._on_operator_changed)
@@ -769,16 +786,49 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             FilterRow with current field/operator/value
         """
         if PYQT_AVAILABLE:
-            field = self._field_edit.text()
+            field = self._field_combo.currentText()
             operator = self._operator_edit.text()
             value = self._value_edit.text()
             return FilterRow(field, operator, value if value else None)
         return self.row
 
-    def _on_field_changed(self) -> None:
-        """Update row and emit signal on field change."""
+    def refresh_schema(self, schema_info: DatabaseSchemaInfo) -> None:
+        """Refresh field dropdown with updated schema.
+
+        Args:
+            schema_info: Updated DatabaseSchemaInfo
+        """
+        if not PYQT_AVAILABLE:
+            return
+        self.schema_info = schema_info
+        current_field = self._field_combo.currentText()
+        self._populate_field_combo()
+        if current_field in schema_info.field_names:
+            self._field_combo.setCurrentText(current_field)
+
+    def _populate_field_combo(self) -> None:
+        """Populate field combo with schema fields or 'Load database first' message."""
+        if not PYQT_AVAILABLE:
+            return
+        self._field_combo.clear()
+        if self.schema_info.field_names:
+            self._field_combo.addItems(self.schema_info.field_names)
+            self._field_combo.setEnabled(True)
+        else:
+            self._field_combo.addItem("Load database first")
+            self._field_combo.setEnabled(False)
+
+    def _on_field_changed(self, field_text: str) -> None:
+        """Update row and emit signal on field change.
+
+        Clear value input when field changes since field type may have changed.
+
+        Args:
+            field_text: New field name from combo box
+        """
         if PYQT_AVAILABLE:
-            self.row.field_name = self._field_edit.text()
+            self.row.field_name = field_text
+            self._value_edit.clear()
             self.row_changed.emit()
 
     def _on_operator_changed(self) -> None:
