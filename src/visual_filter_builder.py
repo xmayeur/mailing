@@ -1,0 +1,603 @@
+"""Visual filter builder widget for PyQt6-based email editor.
+
+Provides table-based GUI for building email subscriber filters without requiring
+knowledge of YAML syntax. Supports visual composition of field-operator-value
+conditions with real-time sync to YAML format.
+
+Main Components:
+    - FilterRow: Single filter condition (field + operator + optional value)
+    - FilterTable: Collection of filter rows with CRUD operations
+    - DatabaseSchemaInfo: Schema metadata for field/operator dropdown population
+    - FilterBuilder: Main Qt widget combining visual table + YAML text editor
+
+Integration:
+    Used by _SendDialog (editor.py) for filter composition in Send Mailing dialog.
+    Emits filter_changed signal when user modifies filter via table or YAML.
+
+Dependencies:
+    - PyQt6: GUI framework
+    - pyyaml: YAML parsing/generation
+    - sendMail: Access to _FILTER_OPS and filter() function
+"""
+
+import logging
+from dataclasses import dataclass
+from typing import Any
+
+try:
+    from PyQt6.QtCore import pyqtSignal
+    from PyQt6.QtWidgets import QPlainTextEdit, QTabWidget, QVBoxLayout, QWidget
+    PYQT_AVAILABLE = True
+except ImportError:
+    PYQT_AVAILABLE = False
+
+log = logging.getLogger(__name__)
+
+__all__ = [
+    "FilterRow",
+    "FilterTable",
+    "DatabaseSchemaInfo",
+    "FilterBuilder",
+    "FilterTableWidget",
+    "FilterRowWidget",
+]
+
+
+@dataclass
+class FilterRow:
+    """Single filter condition: field + operator + optional value.
+
+    Represents one row in the visual filter table. Each row defines
+    a condition to apply when filtering subscriber records.
+
+    Attributes:
+        field_name: Column name from database schema (e.g., "email", "status")
+        operator: Filter operator (e.g., "is", "contains", "greater than")
+        value: Optional filter value. None for operators that don't need values
+               (e.g., "is empty", "is not empty").
+
+    Example:
+        >>> row = FilterRow("email", "is not empty", None)
+        >>> row = FilterRow("status", "is equal to", "active")
+        >>> row = FilterRow("age", "greater than", "18")
+    """
+
+    field_name: str
+    operator: str
+    value: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate field_name and operator are not empty."""
+        if not self.field_name or not self.field_name.strip():
+            raise ValueError("field_name cannot be empty")
+        if not self.operator or not self.operator.strip():
+            raise ValueError("operator cannot be empty")
+        self.field_name = self.field_name.strip()
+        self.operator = self.operator.strip()
+
+
+class FilterTable:
+    """Manages collection of filter rows with CRUD operations.
+
+    Provides methods to add, delete, and update filter rows, and convert
+    between FilterRow list and sendMail filter dict format.
+
+    Attributes:
+        rows: List of FilterRow objects in execution order
+
+    Example:
+        >>> table = FilterTable()
+        >>> table.add_row("email", "is not empty")
+        0
+        >>> table.add_row("status", "is equal to", "active")
+        1
+        >>> table.to_dict()
+        {'email': 'is not empty', 'status': 'is equal to active'}
+    """
+
+    def __init__(self, rows: list[FilterRow] | None = None) -> None:
+        """Initialize with optional list of rows.
+
+        Args:
+            rows: Optional list of FilterRow objects. Defaults to empty list.
+        """
+        self.rows: list[FilterRow] = rows if rows is not None else []
+
+    def add_row(
+        self, field_name: str, operator: str, value: str | None = None
+    ) -> int:
+        """Add new row to filter table.
+
+        Args:
+            field_name: Column name from schema
+            operator: Filter operator
+            value: Optional filter value
+
+        Returns:
+            Index of newly added row
+
+        Raises:
+            ValueError: If field_name or operator is empty
+        """
+        row = FilterRow(field_name, operator, value)
+        self.rows.append(row)
+        return len(self.rows) - 1
+
+    def delete_row(self, index: int) -> None:
+        """Delete row at index.
+
+        Args:
+            index: Row index to delete
+
+        Raises:
+            IndexError: If index is out of range
+        """
+        if not (0 <= index < len(self.rows)):
+            raise IndexError(f"Row index {index} out of range [0, {len(self.rows)-1}]")
+        self.rows.pop(index)
+
+    def update_row(
+        self,
+        index: int,
+        field_name: str | None = None,
+        operator: str | None = None,
+        value: str | None = None,
+    ) -> None:
+        """Update row at index (partial update allowed).
+
+        Args:
+            index: Row index to update
+            field_name: New field name (optional)
+            operator: New operator (optional)
+            value: New value (optional)
+
+        Raises:
+            IndexError: If index is out of range
+            ValueError: If field_name or operator is empty (if provided)
+        """
+        if not (0 <= index < len(self.rows)):
+            raise IndexError(f"Row index {index} out of range [0, {len(self.rows)-1}]")
+        row = self.rows[index]
+        if field_name is not None:
+            if not field_name.strip():
+                raise ValueError("field_name cannot be empty")
+            row.field_name = field_name.strip()
+        if operator is not None:
+            if not operator.strip():
+                raise ValueError("operator cannot be empty")
+            row.operator = operator.strip()
+        if value is not None:
+            row.value = value
+
+    def to_dict(self) -> dict[str, str]:
+        """Convert rows to filter dict for sendMail.filter().
+
+        Returns:
+            Dict mapping field_name → "operator value" string.
+            For operators with no value, returns just operator string.
+
+        Example:
+            >>> table = FilterTable([
+            ...     FilterRow("email", "is not empty"),
+            ...     FilterRow("status", "is", "active")
+            ... ])
+            >>> table.to_dict()
+            {'email': 'is not empty', 'status': 'is active'}
+        """
+        result: dict[str, str] = {}
+        for row in self.rows:
+            if row.value is None:
+                result[row.field_name] = row.operator
+            else:
+                result[row.field_name] = f"{row.operator} {row.value}"
+        return result
+
+    @staticmethod
+    def from_dict(filter_dict: dict[str, str]) -> "FilterTable":
+        """Parse filter dict (from YAML) into FilterTable.
+
+        Uses sendMail._parse_filter_expr to extract operator and value from
+        the operator+value string.
+
+        Args:
+            filter_dict: Dict mapping field_name → "operator value" string
+
+        Returns:
+            FilterTable with rows parsed from dict
+
+        Example:
+            >>> table = FilterTable.from_dict({
+            ...     "email": "is not empty",
+            ...     "status": "is active"
+            ... })
+            >>> len(table.rows)
+            2
+            >>> table.rows[0].field_name
+            'email'
+        """
+        parse_fn: Any = None
+        try:
+            from sendMail import _parse_filter_expr
+            parse_fn = _parse_filter_expr
+        except ImportError as e:
+            log.debug("sendMail not available, using fallback parser: %s", e)
+
+        table = FilterTable()
+        for field_name, expr in filter_dict.items():
+            if parse_fn is not None:
+                operator, value = parse_fn(expr, field_name)
+            else:
+                operator, value = _split_operator_value(expr)
+            table.add_row(field_name, operator, value)
+        return table
+
+
+def _split_operator_value(expr: str) -> tuple[str, str | None]:
+    """Split "operator value" string into operator and value.
+
+    Fallback when sendMail._parse_filter_expr is not available.
+    Tries common operators in order, returning operator and remainder as value.
+
+    Args:
+        expr: Operator+value expression (e.g., "contains text", "is empty")
+
+    Returns:
+        Tuple of (operator, value). value is None if operator takes no value.
+    """
+    no_value_ops = ["is empty", "is not empty"]
+    operators = [
+        "is not",
+        "is equal to",
+        "is not equal to",
+        "greater or equal to",
+        "less or equal to",
+        "greater than",
+        "less than",
+        "does not contain",
+        "does not match",
+        "starts with",
+        "ends with",
+        "contains",
+        "matches",
+        "one of",
+        "none of",
+        "not in",
+        "in",
+        "is",
+    ]
+
+    expr = expr.strip()
+
+    if expr in no_value_ops:
+        return expr, None
+
+    for op in operators:
+        if expr.startswith(op + " "):
+            value = expr[len(op) + 1 :].strip()
+            return op, value if value else None
+
+    return expr, None
+
+
+class DatabaseSchemaInfo:
+    """Metadata about available database fields and applicable operators.
+
+    Used by visual editor to populate field/operator dropdowns and determine
+    which operators apply to each field based on inferred type.
+
+    Attributes:
+        field_names: List of available column names
+        field_types: Dict mapping field_name → type ("text", "numeric", "date")
+
+    Note:
+        MVP defaults all fields to "text" type. Type inference can be added
+        in Phase 2 via sample value inspection.
+    """
+
+    def __init__(
+        self, field_names: list[str], field_types: dict[str, str] | None = None
+    ) -> None:
+        """Initialize schema info.
+
+        Args:
+            field_names: List of column names from database
+            field_types: Optional dict of field → type. Defaults to all "text".
+        """
+        self.field_names = field_names
+        self.field_types = field_types or dict.fromkeys(field_names, "text")
+
+    def get_field_type(self, field_name: str) -> str:
+        """Get inferred type for field.
+
+        Args:
+            field_name: Column name to look up
+
+        Returns:
+            Field type ("text", "numeric", "date") or "text" if unknown
+        """
+        return self.field_types.get(field_name, "text")
+
+    def get_operators_for_field(self, field_name: str) -> list[str]:
+        """Get applicable operators for field based on its type.
+
+        Args:
+            field_name: Column name to get operators for
+
+        Returns:
+            List of applicable operator display names for this field
+        """
+        field_type = self.get_field_type(field_name)
+        return self._operators_for_type(field_type)
+
+    @staticmethod
+    def _operators_for_type(field_type: str) -> list[str]:
+        """Return operator display names for field type.
+
+        MVP returns all operators for "text" fields. Type-specific filtering
+        can be added in Phase 2 when field type inference is implemented.
+
+        Args:
+            field_type: Field type ("text", "numeric", "date")
+
+        Returns:
+            List of applicable operator display names
+        """
+        if field_type == "numeric":
+            return [
+                "Is equal to",
+                "Is not equal to",
+                "Greater than",
+                "Less than",
+                "Greater or equal",
+                "Less or equal",
+                "Is empty",
+                "Is not empty",
+                "In list",
+                "Not in list",
+            ]
+        else:
+            return [
+                "Is equal to",
+                "Is not equal to",
+                "Contains",
+                "Does not contain",
+                "Starts with",
+                "Ends with",
+                "Matches regex",
+                "Does not match",
+                "Is empty",
+                "Is not empty",
+                "In list",
+                "Not in list",
+            ]
+
+
+OPERATOR_LABELS: dict[str, list[str]] = {
+    "Is equal to": ["is", "eq", "is equal to"],
+    "Is not equal to": ["is not", "ne", "is not equal to"],
+    "Greater than": ["gt", "greater than"],
+    "Less than": ["lt", "less than"],
+    "Greater or equal": ["ge", "greater or equal to"],
+    "Less or equal": ["le", "less or equal to"],
+    "Contains": ["contains"],
+    "Does not contain": ["does not contain"],
+    "Starts with": ["starts with"],
+    "Ends with": ["ends with"],
+    "Is empty": ["is empty"],
+    "Is not empty": ["is not empty"],
+    "In list": ["one of", "in"],
+    "Not in list": ["none of", "not in"],
+    "Matches regex": ["matches"],
+    "Does not match": ["does not match"],
+}
+
+OPERATORS_FOR_TYPE: dict[str, list[str]] = {
+    "text": [
+        "Is equal to",
+        "Is not equal to",
+        "Contains",
+        "Does not contain",
+        "Starts with",
+        "Ends with",
+        "Matches regex",
+        "Does not match",
+        "Is empty",
+        "Is not empty",
+        "In list",
+        "Not in list",
+    ],
+    "numeric": [
+        "Is equal to",
+        "Is not equal to",
+        "Greater than",
+        "Less than",
+        "Greater or equal",
+        "Less or equal",
+        "Is empty",
+        "Is not empty",
+        "In list",
+        "Not in list",
+    ],
+}
+
+
+class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
+    """Main visual filter editor widget with bidirectional YAML sync.
+
+    Combines visual table editor with YAML text editor in tabs.
+    Emits filter_changed signal when user modifies filter.
+
+    Signals:
+        filter_changed: Emitted when filter changes. Payload: dict[str, str]
+
+    Attributes:
+        schema_info: DatabaseSchemaInfo for field/operator population
+
+    Example:
+        >>> schema = DatabaseSchemaInfo(["email", "status"])
+        >>> builder = FilterBuilder(schema)
+        >>> builder.filter_changed.connect(on_filter_changed)
+        >>> builder.set_filter_from_yaml({"email": "is not empty"})
+    """
+
+    if PYQT_AVAILABLE:
+        filter_changed = pyqtSignal(dict)
+
+    def __init__(
+        self,
+        schema_info: DatabaseSchemaInfo,
+        initial_filter: dict[str, str] | None = None,
+        parent: Any = None,
+    ) -> None:
+        """Initialize filter builder widget.
+
+        Args:
+            schema_info: DatabaseSchemaInfo for field/operator dropdowns
+            initial_filter: Optional initial filter dict to load
+            parent: Parent Qt widget (if using PyQt)
+        """
+        if PYQT_AVAILABLE:
+            super().__init__(parent)
+        self.schema_info = schema_info
+        self._filter_table = FilterTable()
+        self._syncing = False
+
+        if PYQT_AVAILABLE:
+            self._init_ui()
+            if initial_filter:
+                self.set_filter_from_yaml(initial_filter)
+
+    def _init_ui(self) -> None:
+        """Create UI: tabs with visual table and YAML editor."""
+        if not PYQT_AVAILABLE:
+            return
+
+        layout = QVBoxLayout(self)
+
+        tabs = QTabWidget(self)
+
+        self._yaml_edit = QPlainTextEdit(self)
+        self._yaml_edit.setPlaceholderText(
+            "YAML filter (optional)\nExample: email: is not empty"
+        )
+        tabs.addTab(self._yaml_edit, "YAML")
+
+        layout.addWidget(tabs)
+        self.setLayout(layout)
+
+        self._yaml_edit.textChanged.connect(self._on_yaml_changed)
+
+    def set_filter_from_yaml(self, filter_dict: dict[str, str]) -> None:
+        """Load filter from YAML dict into visual table.
+
+        Args:
+            filter_dict: Filter dict mapping field_name → "operator value"
+        """
+        self._syncing = True
+        try:
+            self._filter_table = FilterTable.from_dict(filter_dict)
+            if PYQT_AVAILABLE:
+                yaml_text = self._dict_to_yaml(filter_dict)
+                self._yaml_edit.setPlainText(yaml_text)
+        finally:
+            self._syncing = False
+
+    def get_filter_as_yaml(self) -> dict[str, str]:
+        """Get current filter as dict for sendMail.filter().
+
+        Returns:
+            Filter dict mapping field_name → "operator value"
+        """
+        return self._filter_table.to_dict()
+
+    def _on_yaml_changed(self) -> None:
+        """Handle YAML text change—parse and update filter table."""
+        if self._syncing or not PYQT_AVAILABLE:
+            return
+
+        self._syncing = True
+        try:
+            yaml_text = self._yaml_edit.toPlainText()
+            if yaml_text.strip():
+                filter_dict = self._parse_yaml(yaml_text)
+                self._filter_table = FilterTable.from_dict(filter_dict)
+            else:
+                self._filter_table = FilterTable()
+            self.filter_changed.emit(self._filter_table.to_dict())
+        except Exception as e:
+            log.debug("YAML parse error: %s", e)
+        finally:
+            self._syncing = False
+
+    @staticmethod
+    def _dict_to_yaml(filter_dict: dict[str, str]) -> str:
+        """Convert filter dict to YAML string.
+
+        Args:
+            filter_dict: Filter dict to convert
+
+        Returns:
+            YAML string representation
+        """
+        try:
+            import yaml
+
+            return yaml.dump(filter_dict, default_flow_style=False, sort_keys=False)
+        except ImportError:
+            return ""
+
+    @staticmethod
+    def _parse_yaml(yaml_text: str) -> dict[str, str]:
+        """Parse YAML string to filter dict.
+
+        Args:
+            yaml_text: YAML text to parse
+
+        Returns:
+            Filter dict, or empty dict if parse fails
+        """
+        try:
+            import yaml
+
+            result = yaml.safe_load(yaml_text)
+            return result if isinstance(result, dict) else {}
+        except Exception:
+            return {}
+
+
+class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
+    """Visual table editor for filter rows (placeholder for Phase 3)."""
+
+    if PYQT_AVAILABLE:
+        row_changed = pyqtSignal()
+
+    def __init__(self, schema_info: DatabaseSchemaInfo, parent: Any = None) -> None:
+        """Placeholder—implementation in Phase 3."""
+        if PYQT_AVAILABLE:
+            super().__init__(parent)
+        self.schema_info = schema_info
+
+    def set_rows(self, rows: list[FilterRow]) -> None:
+        """Placeholder—implementation in Phase 3."""
+        pass
+
+    def get_rows(self) -> list[FilterRow]:
+        """Placeholder—implementation in Phase 3."""
+        return []
+
+
+class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
+    """Per-row filter editor widget (placeholder for Phase 3)."""
+
+    if PYQT_AVAILABLE:
+        row_changed = pyqtSignal()
+
+    def __init__(
+        self, row_index: int, row: FilterRow, schema_info: DatabaseSchemaInfo, parent: Any = None
+    ) -> None:
+        """Placeholder—implementation in Phase 3."""
+        if PYQT_AVAILABLE:
+            super().__init__(parent)
+        self.row_index = row_index
+        self.row = row
+        self.schema_info = schema_info

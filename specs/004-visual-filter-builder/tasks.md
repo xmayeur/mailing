@@ -23,11 +23,11 @@
 
 Initialize project structure and dependencies (no external dependencies needed—using existing PyQt6/pyyaml).
 
-- [ ] T001 Create module structure: `src/visual_filter_builder.py` (empty file with module docstring)
-- [ ] T002 [P] Create test structure: `tests/unit/test_visual_filter_builder.py` (pytest boilerplate)
-- [ ] T003 [P] Create integration test file: `tests/integration/test_send_dialog_filter.py`
-- [ ] T004 [P] Create contract test file: `tests/contract/test_visual_filter_contract.py`
-- [ ] T005 Verify existing dependencies: PyQt6, pyyaml, gspread in pyproject.toml (should already exist)
+- [x] T001 Create module structure: `src/visual_filter_builder.py` (empty file with module docstring)
+- [x] T002 [P] Create test structure: `tests/unit/test_visual_filter_builder.py` (pytest boilerplate)
+- [x] T003 [P] Create integration test file: `tests/integration/test_send_dialog_filter.py`
+- [x] T004 [P] Create contract test file: `tests/contract/test_visual_filter_contract.py`
+- [x] T005 Verify existing dependencies: PyQt6, pyyaml, gspread in pyproject.toml (should already exist)
 
 ---
 
@@ -37,27 +37,27 @@ Build core data model and base widget infrastructure. **BLOCKING**: All user sto
 
 ### Data Classes
 
-- [ ] T006 Implement FilterRow dataclass in `src/visual_filter_builder.py`:
+- [x] T006 Implement FilterRow dataclass in `src/visual_filter_builder.py`:
   - Fields: `field_name: str`, `operator: str`, `value: str | None`
   - __post_init__ validation (field + operator not empty)
   - Docstring with example
 
-- [ ] T007 Implement FilterTable class in `src/visual_filter_builder.py`:
+- [x] T007 Implement FilterTable class in `src/visual_filter_builder.py`:
   - Methods: `__init__`, `add_row()`, `delete_row()`, `update_row()`, `to_dict()`, `from_dict()`
   - Docstring per method
   - Invariant: all rows are valid FilterRow instances
 
-- [ ] T008 Implement DatabaseSchemaInfo class in `src/visual_filter_builder.py`:
+- [x] T008 Implement DatabaseSchemaInfo class in `src/visual_filter_builder.py`:
   - Fields: `field_names: list[str]`, `field_types: dict[str, str]`
   - Methods: `get_field_type()`, `get_operators_for_field()`
   - Default all fields to "text" type (per research.md R002)
 
-- [ ] T009 [P] Create operator categorization in `src/visual_filter_builder.py`:
+- [x] T009 [P] Create operator categorization in `src/visual_filter_builder.py`:
   - Define `OPERATOR_LABELS` dict (user-friendly names → canonical operators)
   - Define `OPERATORS_FOR_TYPE` dict (field type → applicable operators)
   - Reference research.md findings for operator grouping
 
-- [ ] T010 Unit tests for data classes in `tests/unit/test_visual_filter_builder.py`:
+- [x] T010 Unit tests for data classes in `tests/unit/test_visual_filter_builder.py`:
   - Test FilterRow validation (empty field raises error, etc.)
   - Test FilterTable CRUD (add, delete, update)
   - Test FilterTable dict conversion (to_dict, from_dict)
@@ -65,26 +65,26 @@ Build core data model and base widget infrastructure. **BLOCKING**: All user sto
 
 ### Base Widget Class
 
-- [ ] T011 Implement FilterBuilder (QWidget) base class in `src/visual_filter_builder.py`:
+- [x] T011 Implement FilterBuilder (QWidget) base class in `src/visual_filter_builder.py`:
   - Init: `__init__(schema_info, initial_filter, parent)`
   - Signals: `filter_changed = pyqtSignal(dict)`
   - Methods: `set_filter_from_yaml()`, `get_filter_as_yaml()`
   - Internal state: `_filter_table: FilterTable`, `_syncing: bool`
   - Docstring with usage example
 
-- [ ] T012 [P] Implement FilterBuilder._init_ui() (tab structure only):
+- [x] T012 [P] Implement FilterBuilder._init_ui() (tab structure only):
   - Create QTabWidget with two tabs: "Visual Editor" (placeholder) + "YAML"
   - Add QPlainTextEdit for YAML tab
   - Connect textChanged signal (will implement handler in US5)
   - Layout in FilterBuilder
 
-- [ ] T013 Implement FilterBuilder YAML sync methods:
+- [x] T013 Implement FilterBuilder YAML sync methods:
   - `_dict_to_yaml()` static method (dict → YAML string via yaml.dump)
   - `_parse_yaml()` static method (YAML string → dict via yaml.safe_load)
   - `_on_yaml_changed()` slot (parse YAML, update _filter_table, emit filter_changed)
   - Handle parse errors gracefully (don't update table on invalid YAML)
 
-- [ ] T014 Unit tests for FilterBuilder in `tests/unit/test_visual_filter_builder.py`:
+- [x] T014 Unit tests for FilterBuilder in `tests/unit/test_visual_filter_builder.py`:
   - Test initialization with initial_filter
   - Test set_filter_from_yaml loads correctly
   - Test get_filter_as_yaml returns expected dict
