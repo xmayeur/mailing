@@ -78,11 +78,14 @@ class FilterRow:
     value: str | list[str] | None = None
 
     def __post_init__(self) -> None:
-        """Normalize field_name and operator (allow empty for new rows)."""
+        """Normalize field_name and operator (allow empty for new rows).
+
+        Ensures operator is always lowercase (canonical form) for consistent filtering.
+        """
         if isinstance(self.field_name, str):
             self.field_name = self.field_name.strip()
         if isinstance(self.operator, str):
-            self.operator = self.operator.strip()
+            self.operator = self.operator.strip().lower()
 
     def is_complete(self) -> bool:
         """Check if row has required fields filled in."""
@@ -732,12 +735,13 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             self._container_layout.setSpacing(0)
             self._container_layout.setContentsMargins(0, 0, 0, 0)
             self._container.setLayout(self._container_layout)
-            # B016-UX: Set max height for container to show max 5 rows (140px)
-            # This forces vertical scrolling after 5 rows while keeping them at 28px each
-            self._container.setMaximumHeight(140)
+            # B016-UX & B031: Set max height for container to show 5 rows + button
+            # 5 rows × 26px + button × 26px + scrollbar overhead = 250px
+            # Tighter spacing allows more rows visible in same space
+            self._container.setMaximumHeight(250)
             layout.addWidget(self._container)
             self._add_button = QPushButton("Add Row")
-            self._add_button.setMaximumHeight(28)
+            self._add_button.setMaximumHeight(26)
             self._add_button.clicked.connect(self._on_add_row)
             layout.addWidget(self._add_button)
             # B006: Add stretch at end to prevent empty rows appearing below actual rows
@@ -924,12 +928,12 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._delete_btn.clicked.connect(self._on_delete)
             layout.addWidget(self._delete_btn)
 
-            # B010: Set minimal spacing and margins for compact rows
-            layout.setSpacing(4)
+            # B010 & B031: Set minimal spacing and margins for compact rows
+            layout.setSpacing(2)
             layout.setContentsMargins(0, 0, 0, 0)
 
-            # B010: Limit row height to 28px for tight layout
-            self.setMaximumHeight(28)
+            # B010 & B031: Tighten row height from 28px to 26px for tighter layout
+            self.setMaximumHeight(26)
 
             self.setLayout(layout)
         else:
