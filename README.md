@@ -38,7 +38,9 @@ them through `sendMail`.
 - 📝 **Detailed logging** for monitoring and debugging
 - 🔒 **Secure credential management** via secrets vault
 - ✍️ **Standalone newsletter editor** with live HTML preview and sendMail-compatible output
+- 🎛️ **Visual Filter Builder** for intuitive subscriber filtering without YAML syntax
 - 🔍 **Advanced filter validation** with real-time syntax checking and field verification
+- 📊 **CSV, Excel, and Google Sheets** support for subscriber databases
 
 ## Editor
 
@@ -54,9 +56,15 @@ The editor is a separate desktop app for creating and editing newsletter content
 - Insert links, tables, horizontal rules, and named anchors
 - Apply custom CSS to preview and exported HTML
 - Preserve sendMail-ready HTML output for direct campaign use
+- **Visual Filter Builder** - Point-and-click interface for building complex subscriber filters
+  - No YAML syntax needed
+  - Real-time field validation from database schema
+  - Support for multiple operators (is, contains, in list, etc.)
+  - Multi-row AND logic for complex filtering
+  - Synchronized with YAML editor for advanced users
 - Advanced filter validation with real-time syntax checking
 - Database preview showing filtered subscriber records
-- Google Sheets and CSV database integration
+- Google Sheets, CSV, and Excel database integration
 
 ### Launching the Editor
 

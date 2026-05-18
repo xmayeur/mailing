@@ -91,10 +91,10 @@ Different filter operators (e.g., "is not empty", "equals", "contains", "greater
 
 ### Edge Cases
 
-- What happens if database schema changes after the dialog is open (e.g., user updates the database file)?
-- How does the system handle operators that may not apply to certain field types (e.g., "greater than" on a text field)?
-- What if a filter references a field that no longer exists in the database?
-- How does the system distinguish between empty filter values and null/not set?
+- **Database schema changes after dialog open**: Schema is re-loaded when user selects a different database file. Existing filter rows are validated against new schema.
+- **Operators on wrong field type**: Research.md categorizes operators by type (universal, text-only, numeric-only). MVP defaults all fields to "text" type, allowing all operators. Field type inference can be added in Phase 2.
+- **Filter references non-existent field**: Rows with missing fields are loaded but disabled/grayed-out with error icon. User can interactively remove them or reload correct database. FilterValidator provides feedback.
+- **Empty vs null values**: Represented as `value: str | None` in FilterRow (see data-model.md). Empty string ("") differs from None (no value). Operators like "is empty" don't require value input.
 
 ## Requirements *(mandatory)*
 
@@ -131,6 +131,12 @@ Different filter operators (e.g., "is not empty", "equals", "contains", "greater
 - **SC-004**: 90% of users without database schema knowledge can select correct fields from the field dropdown
 - **SC-005**: Filter table updates reflect changes immediately (latency <100ms when modifying a row)
 - **SC-006**: Visual editor and YAML text editor (legacy) remain in sync — changes in one are reflected in the other
+
+## Clarifications
+
+### Session 2026-05-18
+
+- Q: How should the system handle filter rows that reference fields no longer present in the loaded database? → A: Load all rows but disable/gray-out rows with missing fields, showing error icon. User can interactively remove bad rows or reload database.
 
 ## Assumptions
 
