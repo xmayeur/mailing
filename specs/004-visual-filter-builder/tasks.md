@@ -98,29 +98,29 @@ Implement core visual table editor. **Prerequisite**: Phase 2. **Enables**: US4,
 
 ### Visual Table Widget
 
-- [ ] T015 [P] Implement FilterTableWidget (QWidget) in `src/visual_filter_builder.py`:
+- [x] T015 [P] Implement FilterTableWidget (QWidget) in `src/visual_filter_builder.py`:
   - Create QTableWidget with 3 columns: Field | Operator | Value (headers)
   - Methods: `set_rows(rows)`, `get_rows()`
   - Signal: `row_changed = pyqtSignal()`
   - Layout: QTableWidget in QVBoxLayout
 
-- [ ] T016 Implement FilterRowWidget (custom row editor) in `src/visual_filter_builder.py`:
+- [x] T016 Implement FilterRowWidget (custom row editor) in `src/visual_filter_builder.py`:
   - Contains: field input, operator input, value input, delete button
   - Constructor: `__init__(row_index, row: FilterRow, schema_info, parent)`
   - Signal: `row_changed = pyqtSignal()`
   - Initially: All inputs are QLineEdit (text-based, no dropdowns yet—added in US4/US5)
 
-- [ ] T017 Connect FilterTableWidget rows to FilterRowWidget:
+- [x] T017 Connect FilterTableWidget rows to FilterRowWidget:
   - Populate table from FilterTable.rows
   - Create FilterRowWidget per row
   - Connect row_changed signals to FilterTableWidget.row_changed
   - Emit row_changed when any row changes
 
-- [ ] T018 Implement add/delete buttons for FilterTableWidget:
+- [x] T018 Implement add/delete buttons for FilterTableWidget:
   - "Add Row" button at bottom → creates empty FilterRow, appends to table
   - Delete button per row → removes row, emits row_changed
 
-- [ ] T019 Update FilterBuilder._init_ui() to instantiate FilterTableWidget:
+- [x] T019 Update FilterBuilder._init_ui() to instantiate FilterTableWidget:
   - Create FilterTableWidget in "Visual Editor" tab
   - Connect row_changed → _on_table_changed()
   - Implement _on_table_changed() slot (get rows, convert to dict, emit filter_changed)
@@ -130,7 +130,7 @@ Implement core visual table editor. **Prerequisite**: Phase 2. **Enables**: US4,
   - Test deleting row removes from table
   - Test row changes emit filter_changed signal
 
-- [ ] T021 Unit tests for FilterTableWidget and FilterRowWidget:
+- [x] T021 Unit tests for FilterTableWidget and FilterRowWidget:
   - Test set_rows populates table
   - Test add row appends new FilterRow
   - Test delete removes row

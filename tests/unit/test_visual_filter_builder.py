@@ -10,7 +10,6 @@ import pytest
 
 from visual_filter_builder import (
     DatabaseSchemaInfo,
-    FilterBuilder,
     FilterRow,
     FilterTable,
 )
@@ -205,5 +204,5 @@ class TestDatabaseSchemaInfo:
         assert "Contains" not in ops
 
 
-# FilterBuilder tests require Qt display server, skipped in CI/headless environments
-# Full functional tests can be added in Phase 3 when running in graphical context
+# FilterTableWidget and FilterRowWidget tests require Qt display server
+# Skipped in CI/headless environments; full functional tests in Phase 3 integration tests
