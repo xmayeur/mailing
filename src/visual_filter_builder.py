@@ -738,13 +738,13 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             self._container_layout.setSpacing(0)
             self._container_layout.setContentsMargins(0, 0, 0, 0)
             self._container.setLayout(self._container_layout)
-            # B016-UX & B031: Set max height for container to show 5 rows + button
-            # 5 rows × 26px + button × 26px + scrollbar overhead = 250px
-            # Tighter spacing allows more rows visible in same space
-            self._container.setMaximumHeight(250)
+            # B016-UX & B031 & B043: Set max height for container to show 5 rows + button
+            # 5 rows × 30px + button × 30px + scrollbar overhead = 310px
+            # Accommodates taller text inputs
+            self._container.setMaximumHeight(310)
             layout.addWidget(self._container)
             self._add_button = QPushButton("Add Row")
-            self._add_button.setMaximumHeight(26)
+            self._add_button.setMaximumHeight(30)
             self._add_button.clicked.connect(self._on_add_row)
             layout.addWidget(self._add_button)
             # B006: Add stretch at end to prevent empty rows appearing below actual rows
@@ -949,8 +949,9 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             layout.setSpacing(2)
             layout.setContentsMargins(0, 0, 0, 0)
 
-            # B010 & B031: Tighten row height from 28px to 26px for tighter layout
-            self.setMaximumHeight(26)
+            # B010 & B031 & B043: Set row height to accommodate text input (30px minimum)
+            # Text input minHeight(26) needs row to be taller for vertical centering
+            self.setMaximumHeight(30)
 
             self.setLayout(layout)
         else:
