@@ -603,7 +603,10 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
             # Validate operator exists for field type
             if row_widget.row.operator:
                 valid_operators = self.schema_info.get_operators_for_field(row_widget.row.field_name)
-                if row_widget.row.operator not in valid_operators:
+                # B042: Convert canonical operator to display label for comparison
+                # row.operator is canonical (lowercase), valid_operators are display labels
+                display_op = _canonical_to_display_operator(row_widget.row.operator)
+                if display_op not in valid_operators:
                     operator_error = "Operator not valid for field type"
 
             # Validate value is present if operator requires it
