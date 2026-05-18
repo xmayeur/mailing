@@ -120,7 +120,7 @@ The editor shows a live preview of the generated HTML. This helps you see how th
 
 ## Working with Filters
 
-The editor includes advanced filtering capabilities for conditional content delivery.
+The editor includes advanced filtering capabilities for conditional content delivery. You can build filters using either a visual table builder or YAML syntax—both approaches are synchronized.
 
 ### Opening the Send Dialog
 
@@ -128,35 +128,102 @@ The editor includes advanced filtering capabilities for conditional content deli
 2. This opens the Send Dialog with filter options
 3. The dialog shows your current sendMail profiles
 
-### Setting Up Filters
+### Using the Visual Filter Builder
 
-1. In the **Filters** section, enter YAML syntax:
+The **Visual Filter Builder** provides an intuitive point-and-click interface for creating complex filters without writing YAML.
 
-```yaml
-country: USA
-subscription_level: premium
+#### Creating Filters with the Visual Table
+
+1. In the **Filters** section, you'll see a table with columns for:
+   - **Field**: Database column name (dropdown populated from your database)
+   - **Operator**: Comparison operator (is, is not, contains, in list, etc.)
+   - **Value**: Filter value (only shown for operators that require one)
+
+2. **Add a filter row**:
+   - Click the **Add Row** button
+   - Select a field from the dropdown (e.g., "Email", "Status", "Groups")
+   - Choose an operator (e.g., "is", "contains", "in list")
+   - Enter a value if needed
+
+3. **Multiple conditions** (AND logic):
+   - Add multiple rows for complex filters
+   - All conditions must match for a record to be included
+
+4. **Remove a row**:
+   - Click the **Delete** button on the right side of the row
+
+#### Example: Filtering by Status
+
+1. Row 1: Field=**Status**, Operator=**is**, Value=**active**
+2. This shows only subscribers with Status=active
+
+#### Example: Multiple Criteria
+
+1. Row 1: Field=**Email**, Operator=**is not empty**
+2. Row 2: Field=**Status**, Operator=**is**, Value=**active**
+3. Row 3: Field=**Groups**, Operator=**in list**, Value=**News, Premium, VIP**
+
+This filters for subscribers with non-empty emails, active status, AND in one of the three groups.
+
+#### Using List Values
+
+For operators like "in list" or "one of", enter multiple values separated by commas:
+
+```
+News, Premium, VIP
 ```
 
-1. Click **Apply Filter** to activate the filter
-2. The editor validates the filter syntax in real-time
-3. A visual indicator shows if the filter is valid (green) or invalid (red)
+The visual builder automatically parses comma-separated values.
+
+### Using YAML Filters (Advanced)
+
+For complex filters or programmatic generation, you can also enter YAML syntax directly.
+
+1. Switch to the **YAML** tab in the filter section
+2. Enter YAML syntax:
+
+```yaml
+email: is not empty
+status: is active
+groups: in News, Premium, VIP
+```
+
+3. Click **Apply Filter** to activate
+4. The editor validates syntax in real-time
+5. A visual indicator shows if the filter is valid (green) or invalid (red)
+
+**Note**: The visual table and YAML editors are synchronized. Changes in one view automatically update the other.
 
 ### Database Preview
 
-1. Select a subscriber database (CSV or Google Sheets)
+1. Select a subscriber database (CSV, Excel, or Google Sheets)
 2. Click **Load Database** to preview records
 3. The editor shows matching records based on your filter
-4. See exactly which subscribers will receive the filtered content
+4. See exactly which subscribers will receive the filtered newsletter
+5. For Google Sheets, the first load may take a few seconds
 
 ### Valid Filter Fields
 
 Filter fields depend on your subscriber database schema. Common fields include:
 
-- `country`
-- `email`
-- `subscription_level`
-- `name`
-- Custom fields from your CSV/Google Sheets
+- `Email` - subscriber email address
+- `Status` - subscription status (active, inactive, etc.)
+- `Name` - subscriber name
+- `Groups` - group membership
+- `Created` - account creation date
+- Custom fields from your CSV/Excel/Google Sheets
+
+### Supported Operators
+
+- **is** - Exact match (case-sensitive)
+- **is not** - Not equal to
+- **is not empty** - Field has a value
+- **contains** - Substring match
+- **does not contain** - No substring match
+- **in list** / **one of** - Value is in a comma-separated list
+- **not in list** - Value not in list
+- **starts with** - Text begins with value
+- **ends with** - Text ends with value
 
 ## Managing Profiles
 
