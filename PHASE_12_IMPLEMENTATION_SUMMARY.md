@@ -15,6 +15,7 @@
 **Result**: No duplicate rows when loading filters from profile.
 
 **Code Change**:
+
 ```python
 def _clear_rows(self) -> None:
     while self._row_widgets:
@@ -32,6 +33,7 @@ def _clear_rows(self) -> None:
 **Result**: Max 5 visible rows with vertical scrollbar; preview pane always visible.
 
 **Code Change**:
+
 ```python
 self._container.setMaximumHeight(140)  # 5 rows × 28px
 ```
@@ -45,6 +47,7 @@ self._container.setMaximumHeight(140)  # 5 rows × 28px
 **Result**: Schema reloads fresh when database path changes; retry works.
 
 **Code Change**:
+
 ```python
 # Signal connection at line 437
 self.database_input.textChanged.connect(self._on_database_input_changed)
@@ -68,6 +71,7 @@ def _on_database_input_changed(self, _text: str) -> None:
 **Result**: Warning logged for missing files; debug for unknown types.
 
 **Code Change**:
+
 ```python
 # Old: log.debug("Unknown database type: %s")
 # New: log.warning("CSV database file not found: %s")
@@ -87,6 +91,7 @@ if suffix == ".csv":
 **Result**: User can interact even when schema empty; placeholder guides action.
 
 **Code Change**:
+
 ```python
 def _populate_field_combo(self) -> None:
     if self.schema_info.field_names:
@@ -126,6 +131,7 @@ def _populate_operator_combo(self) -> None:
 **Result**: YAML edits sync correctly; invalid YAML logged at WARNING level.
 
 **Code Change**:
+
 ```python
 def _on_yaml_changed(self) -> None:
     if yaml_text.strip():
@@ -219,4 +225,3 @@ def _on_yaml_changed(self) -> None:
 2. **User Testing**: Validate UX improvements (fixed layout, placeholder text)
 3. **Documentation**: Update CLAUDE.md with bug fix context
 4. **Merge**: Ready for PR to main branch
-

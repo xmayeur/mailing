@@ -467,7 +467,13 @@ class _SendDialog(QDialog):
             scroll = QScrollArea()
             scroll.setWidget(self._filter_builder)
             scroll.setWidgetResizable(True)
+            # B026-B027: Set explicit height/width for filter widget
+            # minHeight: 170px (5 rows × 28px + 10px margin) for 5 visible rows
+            # maxHeight: 200px allows scrolling if more than 5 rows
+            # minWidth: 900px ensures dropdowns, operators, values all visible
+            scroll.setMinimumHeight(170)
             scroll.setMaximumHeight(200)
+            scroll.setMinimumWidth(900)
             filter_layout.addWidget(scroll)
             filter_layout.addWidget(self.filter_status_label)
             form.addRow("Filter", filter_widget)
@@ -648,6 +654,14 @@ class _SendDialog(QDialog):
     def _load_profile_defaults(self, profile: str) -> None:
         self._current_profile = profile
         profile_cfg = self._config_data.get(profile, {})
+
+        # B024-B025: Clear schema cache for new profile to force fresh load
+        # Ensures Google Sheets and CSV profiles refresh when switching
+        cache = self._get_schema_cache()
+        # Clear all cache entries for this profile
+        for key in list(cache._cache.keys()):
+            if key.startswith(f"{profile}_"):
+                cache.invalidate(key)
 
         def _int_or_zero(value: object) -> int:
             try:
