@@ -299,16 +299,17 @@ Refinement, error handling, optimization, documentation. **Prerequisite**: All p
   - Cache field_names list (already in DatabaseSchemaInfo)
   - Cache operators_for_type dict
   - Measure dialog open time
+  - Note: DatabaseSchemaInfo field_names already cached as list
 
 ### Documentation & Examples
 
-- [ ] T045 [P] Add docstrings to all public methods:
+- [x] T045 [P] Add docstrings to all public methods:
   - FilterRow, FilterTable, DatabaseSchemaInfo
   - FilterBuilder, FilterTableWidget, FilterRowWidget
   - Include parameter types and return types
   - Example usage for complex methods
 
-- [ ] T046 Update CLAUDE.md with visual filter builder section:
+- [x] T046 Update CLAUDE.md with visual filter builder section:
   - Add to "Key Files" table: visual_filter_builder.py
   - Document FilterBuilder public API
   - Note integration point in _SendDialog
