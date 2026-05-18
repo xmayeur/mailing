@@ -523,6 +523,40 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
         """
         return self._filter_table.to_dict()
 
+    def validate_and_highlight_errors(self) -> None:
+        """Validate rows and set visual error states on FilterRowWidget (T041-T042).
+
+        Checks each row for:
+        - Invalid field (not in schema)
+        - Invalid operator (not in schema)
+        - Missing value (required by operator)
+        """
+        if not PYQT_AVAILABLE or not hasattr(self, "_table_widget"):
+            return
+
+        for row_widget in self._table_widget._row_widgets:
+            field_error = ""
+            operator_error = ""
+            value_error = ""
+
+            # Validate field exists in schema
+            if row_widget.row.field_name and row_widget.row.field_name not in self.schema_info.field_names:
+                field_error = f"Field '{row_widget.row.field_name}' not in database schema"
+
+            # Validate operator exists for field type
+            if row_widget.row.operator:
+                valid_operators = self.schema_info.get_operators_for_field(row_widget.row.field_name)
+                if row_widget.row.operator not in valid_operators:
+                    operator_error = "Operator not valid for field type"
+
+            # Validate value is present if operator requires it
+            if row_widget.row.operator and row_widget._operator_needs_value(row_widget.row.operator):
+                if not row_widget.row.value or not row_widget.row.value.strip():
+                    value_error = f"Operator '{row_widget.row.operator}' requires a value"
+
+            # Apply error state
+            row_widget.set_error_state(field_error, operator_error, value_error)
+
     def _on_table_changed(self) -> None:
         """Handle visual table change—update YAML and emit filter_changed."""
         if self._syncing or not PYQT_AVAILABLE:
@@ -935,6 +969,52 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             text = self._value_edit.text()
             self.row.value = text if text else None
             self.row_changed.emit()
+
+    def set_error_state(
+        self, field_error: str = "", operator_error: str = "", value_error: str = ""
+    ) -> None:
+        """Set visual error indicators on row widgets (T042).
+
+        Args:
+            field_error: Error message for field (empty = no error)
+            operator_error: Error message for operator (empty = no error)
+            value_error: Error message for value (empty = no error)
+        """
+        if not PYQT_AVAILABLE:
+            return
+
+        # Field combo error state
+        if field_error:
+            self._field_combo.setStyleSheet("QComboBox { border: 2px solid #f44336; }")
+            self._field_combo.setToolTip(field_error)
+        else:
+            self._field_combo.setStyleSheet("")
+            self._field_combo.setToolTip("")
+
+        # Operator combo error state
+        if operator_error:
+            self._operator_combo.setStyleSheet("QComboBox { border: 2px solid #f44336; }")
+            self._operator_combo.setToolTip(operator_error)
+        else:
+            self._operator_combo.setStyleSheet("")
+            self._operator_combo.setToolTip("")
+
+        # Value input error state (show as gray if missing value)
+        if value_error:
+            value_style = "QLineEdit, QPlainTextEdit { border: 1px solid #999; background: #f5f5f5; }"
+            self._value_edit.setStyleSheet(value_style)
+            self._value_edit_multiline.setStyleSheet(value_style)
+            self._value_edit.setToolTip(value_error)
+            self._value_edit_multiline.setToolTip(value_error)
+        else:
+            self._value_edit.setStyleSheet("")
+            self._value_edit_multiline.setStyleSheet("")
+            self._value_edit.setToolTip("")
+            self._value_edit_multiline.setToolTip("")
+
+    def clear_error_state(self) -> None:
+        """Clear all error state visual indicators."""
+        self.set_error_state()
 
     def _on_delete(self) -> None:
         """Request deletion of this row."""

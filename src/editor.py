@@ -728,14 +728,18 @@ class _SendDialog(QDialog):
         self._session_filter = None
 
     def _on_filter_changed(self, filter_dict: dict[str, str]) -> None:
-        """Handle FilterBuilder filter_changed signal (T035).
+        """Handle FilterBuilder filter_changed signal (T035, T041-T042).
 
         Updates _session_filter and triggers validation.
+        Highlights invalid rows in visual table.
 
         Args:
             filter_dict: Updated filter dict from FilterBuilder
         """
         self._session_filter = filter_dict if filter_dict else None
+        # T041-T042: Validate rows and highlight errors in visual table
+        if self._filter_builder:
+            self._filter_builder.validate_and_highlight_errors()
         # Trigger validation with debounced timer
         self._validation_timer.stop()
         self._validation_timer.start(50)
@@ -812,7 +816,7 @@ class _SendDialog(QDialog):
         return cast(list[str], cache.get(f"{profile_name}_csv_{db_path}", _load_csv_schema))
 
     def _update_validation_ui(self, status: dict[str, Any]) -> None:
-        """Update filter field UI based on validation status (T019, T020, T021)."""
+        """Update filter field UI based on validation status (T019, T020, T021, T041)."""
         is_valid = status.get("is_valid", True)
         syntax_errors = status.get("syntax_errors", [])
         missing_fields = status.get("missing_fields", [])
@@ -827,12 +831,15 @@ class _SendDialog(QDialog):
                 "QPlainTextEdit { border: 1px solid #f44336; background: #ffebee; }"
             )
 
-        # T020: Error message display
+        # T020, T041: Error message display with count
         error_msg = ""
+        error_count = len(syntax_errors) + len(missing_fields)
+        if error_count > 0:
+            error_msg = f"✗ {error_count} validation error{'s' if error_count != 1 else ''} "
         if syntax_errors:
-            error_msg += "Syntax: " + "; ".join(syntax_errors)
+            error_msg += "| Syntax: " + "; ".join(syntax_errors)
         if missing_fields:
-            if error_msg:
+            if syntax_errors:
                 error_msg += " | "
             error_msg += f"Fields not found: {', '.join(missing_fields)}"
 
