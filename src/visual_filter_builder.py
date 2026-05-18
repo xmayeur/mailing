@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from typing import Any
 
 try:
-    from PyQt6.QtCore import pyqtSignal
+    from PyQt6.QtCore import Qt, pyqtSignal
     from PyQt6.QtWidgets import (
         QComboBox,
         QHBoxLayout,
@@ -744,7 +744,7 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             self._container.setMaximumHeight(310)
             layout.addWidget(self._container)
             self._add_button = QPushButton("Add Row")
-            self._add_button.setMaximumHeight(30)
+            self._add_button.setMaximumHeight(40)
             self._add_button.clicked.connect(self._on_add_row)
             layout.addWidget(self._add_button)
             # B006: Add stretch at end to prevent empty rows appearing below actual rows
@@ -930,6 +930,8 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._value_edit = QLineEdit(value_str)
             # B041: Set minimum height so text isn't vertically truncated
             self._value_edit.setMinimumHeight(26)
+            # B044: Center text vertically within QLineEdit
+            self._value_edit.setAlignment(Qt.AlignmentFlag.AlignVCenter)
             self._value_edit.textChanged.connect(self._on_value_changed)
             self._value_edit_multiline = QPlainTextEdit()
             self._value_edit_multiline.setPlainText(value_str)
