@@ -89,3 +89,8 @@ class TestDatabaseSchemaProvider:
         """Test detection with unknown file type."""
         headers = DatabaseSchemaProvider.detect_and_extract("/path/to/file.txt")
         assert headers == []
+
+    def test_from_excel_file_not_found(self) -> None:
+        """Test handling missing Excel file."""
+        headers = DatabaseSchemaProvider.from_excel("/nonexistent/file.xlsx")
+        assert headers == []
