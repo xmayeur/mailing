@@ -42,6 +42,8 @@ class DatabaseSchemaProvider:
     def from_excel(excel_path: str, sheet_name: str | None = None) -> list[str]:
         """Extract field names from Excel file (XLSX/XLS) headers.
 
+        Uses python-calamine (same as sendMail.py) for reading Excel files.
+
         Args:
             excel_path: Path to Excel file
             sheet_name: Sheet name (if None, uses first sheet)
@@ -50,16 +52,30 @@ class DatabaseSchemaProvider:
             List of field names from first row (headers)
         """
         try:
-            import openpyxl
-            wb = openpyxl.load_workbook(excel_path, data_only=True)
-            ws = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
-            if ws is None:
-                log.debug("Could not find sheet in Excel file: %s", sheet_name)
-                return []
-            headers = [cell.value for cell in ws[1]]
-            return [str(h).strip() for h in headers if h and str(h).strip()]
+            from python_calamine import CalamineWorkbook
+
+            wb = CalamineWorkbook.from_path(excel_path)
+            # Get sheet by name if specified, otherwise first sheet
+            ws = None
+            if sheet_name:
+                for i, name in enumerate(wb.sheet_names):
+                    if name == sheet_name:
+                        ws = wb.get_sheet_by_index(i)
+                        break
+                if ws is None:
+                    log.debug("Could not find sheet in Excel file: %s", sheet_name)
+                    return []
+            else:
+                ws = wb.get_sheet_by_index(0)
+
+            # First row contains headers
+            data = ws.to_python()
+            if data and len(data) > 0:
+                headers = data[0]
+                return [str(h).strip() for h in headers if h and str(h).strip()]
+            return []
         except ImportError:
-            log.debug("openpyxl not available for Excel support")
+            log.error("python-calamine not available for Excel support")
             return []
         except Exception as e:
             log.debug("Could not read Excel headers: %s", e)
