@@ -3,7 +3,7 @@
 **Feature**: 004-visual-filter-builder  
 **Date**: 2026-05-18  
 **Branch**: `004-visual-filter-builder`  
-**Total Tasks**: 45 (42 original + 3 bugs) | **Completed**: 41/42 (T034 optional) + 3 bugs fixed | **Status**: Ready for final testing & merge
+**Total Tasks**: 46 (42 original + 4 bugs) | **Completed**: 41/42 (T034 optional) + 4 bugs fixed | **Status**: Ready for final testing & merge
 
 ---
 
@@ -425,6 +425,15 @@ Critical bugs identified during integration testing. **All resolved.**
   - **Added**: is_complete() method to check row validity
   - **Result**: Empty rows can be created for new filters without crash
   - **Tests**: TestFilterRow::test_empty_field_allowed PASSED
+
+### List Value Type Crash
+
+- [x] B004 Fix QLineEdit crash when row.value is a list in `src/visual_filter_builder.py`:
+  - **Issue**: TypeError when creating QLineEdit with list value for "one of" operators
+  - **Fixed**: Updated FilterRow.value type to `str | list[str] | None`
+  - **Added**: _row_value_to_str() helper to convert values to display strings
+  - **Result**: Multi-value operators now work without crashes
+  - **Tests**: All 94 filter tests passing
 
 ---
 
