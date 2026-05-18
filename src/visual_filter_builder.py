@@ -900,7 +900,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             if schema_info.field_names:
                 self._field_combo.setCurrentText(row.field_name)
             self._field_combo.currentTextChanged.connect(self._on_field_changed)
-            layout.addWidget(self._field_combo)
+            layout.addWidget(self._field_combo, 1)  # stretch: equal width
 
             self._operator_combo = QComboBox()
             self._populate_operator_combo()
@@ -917,7 +917,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
                 except Exception as e:
                     log.info("DEBUG: Failed to set operator '%s': %s", display_op, e)
             self._operator_combo.currentTextChanged.connect(self._on_operator_changed)
-            layout.addWidget(self._operator_combo)
+            layout.addWidget(self._operator_combo, 1)  # stretch: equal width
 
             value_str = self._row_value_to_str(row.value)
             self._value_edit = QLineEdit(value_str)
@@ -928,13 +928,13 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._value_edit_multiline.setMaximumHeight(80)
 
             self._update_value_input_visibility()
-            layout.addWidget(self._value_edit)
-            layout.addWidget(self._value_edit_multiline)
+            layout.addWidget(self._value_edit, 1)  # stretch: equal width
+            layout.addWidget(self._value_edit_multiline, 1)  # stretch: equal width
 
             self._delete_btn = QPushButton("Delete")
             self._delete_btn.setMaximumWidth(60)
             self._delete_btn.clicked.connect(self._on_delete)
-            layout.addWidget(self._delete_btn)
+            layout.addWidget(self._delete_btn, 0)  # no stretch: fixed width
 
             # B010 & B031: Set minimal spacing and margins for compact rows
             layout.setSpacing(2)
