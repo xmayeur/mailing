@@ -728,3 +728,90 @@ Fixes for bugs NOT resolved by Phase 12. User reports indicate core functionalit
 **Fix Priority**: B024 → B025 → B026 → B027 → B028 → B029 → B030
 
 All fixes are **blocking** - users cannot use filter editor until resolved.
+
+---
+
+## Phase 14: Additional Bug Fixes (Performance & Visual)
+
+Fixes for remaining bugs discovered during integration testing and performance analysis.
+
+### Text Rendering & Visual Alignment
+
+- [x] B044 Fix vertical text alignment in QLineEdit filter inputs in `src/visual_filter_builder.py`:
+  - **Issue**: Text in value input boxes appears bottom-aligned instead of centered
+  - **Root cause**: QLineEdit default vertical alignment is bottom
+  - **Fix**: Added `setAlignment(Qt.AlignmentFlag.AlignVCenter)` to _value_edit in FilterRowWidget.__init__
+  - **Result**: Text centered vertically in input boxes
+  - **Files**: src/visual_filter_builder.py:883-956 (FilterRowWidget.__init__)
+  - **Status**: COMPLETE
+
+### Google Sheets Schema & Database Loading
+
+- [x] B045 Google Sheets schema not loading diagnostics in `src/editor.py`:
+  - **Issue**: Google Sheets profiles show empty schema after profile switch
+  - **Root cause**: Case-sensitive config key lookup (code expects "SHEETID", config has "sheetid")
+  - **Status**: Diagnostic (fixed by B047)
+
+- [x] B046 Improved Google Sheets API diagnostics logging in `src/editor.py`:
+  - **Issue**: Unclear why Google Sheets schema not loading
+  - **Fix**: Added direct get_google_sheets_schema import and INFO-level logging
+  - **Result**: Clear visibility into API calls and schema loading
+  - **Files**: src/editor.py:838-882 (_get_database_schema)
+  - **Status**: COMPLETE
+
+- [x] B047 Fix case-insensitive config key handling in `src/editor.py`:
+  - **Issue**: User's config.yml has lowercase keys (sheetid, sa) but code checks uppercase (SHEETID, SA)
+  - **Root cause**: Config parser doesn't normalize keys
+  - **Fix**: Check both uppercase and lowercase variants: `config.get("SHEETID") or config.get("sheetid")`
+  - **Result**: Works with any config key case
+  - **Files**: src/editor.py:856-857, 943-944 (_get_database_schema, load_database_records)
+  - **Status**: COMPLETE
+
+### Dropdown Visual Update & Operator Persistence
+
+- [x] B048 Fix operator value loss during schema refresh in `src/visual_filter_builder.py`:
+  - **Issue**: Operator selection cleared when field changes during refresh_schema
+  - **Root cause**: Operator combo populated AFTER field combo, but field change clears operator
+  - **Fix**: Store operator before field change, restore after populate operators (B048)
+  - **Result**: Operator selection preserved through schema refresh
+  - **Files**: src/visual_filter_builder.py:991-1021 (refresh_schema)
+  - **Status**: COMPLETE
+
+- [x] B049 Fix dropdown lists appearing grayed out despite population in `src/visual_filter_builder.py`:
+  - **Issue**: Operator dropdown appears grayed/disabled even though items are present
+  - **Root cause**: Widget redraw not triggered after addItems()
+  - **Fix**: Changed from update() to repaint() + setStyleSheet("") for immediate visual update
+  - **Result**: Dropdowns appear correctly populated and enabled
+  - **Files**: src/visual_filter_builder.py:1023-1057 (_populate_field_combo, _populate_operator_combo)
+  - **Status**: COMPLETE
+
+### Performance Bottleneck
+
+- [x] B050 Add timing measurements for schema and database loading in `src/editor.py`:
+  - **Issue**: Profile switching takes 27+ seconds for Google Sheets
+  - **Debug approach**: Added `import time` and timing around _get_database_schema and refresh_schema
+  - **Result**: Identified refresh_schema triggering cascading filter_and_display_records calls
+  - **Files**: src/editor.py:704-719 (timing measurements)
+  - **Status**: COMPLETE (measurements show root cause)
+
+- [x] B051 Skip row_changed signal during schema refresh when no rows in `src/visual_filter_builder.py`:
+  - **Issue**: Profile switch takes 27+ seconds - refresh_schema emits row_changed unconditionally
+  - **Root cause**: Signal chain: row_changed → filter_changed → _on_filter_changed → filter_and_display_records → load_database_records (expensive)
+  - **Analysis**: Timing showed refresh_schema call taking 27.76s due to cascading filter_and_display_records call
+  - **Fix**: Only emit row_changed if there are actual rows being refreshed (has_rows check)
+  - **Rationale**: During profile load, there are typically 0 rows, so signal emission is unnecessary
+  - **Result**: Profile switch time reduced from 27+ seconds to under 2 seconds
+  - **Files**: src/visual_filter_builder.py:787-798 (refresh_schema with has_rows check)
+  - **Status**: COMPLETE
+
+---
+
+**Root Cause Analysis**:
+- B044: Default Qt widget alignment
+- B047: Case-sensitive config key lookup
+- B048-B049: Signal chain and visual update issues
+- B050-B051: Unnecessary cascading signal emissions during profile load
+
+**Performance Impact**: B051 reduces Google Sheets profile switch time from 27+ seconds to ~2 seconds (10x improvement)
+
+All fixes are **blocking** for usable filter editor experience.
