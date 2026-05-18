@@ -76,13 +76,15 @@ class FilterRow:
     value: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate field_name and operator are not empty."""
-        if not self.field_name or not self.field_name.strip():
-            raise ValueError("field_name cannot be empty")
-        if not self.operator or not self.operator.strip():
-            raise ValueError("operator cannot be empty")
-        self.field_name = self.field_name.strip()
-        self.operator = self.operator.strip()
+        """Normalize field_name and operator (allow empty for new rows)."""
+        if isinstance(self.field_name, str):
+            self.field_name = self.field_name.strip()
+        if isinstance(self.operator, str):
+            self.operator = self.operator.strip()
+
+    def is_complete(self) -> bool:
+        """Check if row has required fields filled in."""
+        return bool(self.field_name) and bool(self.operator)
 
 
 class FilterTable:
@@ -184,6 +186,7 @@ class FilterTable:
         Returns:
             Dict mapping field_name → "operator value" string.
             For operators with no value, returns just operator string.
+            Incomplete rows (empty field or operator) are skipped.
 
         Example:
             >>> table = FilterTable([
@@ -195,6 +198,8 @@ class FilterTable:
         """
         result: dict[str, str] = {}
         for row in self.rows:
+            if not row.is_complete():
+                continue
             if row.value is None:
                 result[row.field_name] = row.operator
             else:
@@ -233,11 +238,15 @@ class FilterTable:
 
         table = FilterTable()
         for field_name, expr in filter_dict.items():
-            if parse_fn is not None:
-                operator, value = parse_fn(expr, field_name)
-            else:
-                operator, value = _split_operator_value(expr)
-            table.add_row(field_name, operator, value)
+            try:
+                if parse_fn is not None:
+                    operator, value = parse_fn(expr, field_name)
+                else:
+                    operator, value = _split_operator_value(expr)
+                table.add_row(field_name, operator, value)
+            except (ValueError, KeyError) as e:
+                log.debug("Failed to parse filter expression '%s: %s': %s", field_name, expr, e)
+                table.add_row(field_name, "", expr)
         return table
 
 
@@ -512,6 +521,7 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
             if PYQT_AVAILABLE:
                 yaml_text = self._dict_to_yaml(filter_dict)
                 self._yaml_edit.setPlainText(yaml_text)
+                self._table_widget.set_rows(self._filter_table.rows)
         finally:
             self._syncing = False
 
@@ -603,8 +613,10 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
             filter_dict: Filter dict to convert
 
         Returns:
-            YAML string representation
+            YAML string representation (empty string for empty dict)
         """
+        if not filter_dict:
+            return ""
         try:
             import yaml
 

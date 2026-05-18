@@ -913,7 +913,6 @@ class _SendDialog(QDialog):
         if not hasattr(self, "_last_profile"):
             self._last_profile = self._current_profile
 
-        filter_text = self.filter_text_edit.toPlainText()
         rows, headers = self.load_database_records()
 
         # T040, T042: Better error and zero-record handling
@@ -941,15 +940,23 @@ class _SendDialog(QDialog):
             from filter_matcher import FilterMatcher
 
             matcher = FilterMatcher()
-            if filter_text and filter_text.strip():
-                import yaml
-
-                filter_dict = yaml.safe_load(filter_text) or {}
+            # Use _session_filter if set (from FilterBuilder), otherwise read from YAML editor
+            filter_dict: dict[str, str] = {}
+            if self._session_filter:
+                filter_dict = self._session_filter
                 filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
-                log.debug(f"Filter applied: {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+                log.debug(f"Filter applied (from session): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
             else:
-                filtered_rows = rows
-                log.debug(f"No filter, showing all {len(rows)} records")
+                filter_text = self.filter_text_edit.toPlainText()
+                if filter_text and filter_text.strip():
+                    import yaml
+
+                    filter_dict = yaml.safe_load(filter_text) or {}
+                    filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
+                    log.debug(f"Filter applied (from YAML): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+                else:
+                    filtered_rows = rows
+                    log.debug(f"No filter, showing all {len(rows)} records")
 
             self._update_record_display(filtered_rows, headers, len(rows))
             # Reset error state on success
