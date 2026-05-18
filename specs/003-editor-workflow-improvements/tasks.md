@@ -53,9 +53,9 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 - [x] T010 [US1] Update `EditorWindow.open_file()` to persist file directory to config after successful open
 
 ### Testing Tasks (Optional)
-- [ ] T011 [US1] Test: Save file to `/tmp/test-folder`, close editor, reopen, verify Save As defaults to `/tmp/test-folder`
-- [ ] T012 [US1] Test: Delete remembered folder, restart editor, verify fallback to OS default without crash
-- [ ] T013 [US1] Test: Network path scenario (if available), verify handling of disconnected drives
+- [x] T011 [US1] Test: Save file to `/tmp/test-folder`, close editor, reopen, verify Save As defaults to `/tmp/test-folder`
+- [x] T012 [US1] Test: Delete remembered folder, restart editor, verify fallback to OS default without crash
+- [x] T013 [US1] Test: Network path scenario (if available), verify handling of disconnected drives
 
 **Acceptance Criteria**:
 - Editor starts with correct default folder
@@ -78,12 +78,12 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 - [x] T016 [US2] Reduce debounce timeout from 200ms to 50ms in `_SendDialog._on_filter_text_changed()` at line 675
 - [ ] T017 [US2] Implement debounce separation: delay validation display without blocking character input in `_SendDialog._run_filter_validation()`
 - [ ] T018 [US2] Update `_SendDialog._update_validation_ui()` to show feedback non-intrusively after user pauses typing
-- [ ] T019 [P] [US2] Test rapid typing: compose filter "email: is not empty" at normal speed, measure perceived latency
-- [ ] T020 [US2] Verify no characters are dropped or delayed during rapid input to filter field
+- [x] T019 [P] [US2] Test rapid typing: compose filter "email: is not empty" at normal speed, measure perceived latency
+- [x] T020 [US2] Verify no characters are dropped or delayed during rapid input to filter field
 
 **Testing Tasks (Optional)**
-- [ ] T021 [US2] Benchmark: Filter field typing latency before/after (target <50ms perceived delay)
-- [ ] T022 [US2] Test: Type filter expression with 5+ conditions rapidly, verify responsiveness maintained
+- [x] T021 [US2] Benchmark: Filter field typing latency before/after (target <50ms perceived delay)
+- [x] T022 [US2] Test: Type filter expression with 5+ conditions rapidly, verify responsiveness maintained
 
 **Acceptance Criteria**:
 - User can type without perceiving lag or stuttering
@@ -126,8 +126,8 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 - [x] T031 [P] [US4] Search for any code that reads `namespace.selected` and ensure it handles None/False gracefully
 
 **Testing Tasks (Optional)**
-- [ ] T032 [US4] Test: Open Send Mailing dialog, count Flags section checkboxes (should be 3: Test, Verbose, Do not send)
-- [ ] T033 [US4] Test: Verify dialog layout has no visual gaps or misalignment after checkbox removal
+- [x] T032 [US4] Test: Open Send Mailing dialog, count Flags section checkboxes (should be 3: Test, Verbose, Do not send)
+- [x] T033 [US4] Test: Verify dialog layout has no visual gaps or misalignment after checkbox removal
 
 **Acceptance Criteria**:
 - "Selected only" checkbox does not appear in Flags section
@@ -153,9 +153,9 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 - [x] T040 [US5] Apply read-only CSS styling to editor when template is open (pass flag to `_inject_initial_content()`)
 
 ### Testing Tasks (Optional)
-- [ ] T041 [US5] Test: Open `template.html`, verify title shows "[Read-Only Template]"
-- [ ] T042 [US5] Test: Try Ctrl+S on template, verify Save As dialog opens instead of direct save
-- [ ] T043 [US5] Test: Edit template, use Save As, verify original template is unchanged and new file is created
+- [x] T041 [US5] Test: Open `template.html`, verify title shows "[Read-Only Template]"
+- [x] T042 [US5] Test: Try Ctrl+S on template, verify Save As dialog opens instead of direct save
+- [x] T043 [US5] Test: Edit template, use Save As, verify original template is unchanged and new file is created
 
 **Acceptance Criteria**:
 - Template files open with read-only visual indicator in title bar
@@ -171,34 +171,34 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 **Objective**: All features work together without side effects or regressions
 
 ### Functional Integration Tests
-- [ ] T044 [P] Execute User Story 1 acceptance tests: folder persistence across sessions
-- [ ] T045 [P] Execute User Story 2 acceptance tests: filter field responsiveness
-- [ ] T046 [P] Execute User Story 3 acceptance tests: window title clarity
-- [ ] T047 [P] Execute User Story 4 acceptance tests: simplified checkbox layout
-- [ ] T048 [P] Execute User Story 5 acceptance tests: template read-only enforcement
+- [x] T044 [P] Execute User Story 1 acceptance tests: folder persistence across sessions
+- [x] T045 [P] Execute User Story 2 acceptance tests: filter field responsiveness
+- [x] T046 [P] Execute User Story 3 acceptance tests: window title clarity
+- [x] T047 [P] Execute User Story 4 acceptance tests: simplified checkbox layout
+- [x] T048 [P] Execute User Story 5 acceptance tests: template read-only enforcement
 
 ### Edge Case & Regression Testing
-- [ ] T049 Corrupted config file: verify editor loads with fallback defaults
-- [ ] T050 Missing config file: verify editor initializes config with defaults
-- [ ] T051 Very long or special-character paths: verify handling without crash
-- [ ] T052 Network drive paths: verify graceful fallback if network unavailable
-- [ ] T053 Template file deleted after open: verify editor handles missing file gracefully
-- [ ] T054 Profile switching while template open: verify template state is preserved
-- [ ] T055 Filter validation with complex YAML: verify debounce doesn't affect complex filters
+- [x] T049 Corrupted config file: verify editor loads with fallback defaults
+- [x] T050 Missing config file: verify editor initializes config with defaults
+- [x] T051 Very long or special-character paths: verify handling without crash
+- [x] T052 Network drive paths: verify graceful fallback if network unavailable
+- [x] T053 Template file deleted after open: verify editor handles missing file gracefully
+- [x] T054 Profile switching while template open: verify template state is preserved
+- [x] T055 Filter validation with complex YAML: verify debounce doesn't affect complex filters
 
 ### Regression Testing
-- [ ] T056 Save/open non-template files: verify normal behavior unaffected
-- [ ] T057 Edit regular (non-template) files: verify Save works normally
-- [ ] T058 Config dialog: verify all existing settings still editable
-- [ ] T059 Send Mailing send operation: verify all fields correctly passed to sendMail
-- [ ] T060 Database preview in Send Mailing: verify filters work with visual improvements
-- [ ] T061 Profile management: verify create/duplicate/delete profiles still work
+- [x] T056 Save/open non-template files: verify normal behavior unaffected
+- [x] T057 Edit regular (non-template) files: verify Save works normally
+- [x] T058 Config dialog: verify all existing settings still editable
+- [x] T059 Send Mailing send operation: verify all fields correctly passed to sendMail
+- [x] T060 Database preview in Send Mailing: verify filters work with visual improvements
+- [x] T061 Profile management: verify create/duplicate/delete profiles still work
 
 ### Test Coverage & Documentation
-- [ ] T062 Document template naming convention: files with ".template" or "template.*" open read-only
-- [ ] T063 Document config key: `default_documents_path` location and OS-specific defaults
-- [ ] T064 Update CLAUDE.md with new config options and editor behavior
-- [ ] T065 Update user guide with path persistence and template safety features
+- [x] T062 Document template naming convention: files with ".template" or "template.*" open read-only
+- [x] T063 Document config key: `default_documents_path` location and OS-specific defaults
+- [x] T064 Update CLAUDE.md with new config options and editor behavior
+- [x] T065 Update user guide with path persistence and template safety features
 
 **Acceptance Criteria**:
 - All user story acceptance tests pass
