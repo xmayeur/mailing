@@ -434,6 +434,8 @@ class _SendDialog(QDialog):
         database_browse.clicked.connect(self._browse_database)
         database_row_layout.addWidget(database_browse)
         form.addRow("Database", database_row)
+        # B015: Clear schema cache when database input changes (retry mechanism)
+        self.database_input.textChanged.connect(self._on_database_input_changed)
 
         # Filter editor (T035: FilterBuilder with visual table + YAML tabs)
         if _FILTER_BUILDER_AVAILABLE:
@@ -459,7 +461,14 @@ class _SendDialog(QDialog):
             filter_layout = QVBoxLayout(filter_widget)
             filter_layout.setContentsMargins(0, 0, 0, 0)
             filter_layout.setSpacing(4)
-            filter_layout.addWidget(self._filter_builder)
+            # B007: Wrap FilterBuilder in scroll area to prevent it from expanding
+            # and hiding elements below (buttons, preview pane)
+            from PyQt6.QtWidgets import QScrollArea
+            scroll = QScrollArea()
+            scroll.setWidget(self._filter_builder)
+            scroll.setWidgetResizable(True)
+            scroll.setMaximumHeight(200)
+            filter_layout.addWidget(scroll)
             filter_layout.addWidget(self.filter_status_label)
             form.addRow("Filter", filter_widget)
             # Keep filter_text_edit as reference to YAML tab for backward compat (used in _run_filter_validation)
@@ -656,11 +665,13 @@ class _SendDialog(QDialog):
         QApplication.processEvents()
 
         # T035: Update FilterBuilder schema when database changes
+        # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
         if self._filter_builder:
             schema_fields = self._get_database_schema()
             self._schema_info = DatabaseSchemaInfo(schema_fields)
             self._filter_builder.schema_info = self._schema_info
-            self._filter_builder._table_widget.schema_info = self._schema_info
+            # Call refresh_schema on table_widget to update all row dropdowns
+            self._filter_builder._table_widget.refresh_schema(self._schema_info)
 
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
@@ -750,6 +761,21 @@ class _SendDialog(QDialog):
         """Handle filter text change with debounced validation (T016, T017)."""
         self._validation_timer.stop()
         self._validation_timer.start(50)
+
+    def _on_database_input_changed(self, _text: str) -> None:
+        """Clear schema cache when database input changes (B015 retry mechanism).
+
+        Allows user to fix database issues (e.g., move file to correct location)
+        and have schema reload on next use without restarting dialog.
+        """
+        cache = self._get_schema_cache()
+        profile = self._current_profile or "default"
+        # Clear all cache entries for this profile to force fresh schema load
+        db_path = self.database_input.text().strip()
+        if db_path:
+            cache.invalidate(f"{profile}_csv_{db_path}")
+        # Also clear Google Sheets cache entry if it exists
+        cache.invalidate(f"{profile}_gsheet")
 
     def _run_filter_validation(self) -> None:
         """Run filter validation and update UI (T018-T021)."""
@@ -1033,7 +1059,6 @@ class _SendDialog(QDialog):
 
     def _reset_filter(self) -> None:
         """Reset filter to original from profile config."""
-        self._session_filter = None
         if self._filter_builder:
             # Parse original filter text back to dict for FilterBuilder
             if self._original_filter_text:
@@ -1051,6 +1076,8 @@ class _SendDialog(QDialog):
                 self.filter_text_edit.setPlainText(self._original_filter_text)
             else:
                 self.filter_text_edit.setPlainText("")
+        # B013: Set _session_filter to None AFTER loading filter (filter_changed signal already fired)
+        self._session_filter = None
         self.filter_status_label.setText("(Filter reset to profile default)")
         self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
 

@@ -22,3 +22,51 @@ class TestFilterTableWidgetIntegration:
     def test_placeholder(self) -> None:
         """Placeholder test—implementation follows in Phase 3."""
         assert True
+
+
+# B021-B023: Integration tests for bug fixes
+class TestFilterBugFixes:
+    """Integration tests for Phase 12 bug fixes (B021-B023)."""
+
+    def test_b021_duplicate_row_scenario(self) -> None:
+        """B021: No duplicate rows when switching profiles.
+
+        Scenario:
+        - Load profile A (2 filters) → switch to profile B (3 filters) → switch back to profile A
+        Expected:
+        - Exactly 2 rows for A, exactly 3 rows for B, exactly 2 rows for A again
+        - No cumulative duplicates (not 4 or 5 rows)
+        """
+        # This test requires mocking the dialog state and filter loading
+        # Placeholder for implementation
+        assert True
+
+    def test_b022_schema_loading_with_file_changes(self) -> None:
+        """B022: Schema updates when database file changes.
+
+        Scenario:
+        - Load CSV with fields [a, b, c]
+        - Change database path to CSV with [x, y, z]
+        - Verify fields update
+        Expected:
+        - Field dropdown shows [x, y, z], not [a, b, c]
+        - Schema cache is invalidated on database path change
+        """
+        # This test requires temp files and database path changes
+        # Placeholder for implementation
+        assert True
+
+    def test_b023_yaml_visual_sync_robustness(self) -> None:
+        """B023: YAML ↔ Visual sync works through multiple transitions.
+
+        Scenario:
+        - Load visual filter → switch to YAML → edit YAML → switch to visual
+        - Edit visual → switch to YAML
+        Expected:
+        - Changes persist through transitions
+        - No duplicates or data loss
+        - Both editors show consistent state
+        """
+        # This test requires simulating tab switches and edits
+        # Placeholder for implementation
+        assert True

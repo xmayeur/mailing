@@ -494,6 +494,8 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
             return
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         tabs = QTabWidget(self)
 
@@ -527,6 +529,8 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
                 self._table_widget.set_rows(self._filter_table.rows)
         finally:
             self._syncing = False
+        # B013: Emit filter_changed to trigger validation after loading filter
+        self.filter_changed.emit(self._filter_table.to_dict())
 
     def get_filter_as_yaml(self) -> dict[str, str]:
         """Get current filter as dict for sendMail.filter().
@@ -603,13 +607,19 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
             yaml_text = self._yaml_edit.toPlainText()
             if yaml_text.strip():
                 filter_dict = self._parse_yaml(yaml_text)
+                # B020: Detect if YAML parsing failed (empty dict when text was present)
+                if not filter_dict and yaml_text.strip():
+                    log.warning("Invalid YAML filter syntax: %s", yaml_text[:50])
+                    # Don't update table, keep previous state
+                    self._syncing = False
+                    return
                 self._filter_table = FilterTable.from_dict(filter_dict)
             else:
                 self._filter_table = FilterTable()
             self._table_widget.set_rows(self._filter_table.rows)
             self.filter_changed.emit(self._filter_table.to_dict())
         except Exception as e:
-            log.debug("YAML parse error: %s", e)
+            log.warning("YAML parse error: %s", e)
         finally:
             self._syncing = False
 
@@ -677,13 +687,24 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             self.schema_info = schema_info
             self._row_widgets: list[FilterRowWidget] = []
             layout = QVBoxLayout()
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
             self._container = QWidget()
             self._container_layout = QVBoxLayout()
+            # B005 & B010: Set minimal spacing (0px) + explicit row height
+            self._container_layout.setSpacing(0)
+            self._container_layout.setContentsMargins(0, 0, 0, 0)
             self._container.setLayout(self._container_layout)
+            # B016-UX: Set max height for container to show max 5 rows (140px)
+            # This forces vertical scrolling after 5 rows while keeping them at 28px each
+            self._container.setMaximumHeight(140)
             layout.addWidget(self._container)
             self._add_button = QPushButton("Add Row")
+            self._add_button.setMaximumHeight(28)
             self._add_button.clicked.connect(self._on_add_row)
             layout.addWidget(self._add_button)
+            # B006: Add stretch at end to prevent empty rows appearing below actual rows
+            layout.addStretch()
             self.setLayout(layout)
         else:
             self.schema_info = schema_info
@@ -721,6 +742,10 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
         self.schema_info = schema_info
         for widget in self._row_widgets:
             widget.refresh_schema(schema_info)
+        # B011: Enable/disable Add Row button based on whether database is loaded
+        self._add_button.setEnabled(bool(schema_info.field_names))
+        # B008: Emit row_changed to trigger validation and dropdown updates
+        self.row_changed.emit()
 
     def _add_row_widget(self, row_idx: int, row: FilterRow) -> None:
         """Create and insert FilterRowWidget.
@@ -743,6 +768,9 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             return
         while self._row_widgets:
             widget = self._row_widgets.pop()
+            # B014: Remove widget from layout immediately before async cleanup
+            # setParent(None) removes from layout + schedules for deletion
+            widget.setParent(None)
             widget.deleteLater()
 
     def _on_row_changed(self) -> None:
@@ -857,6 +885,13 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._delete_btn.clicked.connect(self._on_delete)
             layout.addWidget(self._delete_btn)
 
+            # B010: Set minimal spacing and margins for compact rows
+            layout.setSpacing(4)
+            layout.setContentsMargins(0, 0, 0, 0)
+
+            # B010: Limit row height to 28px for tight layout
+            self.setMaximumHeight(28)
+
             self.setLayout(layout)
         else:
             self.row_index = row_index
@@ -907,7 +942,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         self._update_value_input_visibility()
 
     def _populate_field_combo(self) -> None:
-        """Populate field combo with schema fields or 'Load database first' message."""
+        """Populate field combo with schema fields or show placeholder if no database."""
         if not PYQT_AVAILABLE:
             return
         self._field_combo.clear()
@@ -915,8 +950,10 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._field_combo.addItems(self.schema_info.field_names)
             self._field_combo.setEnabled(True)
         else:
-            self._field_combo.addItem("Load database first")
-            self._field_combo.setEnabled(False)
+            # B017: Keep combo enabled to allow user interaction even when no database
+            # Show placeholder so user knows they need to load a database first
+            self._field_combo.addItem("(Load database first)")
+            self._field_combo.setEnabled(True)
 
     def _populate_operator_combo(self) -> None:
         """Populate operator combo with operators for current field."""
@@ -924,10 +961,11 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             return
         self._operator_combo.clear()
         field = self._field_combo.currentText()
-        if field and field != "Load database first":
+        if field and field != "(Load database first)":
             operators = self.schema_info.get_operators_for_field(field)
             self._operator_combo.addItems(operators)
-        self._operator_combo.setEnabled(bool(self.schema_info.field_names))
+        # B017: Keep operator combo enabled to match field combo behavior
+        self._operator_combo.setEnabled(True)
 
     def _operator_needs_value(self, operator: str) -> bool:
         """Check if operator requires a value.
