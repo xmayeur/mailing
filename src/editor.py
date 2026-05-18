@@ -932,10 +932,13 @@ class _SendDialog(QDialog):
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
-        if not db_path and profile_cfg.get("SHEETID"):
+        # B047: Handle both uppercase and lowercase config keys
+        sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
+        sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
+        if not db_path and sheet_id_val:
             # Google Sheets profile - try to load records from Google Sheets
-            sa = profile_cfg.get("SA")
-            sheet_id = profile_cfg.get("SHEETID")
+            sa = sa_val
+            sheet_id = sheet_id_val
             if sa and sheet_id:
                 try:
                     import sendMail as sm  # noqa: N813
