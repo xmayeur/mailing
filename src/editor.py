@@ -369,7 +369,7 @@ class _SendDialog(QDialog):
         initial_profile: str = "default",
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Send Newsletter")
+        self.setWindowTitle("Send Mailing")
         self.setMinimumWidth(720)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
@@ -486,8 +486,7 @@ class _SendDialog(QDialog):
         self.test_check.toggled.connect(self._on_test_mode_toggled)
         self.verbose_check = QCheckBox("Verbose", flag_row)
         self.do_not_send_check = QCheckBox("Do not send", flag_row)
-        self.selected_check = QCheckBox("Selected only", flag_row)
-        for widget in (self.test_check, self.verbose_check, self.do_not_send_check, self.selected_check):
+        for widget in (self.test_check, self.verbose_check, self.do_not_send_check):
             flag_layout.addWidget(widget)
         flag_layout.addStretch(1)
         form.addRow("Flags", flag_row)
@@ -629,7 +628,6 @@ class _SendDialog(QDialog):
         self.test_check.setChecked(bool(profile_cfg.get("test", False)))
         self.verbose_check.setChecked(bool(profile_cfg.get("verbose", False)))
         self.do_not_send_check.setChecked(bool(profile_cfg.get("doNotSend", False)))
-        self.selected_check.setChecked(bool(profile_cfg.get("selected", False)))
 
         self.load_current_filter(profile)
         self.filter_and_display_records()
@@ -672,7 +670,7 @@ class _SendDialog(QDialog):
     def _on_filter_text_changed(self) -> None:
         """Handle filter text change with debounced validation (T016, T017)."""
         self._validation_timer.stop()
-        self._validation_timer.start(200)
+        self._validation_timer.start(50)
 
     def _run_filter_validation(self) -> None:
         """Run filter validation and update UI (T018-T021)."""
@@ -961,7 +959,6 @@ class _SendDialog(QDialog):
         namespace.from_index = str(self.from_index_input.value()) if self.from_index_input.value() else None
         namespace.to_index = str(self.to_index_input.value()) if self.to_index_input.value() else None
         namespace.wait = self.wait_input.value() or None
-        namespace.selected = self.selected_check.isChecked()
         namespace.max_mails_per_hour = self.max_mails_input.value()
         namespace.max_addr_per_mail = self.max_addr_input.value()
         namespace.pause = self.pause_input.value()
@@ -1504,7 +1501,6 @@ class _ConfigDialog(QDialog):
         self._add_check_field(layout, "test", "Test", tooltip="Enable test mode.")
         self._add_check_field(layout, "verbose", "Verbose", tooltip="Increase logging verbosity.")
         self._add_check_field(layout, "doNotSend", "Do not send", tooltip="Suppress actual sending.")
-        self._add_check_field(layout, "selected", "Selected only", tooltip="Send only selected rows.")
         self._add_check_field(layout, "md2html", "md2html", tooltip="Keep the Markdown-to-HTML compatibility flag.")
         self._add_check_field(layout, "keep-html", "keep-html", tooltip="Preserve generated HTML output.")
 
@@ -1905,6 +1901,7 @@ class EditorWindow(QMainWindow):
         self._css_path: str | None = None   # user-selected CSS stylesheet
         self._load_finished_connected = False
         self._send_in_progress = False
+        self._is_template = False
         self._config_path = str(Path(__file__).parent / "config.yml")
         self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
         self._current_profile = profile or "default"
@@ -2001,6 +1998,11 @@ class EditorWindow(QMainWindow):
         except Exception as exc:
             log.error("Failed to save documents path: %s", exc)
 
+    def _is_template_file(self, file_path: str) -> bool:
+        """Check if file is a template (contains .template or matches template.* pattern)."""
+        name_lower = Path(file_path).name.lower()
+        return ".template" in name_lower or name_lower.startswith("template.")
+
     # ------------------------------------------------------------------
     # Page loading
     # ------------------------------------------------------------------
@@ -2071,6 +2073,7 @@ class EditorWindow(QMainWindow):
             return
 
         self._file_path = path
+        self._is_template = self._is_template_file(path)
         self._bridge.reset(body_html)
         self._update_title()
 
@@ -2303,6 +2306,13 @@ class EditorWindow(QMainWindow):
 
     def _save(self) -> bool:
         """Save current content as HTML. Returns True on success."""
+        if getattr(self, "_is_template", False):
+            QMessageBox.information(
+                self,
+                "Read-Only Template",
+                "Templates are read-only. Use Save As to create a new file from this template."
+            )
+            return self._save_as()
         if not self._file_path:
             return self._save_as()
 
@@ -2341,6 +2351,7 @@ class EditorWindow(QMainWindow):
         if not path:
             return False
         self._file_path = str(Path(path).with_suffix(_HTML_EXT))
+        self._is_template = False
         result = self._save()
         if result:
             self._save_documents_path(str(Path(self._file_path).parent))
@@ -2856,9 +2867,10 @@ class EditorWindow(QMainWindow):
 
     def _update_title(self) -> None:
         dirty_marker = " *" if self._bridge.is_dirty else ""
+        template_marker = " [Read-Only Template]" if getattr(self, "_is_template", False) else ""
         if self._file_path:
             filename = Path(self._file_path).name
-            self.setWindowTitle(f"sendMail Editor — {filename}{dirty_marker}")
+            self.setWindowTitle(f"sendMail Editor — {filename}{template_marker}{dirty_marker}")
         else:
             self.setWindowTitle(f"sendMail Editor — New Document{dirty_marker}")
 

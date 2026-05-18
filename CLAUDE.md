@@ -102,3 +102,8 @@ CI enforces:
 - Google Sheets/Drive via service accounts
 - Logging to `sendMail.log`
 - snake_case naming throughout
+
+## Tool Enforcement
+- This project uses `mypy --strict` and `ruff check .`.
+- Never use `type: ignore` without a human-approved justification.
+- All function signatures must be fully typed.
