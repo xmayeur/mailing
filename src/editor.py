@@ -671,6 +671,8 @@ class _SendDialog(QDialog):
     def _load_profile_defaults(self, profile: str) -> None:
         self._current_profile = profile
         profile_cfg = self._config_data.get(profile, {})
+        log.info("DEBUG: _load_profile_defaults: profile=%s, config_data keys=%s, profile_cfg keys=%s",
+                 profile, list(self._config_data.keys()), list(profile_cfg.keys()))
 
         # B024-B025: Clear schema cache for new profile to force fresh load
         # Ensures Google Sheets and CSV profiles refresh when switching
@@ -843,6 +845,8 @@ class _SendDialog(QDialog):
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
+        log.info("DEBUG: _get_database_schema: profile=%s, db_path=%s, profile_cfg keys=%s, SHEETID=%s",
+                 self._current_profile, db_path, list(profile_cfg.keys()), profile_cfg.get("SHEETID"))
         if not db_path and profile_cfg.get("SHEETID"):
             # Google Sheets profile - try to load schema from Google Sheets
             sa = profile_cfg.get("SA")
