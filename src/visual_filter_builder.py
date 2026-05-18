@@ -1009,22 +1009,33 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         log.debug("refresh_schema: field=%s, operator=%s, field_names=%s",
                   current_field, current_operator, len(schema_info.field_names))
 
-        self._populate_field_combo()
-        # B028: Only restore selection if it's a real field (not placeholder)
-        if current_field and current_field != "(Load database first)" and current_field in schema_info.field_names:
-            self._field_combo.setCurrentText(current_field)
-        elif schema_info.field_names:
-            # B028: If we have real fields, select first one (not placeholder)
-            self._field_combo.setCurrentIndex(0)
-        self._populate_operator_combo()
-        # B048: Restore operator after field/operator population
-        if current_operator and self._operator_combo.count() > 0:
-            try:
-                self._operator_combo.setCurrentText(current_operator)
-                log.debug("refresh_schema: restored operator=%s", current_operator)
-            except Exception as e:
-                log.debug("refresh_schema: could not restore operator: %s", e)
-        self._update_value_input_visibility()
+        # B052: Suppress signals during schema refresh to avoid cascading filter updates
+        # Temporarily disconnect combo signals so setCurrentText doesn't trigger _on_field_changed
+        # which would emit row_changed and cascade to filter_and_display_records
+        self._field_combo.currentTextChanged.disconnect()
+        self._operator_combo.currentTextChanged.disconnect()
+
+        try:
+            self._populate_field_combo()
+            # B028: Only restore selection if it's a real field (not placeholder)
+            if current_field and current_field != "(Load database first)" and current_field in schema_info.field_names:
+                self._field_combo.setCurrentText(current_field)
+            elif schema_info.field_names:
+                # B028: If we have real fields, select first one (not placeholder)
+                self._field_combo.setCurrentIndex(0)
+            self._populate_operator_combo()
+            # B048: Restore operator after field/operator population
+            if current_operator and self._operator_combo.count() > 0:
+                try:
+                    self._operator_combo.setCurrentText(current_operator)
+                    log.debug("refresh_schema: restored operator=%s", current_operator)
+                except Exception as e:
+                    log.debug("refresh_schema: could not restore operator: %s", e)
+            self._update_value_input_visibility()
+        finally:
+            # Reconnect signals
+            self._field_combo.currentTextChanged.connect(self._on_field_changed)
+            self._operator_combo.currentTextChanged.connect(self._on_operator_changed)
 
     def _populate_field_combo(self) -> None:
         """Populate field combo with schema fields or show placeholder if no database."""
