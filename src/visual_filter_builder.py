@@ -936,8 +936,12 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         self.schema_info = schema_info
         current_field = self._field_combo.currentText()
         self._populate_field_combo()
-        if current_field in schema_info.field_names:
+        # B028: Only restore selection if it's a real field (not placeholder)
+        if current_field and current_field != "(Load database first)" and current_field in schema_info.field_names:
             self._field_combo.setCurrentText(current_field)
+        elif schema_info.field_names:
+            # B028: If we have real fields, select first one (not placeholder)
+            self._field_combo.setCurrentIndex(0)
         self._populate_operator_combo()
         self._update_value_input_visibility()
 
@@ -947,11 +951,15 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             return
         self._field_combo.clear()
         if self.schema_info.field_names:
+            # B028: Debug log when populating with real fields
+            log.debug("FilterRowWidget: Populating field combo with %d fields: %s",
+                      len(self.schema_info.field_names), self.schema_info.field_names[:3])
             self._field_combo.addItems(self.schema_info.field_names)
             self._field_combo.setEnabled(True)
         else:
             # B017: Keep combo enabled to allow user interaction even when no database
             # Show placeholder so user knows they need to load a database first
+            log.debug("FilterRowWidget: No schema fields, showing placeholder")
             self._field_combo.addItem("(Load database first)")
             self._field_combo.setEnabled(True)
 

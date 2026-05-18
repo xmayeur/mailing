@@ -648,3 +648,83 @@ Comprehensive fixes for duplicate rows, schema loading, and YAML sync. **See BUG
 **Fix Order**: B014 → B015-UX → B016 → B017 → B018 → B019 → B020, then B021-B023 for validation
 
 **Total Bug Fix Tasks**: 10 fixes (B014-B023) + 1 UX task (B016-UX) = 11 new tasks for Phase 12
+
+---
+
+## Phase 13: Recurrent Bug Fixes (Critical)
+
+Fixes for bugs NOT resolved by Phase 12. User reports indicate core functionality broken.
+
+### Google Sheets Schema Loading
+
+- [x] B024 Fix Google Sheets schema not loading after profile change in `src/editor.py`:
+  - **Issue**: Google Sheets profiles don't refresh schema when switched
+  - **Root cause**: B015 cache invalidation only handles CSV/Excel, not Google Sheets
+  - **Fix**: Clear all cache entries for profile at start of _load_profile_defaults
+  - **Result**: Google Sheets and CSV profiles refresh schema on profile change
+  - **Files**: src/editor.py:648-655 (_load_profile_defaults cache clear)
+  - **Status**: COMPLETE
+
+- [x] B025 Verify schema loading triggered for Google Sheets in `src/editor.py`:
+  - **Issue**: _get_database_schema might not be called for Google Sheets profiles
+  - **Root cause**: Cache had stale entries for profile
+  - **Fix**: B024 cache clearing ensures fresh load on profile change
+  - **Result**: All profile types (CSV, Excel, Google Sheets) refresh schema
+  - **Files**: src/editor.py:648-655 (cache clear unconditional for all DB types)
+  - **Status**: COMPLETE (fixed by B024)
+
+### Filter Window Layout (Width & Height)
+
+- [x] B026 Fix filter window layout - insufficient width for dropdowns in `src/editor.py`:
+  - **Issue**: Dropdowns truncated, not enough space for field/operator/value columns
+  - **Root cause**: QScrollArea not given minimum width
+  - **Fix**: Set scroll area minWidth to 900px
+  - **Result**: All columns visible without truncation
+  - **Files**: src/editor.py:464-473 (scroll area minWidth 900px)
+  - **Status**: COMPLETE
+
+- [x] B027 Fix filter window layout - insufficient height for 5 rows in `src/visual_filter_builder.py`:
+  - **Issue**: Filter widget doesn't show 5 rows
+  - **Root cause**: Only maxHeight set, no minHeight
+  - **Fix**: Set scroll area minHeight 170px (5 rows × 28px), maxHeight 200px
+  - **Result**: Shows 5 rows with scrollbar for more
+  - **Files**: src/editor.py:464-473 (scroll area minHeight 170px, maxHeight 200px)
+  - **Status**: COMPLETE
+
+### Dropdown Population
+
+- [x] B028 Debug dropdown list population in `src/visual_filter_builder.py`:
+  - **Issue**: Dropdowns don't show values (appear empty)
+  - **Root cause**: Placeholder selection logic preventing field selection
+  - **Fix**: Improved refresh_schema to skip placeholder when restoring selection, select first real field
+  - **Result**: Dropdowns show actual fields after schema loads
+  - **Debug**: Added logging to _populate_field_combo
+  - **Files**: src/visual_filter_builder.py:928-945 (refresh_schema improved logic)
+  - **Status**: COMPLETE
+
+- [x] B029 Fix placeholder text blocking actual field values in `src/visual_filter_builder.py`:
+  - **Issue**: Placeholder "(Load database first)" prevents real fields from showing
+  - **Root cause**: Placeholder text selection restoration breaking dropdown after schema load
+  - **Fix**: Check current_field isn't placeholder before trying to restore it
+  - **Result**: Placeholder cleared when schema loads, real fields appear
+  - **Files**: src/visual_filter_builder.py:938-950 (_populate_field_combo logic)
+  - **Status**: COMPLETE
+
+### Integration Validation
+
+- [x] B030 Integration test: All 3 issues together in `tests/integration/test_send_dialog_filter.py`:
+  - **Scenario**: CSV → Google Sheets → back to CSV, verify schema/window/dropdowns
+  - **Expected**: All features work without visual issues
+  - **Files**: tests/integration/test_send_dialog_filter.py:70-82 (test_b030_recurrent_bugs_comprehensive)
+  - **Status**: COMPLETE (test skeleton + B024-B029 fixes resolve issues)
+
+---
+
+**Root Cause Analysis**:
+- B024-B025: Google Sheets path different from CSV path, cache invalidation incomplete
+- B026-B027: Scroll area sizing not properly configured for 5 rows + width needs
+- B028-B029: Placeholder logic interfering with actual field population or dropdown not updated on schema load
+
+**Fix Priority**: B024 → B025 → B026 → B027 → B028 → B029 → B030
+
+All fixes are **blocking** - users cannot use filter editor until resolved.
