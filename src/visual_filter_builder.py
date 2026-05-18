@@ -837,6 +837,9 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             return
         if 0 <= row_idx < len(self._row_widgets):
             widget = self._row_widgets.pop(row_idx)
+            # B034: Remove widget from layout immediately (setParent(None))
+            # before async deletion (deleteLater), matching _clear_rows pattern
+            widget.setParent(None)
             widget.deleteLater()
             self.row_changed.emit()
 
