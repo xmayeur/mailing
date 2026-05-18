@@ -1038,6 +1038,26 @@ class _SendDialog(QDialog):
                         continue
                 # If all encodings fail, raise error
                 raise ValueError(f"Could not decode {db_path} with any supported encoding")
+
+            # Handle Excel files (XLSX, XLS) using same approach as sendMail.py
+            if db_path.endswith((".xlsx", ".xls")):
+                from python_calamine import CalamineWorkbook
+                wb = CalamineWorkbook.from_path(db_path)
+                ws = wb.get_sheet_by_index(0)
+                data = ws.to_python()
+                if data and len(data) > 0:
+                    headers = [str(h).strip() for h in data[0] if h]
+                    rows = [[str(cell) if cell is not None else "" for cell in row] for row in data[1:]]
+                    log.debug(f"Loaded {len(rows)} records from {db_path}")
+                    # B053: Cache the loaded records
+                    self._cached_records = rows
+                    self._cached_headers = headers
+                    self._cached_for_profile = self._current_profile
+                    self._cached_for_db = db_path
+                    return rows, headers
+                else:
+                    log.debug(f"No data found in {db_path}")
+                    raise ValueError(f"No data in {db_path}")
         except Exception as e:
             log.debug("Could not load database: %s", e)
 
