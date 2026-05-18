@@ -26,7 +26,7 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 
 ### Configuration Changes
 - [x] T001 Update `config.yml` to add `default_documents_path` key documentation and example
-- [x] T002 Extend `_ConfigDialog` class in `src/editor.py` with new configuration field for `default_documents_path`
+- [x] T002 Extend `_ConfigDialog` class in `src/editor.py` with new configuration field for `default_documents_path` (bug fixed: use directory picker)
 - [x] T003 Add validation in `_ConfigDialog._get_spinbox_default_value()` and `_load_yaml_block()` to handle path strings
 - [x] T004 Update `_ConfigDialog._default_profile_data()` to include `"default_documents_path": ""` in defaults
 
