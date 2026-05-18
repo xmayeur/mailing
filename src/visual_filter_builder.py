@@ -976,8 +976,16 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         if PYQT_AVAILABLE:
             field = self._field_combo.currentText()
             operator = self._operator_combo.currentText()
-            value = self._get_value_input()
-            return FilterRow(field, operator, value if value else None)
+            value_text = self._get_value_input()
+            # B054: Parse comma-separated list values for list operators
+            parsed_value: str | list[str] | None = None
+            if value_text and self._operator_is_multiline(operator):
+                # Split by comma and strip whitespace from each item
+                items = [item.strip() for item in value_text.split(",") if item.strip()]
+                parsed_value = items if items else None
+            elif value_text:
+                parsed_value = value_text
+            return FilterRow(field, operator, parsed_value)
         return self.row
 
     def _get_value_input(self) -> str:
@@ -1149,10 +1157,20 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self.row_changed.emit()
 
     def _on_value_changed(self) -> None:
-        """Update row and emit signal on value change."""
+        """Update row and emit signal on value change.
+
+        B054: Parse comma-separated list values for list operators.
+        """
         if PYQT_AVAILABLE:
-            text = self._value_edit.text()
-            self.row.value = text if text else None
+            text = self._get_value_input()  # Use _get_value_input to get from visible input
+            # B054: Parse comma-separated values for list operators
+            parsed_value: str | list[str] | None = None
+            if text and self._operator_is_multiline(self._operator_combo.currentText()):
+                items = [item.strip() for item in text.split(",") if item.strip()]
+                parsed_value = items if items else None
+            elif text:
+                parsed_value = text
+            self.row.value = parsed_value
             self.row_changed.emit()
 
     def set_error_state(
