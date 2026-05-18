@@ -152,6 +152,13 @@ except Exception as exc:  # pragma: no cover
     log.warning("FilterValidator not importable: %s", exc)
     _VALIDATOR_AVAILABLE = False
 
+try:
+    from visual_filter_builder import DatabaseSchemaInfo, FilterBuilder  # noqa: E402
+    _FILTER_BUILDER_AVAILABLE = True
+except Exception as exc:  # pragma: no cover
+    log.warning("FilterBuilder not importable: %s", exc)
+    _FILTER_BUILDER_AVAILABLE = False
+
 # Fallback markdown support
 try:
     import markdown2  # noqa: E402
@@ -428,19 +435,49 @@ class _SendDialog(QDialog):
         database_row_layout.addWidget(database_browse)
         form.addRow("Database", database_row)
 
-        # Filter editor (T009, T010, T016-T021)
-        self.filter_text_edit = QPlainTextEdit(self)
-        self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
-        self.filter_text_edit.setMinimumHeight(60)
-        self.filter_status_label = QLabel("", self)
-        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
-        filter_widget = QWidget(self)
-        filter_layout = QVBoxLayout(filter_widget)
-        filter_layout.setContentsMargins(0, 0, 0, 0)
-        filter_layout.setSpacing(4)
-        filter_layout.addWidget(self.filter_text_edit)
-        filter_layout.addWidget(self.filter_status_label)
-        form.addRow("Filter (YAML)", filter_widget)
+        # Filter editor (T035: FilterBuilder with visual table + YAML tabs)
+        if _FILTER_BUILDER_AVAILABLE:
+            initial_filter_dict: dict[str, str] = {}
+            try:
+                if config_data and initial_profile in cast(Any, config_data):
+                    profile_cfg = cast(Any, config_data)[initial_profile]
+                    filter_obj = cast(Any, profile_cfg).get("filter") if isinstance(profile_cfg, dict) else None
+                    if isinstance(filter_obj, dict):
+                        initial_filter_dict = cast(dict[str, str], filter_obj)
+            except (KeyError, TypeError, AttributeError) as e:
+                log.debug("Could not extract initial filter from config: %s", e)
+            self._schema_info = DatabaseSchemaInfo([])
+            self._filter_builder = FilterBuilder(
+                self._schema_info,
+                initial_filter=initial_filter_dict,
+                parent=self,
+            )
+            self._filter_builder.filter_changed.connect(self._on_filter_changed)
+            self.filter_status_label = QLabel("", self)
+            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            filter_widget = QWidget(self)
+            filter_layout = QVBoxLayout(filter_widget)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+            filter_layout.setSpacing(4)
+            filter_layout.addWidget(self._filter_builder)
+            filter_layout.addWidget(self.filter_status_label)
+            form.addRow("Filter", filter_widget)
+            # Keep filter_text_edit as reference to YAML tab for backward compat (used in _run_filter_validation)
+            self.filter_text_edit = self._filter_builder._yaml_edit
+        else:
+            self.filter_text_edit = QPlainTextEdit(self)
+            self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
+            self.filter_text_edit.setMinimumHeight(60)
+            self.filter_status_label = QLabel("", self)
+            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            filter_widget = QWidget(self)
+            filter_layout = QVBoxLayout(filter_widget)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+            filter_layout.setSpacing(4)
+            filter_layout.addWidget(self.filter_text_edit)
+            filter_layout.addWidget(self.filter_status_label)
+            form.addRow("Filter (YAML)", filter_widget)
+            self._filter_builder = None  # type: ignore[assignment]
 
         # Validation setup (T016, T017)
         self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
@@ -448,7 +485,11 @@ class _SendDialog(QDialog):
         self._validation_timer = QTimer(self)
         self._validation_timer.setSingleShot(True)
         self._validation_timer.timeout.connect(self._run_filter_validation)
-        self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
+        if self._filter_builder:
+            # Connect to FilterBuilder filter_changed signal for debounced validation
+            pass  # FilterBuilder already emits on change, validation triggered via _on_filter_changed
+        else:
+            self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
 
         self.password_input = QLineEdit(self)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -614,6 +655,13 @@ class _SendDialog(QDialog):
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
 
+        # T035: Update FilterBuilder schema when database changes
+        if self._filter_builder:
+            schema_fields = self._get_database_schema()
+            self._schema_info = DatabaseSchemaInfo(schema_fields)
+            self._filter_builder.schema_info = self._schema_info
+            self._filter_builder._table_widget.schema_info = self._schema_info
+
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
         self.body_input.setText("")
@@ -633,29 +681,41 @@ class _SendDialog(QDialog):
         self.filter_and_display_records()
 
     def load_current_filter(self, profile: str) -> None:
-        """Load filter from profile config and display in filter field."""
+        """Load filter from profile config and display in filter field (T036)."""
         profile_cfg = self._config_data.get(profile, {})
         # Use filter_test if test mode enabled, otherwise use filter
         filter_key = "filter_test" if self.test_check.isChecked() else "filter"
-        filter_obj = profile_cfg.get(filter_key)
+        filter_obj: Any = profile_cfg.get(filter_key)
 
         if not filter_obj:
-            self.filter_text_edit.setPlainText("")
+            if self._filter_builder:
+                self._filter_builder.set_filter_from_yaml({})
+            else:
+                self.filter_text_edit.setPlainText("")
             self.filter_status_label.setText("")
             self._original_filter_text = ""
             self._session_filter = None
             return
 
-        # Format filter dict as YAML string for display
+        # Format filter dict for display
+        filter_dict: dict[str, str] = {}
         filter_str = ""
-        if isinstance(filter_obj, dict):  # type: ignore[unreachable]
-            for key, value in filter_obj.items():  # type: ignore[unreachable]
-                filter_str += f"{key}: {value}\n"
-            filter_str = filter_str.rstrip()
-        else:
+        try:
+            if isinstance(filter_obj, dict):
+                for key, value in filter_obj.items():
+                    filter_dict[key] = str(value)
+                    filter_str += f"{key}: {value}\n"
+                filter_str = filter_str.rstrip()
+            else:
+                filter_str = str(filter_obj)
+        except (TypeError, AttributeError):
             filter_str = str(filter_obj)
 
-        self.filter_text_edit.setPlainText(filter_str)
+        if self._filter_builder:
+            # T036: Load filter into visual editor (T035)
+            self._filter_builder.set_filter_from_yaml(filter_dict)
+        else:
+            self.filter_text_edit.setPlainText(filter_str)
         self.filter_status_label.setText("")
         self._original_filter_text = filter_str
         self._session_filter = None
@@ -666,6 +726,21 @@ class _SendDialog(QDialog):
         self.load_current_filter(self._current_profile)
         # Clear session filter since we're switching filter mode
         self._session_filter = None
+
+    def _on_filter_changed(self, filter_dict: dict[str, str]) -> None:
+        """Handle FilterBuilder filter_changed signal (T035).
+
+        Updates _session_filter and triggers validation.
+
+        Args:
+            filter_dict: Updated filter dict from FilterBuilder
+        """
+        self._session_filter = filter_dict if filter_dict else None
+        # Trigger validation with debounced timer
+        self._validation_timer.stop()
+        self._validation_timer.start(50)
+        # Update record preview
+        self.filter_and_display_records()
 
     def _on_filter_text_changed(self) -> None:
         """Handle filter text change with debounced validation (T016, T017)."""
@@ -893,9 +968,23 @@ class _SendDialog(QDialog):
 
     def _apply_filter(self) -> None:
         """Apply edited filter as session-active filter (T034)."""
-        filter_text = self.filter_text_edit.toPlainText().strip()
+        if self._filter_builder:
+            # T037: Get filter from FilterBuilder (visual or YAML)
+            filter_dict = self._filter_builder.get_filter_as_yaml()
+        else:
+            filter_text = self.filter_text_edit.toPlainText().strip()
+            if not filter_text:
+                filter_dict = {}
+            else:
+                import yaml
+                try:
+                    filter_dict = yaml.safe_load(filter_text) or {}
+                except Exception as e:
+                    self.filter_status_label.setText(f"Parse error: {e}")
+                    self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+                    return
 
-        if not filter_text:
+        if not filter_dict:
             self._session_filter = None
             self.filter_status_label.setText("(Filter cleared - will use profile default)")
             self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
@@ -907,6 +996,9 @@ class _SendDialog(QDialog):
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
             return
 
+        # Reconstruct YAML string for validator (expects text format)
+        import yaml
+        filter_text = yaml.dump(filter_dict, default_flow_style=False, sort_keys=False)
         schema = self._get_database_schema()
         status = self._filter_validator.get_validation_status(filter_text, schema)
 
@@ -916,29 +1008,35 @@ class _SendDialog(QDialog):
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
             return
 
-        import yaml
-
         try:
-            filter_dict = yaml.safe_load(filter_text) or {}
-            if isinstance(filter_dict, dict):
-                self._session_filter = filter_dict
-                self.filter_status_label.setText("✓ Session filter applied")
-                self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
-                self.filter_and_display_records()
-            else:
-                self.filter_status_label.setText("Filter must be YAML mapping (key: value)")
-                self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            self._session_filter = filter_dict
+            self.filter_status_label.setText("✓ Session filter applied")
+            self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+            self.filter_and_display_records()
         except Exception as e:
-            self.filter_status_label.setText(f"Parse error: {e}")
+            self.filter_status_label.setText(f"Error: {e}")
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
 
     def _reset_filter(self) -> None:
-        """Reset filter to original from profile config (T035)."""
+        """Reset filter to original from profile config."""
         self._session_filter = None
-        if self._original_filter_text:
-            self.filter_text_edit.setPlainText(self._original_filter_text)
+        if self._filter_builder:
+            # Parse original filter text back to dict for FilterBuilder
+            if self._original_filter_text:
+                try:
+                    import yaml
+                    filter_dict = yaml.safe_load(self._original_filter_text) or {}
+                    if isinstance(filter_dict, dict):
+                        self._filter_builder.set_filter_from_yaml(filter_dict)
+                except Exception:
+                    self._filter_builder.set_filter_from_yaml({})
+            else:
+                self._filter_builder.set_filter_from_yaml({})
         else:
-            self.filter_text_edit.setPlainText("")
+            if self._original_filter_text:
+                self.filter_text_edit.setPlainText(self._original_filter_text)
+            else:
+                self.filter_text_edit.setPlainText("")
         self.filter_status_label.setText("(Filter reset to profile default)")
         self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
 
