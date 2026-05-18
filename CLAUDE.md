@@ -107,3 +107,10 @@ CI enforces:
 - This project uses `mypy --strict` and `ruff check .`.
 - Never use `type: ignore` without a human-approved justification.
 - All function signatures must be fully typed.
+
+## Active Technologies
+- Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, gspread, google-api-python-clien (004-visual-filter-builder)
+- N/A (filter definitions stored in YAML config) (004-visual-filter-builder)
+
+## Recent Changes
+- 004-visual-filter-builder: Added Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, gspread, google-api-python-clien
