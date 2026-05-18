@@ -908,14 +908,14 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
                 # Map canonical operator to display label (case-insensitive)
                 display_op = _canonical_to_display_operator(row.operator)
                 combo_items = [self._operator_combo.itemText(i) for i in range(self._operator_combo.count())]
-                log.debug("FilterRowWidget: Setting operator '%s' from canonical '%s', combo items: %s",
+                log.info("DEBUG: FilterRowWidget: Setting operator '%s' from canonical '%s', combo items: %s",
                           display_op, row.operator, combo_items)
                 try:
                     self._operator_combo.setCurrentText(display_op)
                     current = self._operator_combo.currentText()
-                    log.debug("FilterRowWidget: After setCurrentText, combo shows: '%s'", current)
+                    log.info("DEBUG: FilterRowWidget: After setCurrentText, combo shows: '%s'", current)
                 except Exception as e:
-                    log.debug("Failed to set operator '%s': %s", display_op, e)
+                    log.info("DEBUG: Failed to set operator '%s': %s", display_op, e)
             self._operator_combo.currentTextChanged.connect(self._on_operator_changed)
             layout.addWidget(self._operator_combo)
 
