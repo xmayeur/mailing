@@ -62,18 +62,20 @@ class FilterRow:
     Attributes:
         field_name: Column name from database schema (e.g., "email", "status")
         operator: Filter operator (e.g., "is", "contains", "greater than")
-        value: Optional filter value. None for operators that don't need values
+        value: Optional filter value. Can be str, list (for "one of" operators),
+               or None for operators that don't need values
                (e.g., "is empty", "is not empty").
 
     Example:
         >>> row = FilterRow("email", "is not empty", None)
         >>> row = FilterRow("status", "is equal to", "active")
         >>> row = FilterRow("age", "greater than", "18")
+        >>> row = FilterRow("status", "one of", ["active", "pending"])
     """
 
     field_name: str
     operator: str
-    value: str | None = None
+    value: str | list[str] | None = None
 
     def __post_init__(self) -> None:
         """Normalize field_name and operator (allow empty for new rows)."""
@@ -203,7 +205,8 @@ class FilterTable:
             if row.value is None:
                 result[row.field_name] = row.operator
             else:
-                result[row.field_name] = f"{row.operator} {row.value}"
+                value_str = ", ".join(str(v) for v in row.value) if isinstance(row.value, list) else str(row.value)
+                result[row.field_name] = f"{row.operator} {value_str}"
         return result
 
     @staticmethod
@@ -561,7 +564,12 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
 
             # Validate value is present if operator requires it
             if row_widget.row.operator and row_widget._operator_needs_value(row_widget.row.operator):
-                if not row_widget.row.value or not row_widget.row.value.strip():
+                value_empty = False
+                if not row_widget.row.value:
+                    value_empty = True
+                elif isinstance(row_widget.row.value, str) and not row_widget.row.value.strip():
+                    value_empty = True
+                if value_empty:
                     value_error = f"Operator '{row_widget.row.operator}' requires a value"
 
             # Apply error state
@@ -781,6 +789,22 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         row_changed = pyqtSignal()
         delete_requested = pyqtSignal(int)
 
+    @staticmethod
+    def _row_value_to_str(value: str | list[str] | None) -> str:
+        """Convert row value to string, handling lists and None.
+
+        Args:
+            value: Row value (string, list, or None)
+
+        Returns:
+            String representation of value
+        """
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            return ", ".join(str(v) for v in value)
+        return str(value)
+
     def __init__(
         self, row_index: int, row: FilterRow, schema_info: DatabaseSchemaInfo, parent: Any = None
     ) -> None:
@@ -816,10 +840,11 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._operator_combo.currentTextChanged.connect(self._on_operator_changed)
             layout.addWidget(self._operator_combo)
 
-            self._value_edit = QLineEdit(row.value if row.value else "")
+            value_str = self._row_value_to_str(row.value)
+            self._value_edit = QLineEdit(value_str)
             self._value_edit.textChanged.connect(self._on_value_changed)
             self._value_edit_multiline = QPlainTextEdit()
-            self._value_edit_multiline.setPlainText(row.value if row.value else "")
+            self._value_edit_multiline.setPlainText(value_str)
             self._value_edit_multiline.textChanged.connect(self._on_value_changed)
             self._value_edit_multiline.setMaximumHeight(80)
 
