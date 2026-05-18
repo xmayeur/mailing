@@ -25,10 +25,10 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 **Objective**: Extend editor config to support path persistence
 
 ### Configuration Changes
-- [ ] T001 Update `config.yml` to add `default_documents_path` key documentation and example
-- [ ] T002 Extend `_ConfigDialog` class in `src/editor.py` with new configuration field for `default_documents_path`
-- [ ] T003 Add validation in `_ConfigDialog._get_spinbox_default_value()` and `_load_yaml_block()` to handle path strings
-- [ ] T004 Update `_ConfigDialog._default_profile_data()` to include `"default_documents_path": ""` in defaults
+- [x] T001 Update `config.yml` to add `default_documents_path` key documentation and example
+- [x] T002 Extend `_ConfigDialog` class in `src/editor.py` with new configuration field for `default_documents_path`
+- [x] T003 Add validation in `_ConfigDialog._get_spinbox_default_value()` and `_load_yaml_block()` to handle path strings
+- [x] T004 Update `_ConfigDialog._default_profile_data()` to include `"default_documents_path": ""` in defaults
 
 **Acceptance Criteria**:
 - Config file loads/saves with new key without errors
@@ -45,12 +45,12 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 **Independent Test**: Save file to custom folder → close editor → reopen → verify Save As opens in same folder
 
 ### Implementation Tasks
-- [ ] T005 [US1] Load `default_documents_path` from config in `EditorWindow.__init__()` at line ~1891
-- [ ] T006 [US1] Implement OS-specific path defaults (Windows: `%USERPROFILE%\Documents`, macOS/Linux: `~`) in `EditorWindow._get_default_documents_path()`
-- [ ] T007 [US1] Add path validation in `EditorWindow._validate_documents_path()` to check existence and handle missing paths
-- [ ] T008 [US1] Update `EditorWindow._save_as()` to use remembered path as initial directory in `QFileDialog.getSaveFileName()`
-- [ ] T009 [US1] Update `EditorWindow._save()` to persist save directory to config after successful save
-- [ ] T010 [US1] Update `EditorWindow.open_file()` to persist file directory to config after successful open
+- [x] T005 [US1] Load `default_documents_path` from config in `EditorWindow.__init__()` at line ~1891
+- [x] T006 [US1] Implement OS-specific path defaults (Windows: `%USERPROFILE%\Documents`, macOS/Linux: `~`) in `EditorWindow._get_default_documents_path()`
+- [x] T007 [US1] Add path validation in `EditorWindow._validate_documents_path()` to check existence and handle missing paths
+- [x] T008 [US1] Update `EditorWindow._save_as()` to use remembered path as initial directory in `QFileDialog.getSaveFileName()`
+- [x] T009 [US1] Update `EditorWindow._save()` to persist save directory to config after successful save
+- [x] T010 [US1] Update `EditorWindow.open_file()` to persist file directory to config after successful open
 
 ### Testing Tasks (Optional)
 - [ ] T011 [US1] Test: Save file to `/tmp/test-folder`, close editor, reopen, verify Save As defaults to `/tmp/test-folder`
@@ -75,7 +75,7 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 ### Implementation Tasks
 - [ ] T014 [P] [US2] Locate debounce timer in `_SendDialog._on_filter_text_changed()` at line ~675
 - [ ] T015 [P] [US2] Analyze current debounce timeout value (expected 200ms) in `_validation_timer.start()`
-- [ ] T016 [US2] Reduce debounce timeout from 200ms to 50ms in `_SendDialog._on_filter_text_changed()` at line 675
+- [x] T016 [US2] Reduce debounce timeout from 200ms to 50ms in `_SendDialog._on_filter_text_changed()` at line 675
 - [ ] T017 [US2] Implement debounce separation: delay validation display without blocking character input in `_SendDialog._run_filter_validation()`
 - [ ] T018 [US2] Update `_SendDialog._update_validation_ui()` to show feedback non-intrusively after user pauses typing
 - [ ] T019 [P] [US2] Test rapid typing: compose filter "email: is not empty" at normal speed, measure perceived latency
@@ -100,7 +100,7 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 **Independent Test**: Open Send Mailing dialog → verify window title reads "Send Mailing" (not "Send Newsletter")
 
 ### Implementation Tasks
-- [ ] T023 [P] [US3] Update `_SendDialog.__init__()` at line 372: change `setWindowTitle("Send Newsletter")` to `setWindowTitle("Send Mailing")`
+- [x] T023 [P] [US3] Update `_SendDialog.__init__()` at line 372: change `setWindowTitle("Send Newsletter")` to `setWindowTitle("Send Mailing")`
 - [ ] T024 [P] [US3] Search codebase for any references to "Send Newsletter" dialog title and update or remove them
 - [ ] T025 [P] [US3] Update CLAUDE.md or user documentation that references old dialog name
 
@@ -118,12 +118,12 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 **Independent Test**: Open Send Mailing dialog → verify Flags section shows exactly 3 checkboxes (no "Selected" checkbox)
 
 ### Implementation Tasks
-- [ ] T026 [P] [US4] Locate `self.selected_check` initialization in `_SendDialog.__init__()` around line ~488-490
-- [ ] T027 [P] [US4] Remove `self.selected_check = QCheckBox(...)` widget initialization in Flags section
-- [ ] T028 [P] [US4] Remove `selected_check` from `flag_layout.addWidget()` in `_SendDialog.__init__()` around line ~490
-- [ ] T029 [P] [US4] Remove `self.selected_check.setChecked()` call from `_SendDialog._load_profile_defaults()` around line ~632
-- [ ] T030 [P] [US4] Update `_SendDialog.build_args()` to handle absence of selected field: either omit `namespace.selected` or default to `False`
-- [ ] T031 [P] [US4] Search for any code that reads `namespace.selected` and ensure it handles None/False gracefully
+- [x] T026 [P] [US4] Locate `self.selected_check` initialization in `_SendDialog.__init__()` around line ~488-490
+- [x] T027 [P] [US4] Remove `self.selected_check = QCheckBox(...)` widget initialization in Flags section
+- [x] T028 [P] [US4] Remove `selected_check` from `flag_layout.addWidget()` in `_SendDialog.__init__()` around line ~490
+- [x] T029 [P] [US4] Remove `self.selected_check.setChecked()` call from `_SendDialog._load_profile_defaults()` around line ~632
+- [x] T030 [P] [US4] Update `_SendDialog.build_args()` to handle absence of selected field: either omit `namespace.selected` or default to `False`
+- [x] T031 [P] [US4] Search for any code that reads `namespace.selected` and ensure it handles None/False gracefully
 
 **Testing Tasks (Optional)**
 - [ ] T032 [US4] Test: Open Send Mailing dialog, count Flags section checkboxes (should be 3: Test, Verbose, Do not send)
@@ -144,13 +144,13 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 **Independent Test**: Open `template.html` → verify read-only indicator → try Ctrl+S → verify Save As opens instead
 
 ### Implementation Tasks
-- [ ] T034 [US5] Create `EditorWindow._is_template` boolean flag initialization in `EditorWindow.__init__()` at line ~1896
-- [ ] T035 [US5] Implement template detection in `EditorWindow.open_file()` at line ~1984: check if filename contains ".template" or matches "template.*"
-- [ ] T036 [US5] Set `self._is_template = True` when template file is detected in `EditorWindow.open_file()`
-- [ ] T037 [US5] Update `EditorWindow._update_title()` to append "[Read-Only Template]" to title when template is open
-- [ ] T038 [US5] Disable Save action in `EditorWindow._build_menus()` when `self._is_template` is True (line ~2333-2335)
-- [ ] T039 [US5] Keep Save As action enabled for templates; verify `_save_as()` creates new file without modifying template
-- [ ] T040 [US5] Apply read-only CSS styling to editor when template is open (pass flag to `_inject_initial_content()`)
+- [x] T034 [US5] Create `EditorWindow._is_template` boolean flag initialization in `EditorWindow.__init__()` at line ~1896
+- [x] T035 [US5] Implement template detection in `EditorWindow.open_file()` at line ~1984: check if filename contains ".template" or matches "template.*"
+- [x] T036 [US5] Set `self._is_template = True` when template file is detected in `EditorWindow.open_file()`
+- [x] T037 [US5] Update `EditorWindow._update_title()` to append "[Read-Only Template]" to title when template is open
+- [x] T038 [US5] Disable Save action in `EditorWindow._build_menus()` when `self._is_template` is True (line ~2333-2335)
+- [x] T039 [US5] Keep Save As action enabled for templates; verify `_save_as()` creates new file without modifying template
+- [x] T040 [US5] Apply read-only CSS styling to editor when template is open (pass flag to `_inject_initial_content()`)
 
 ### Testing Tasks (Optional)
 - [ ] T041 [US5] Test: Open `template.html`, verify title shows "[Read-Only Template]"
@@ -289,8 +289,8 @@ Each task follows the strict format:
 ```
 
 **Examples from this breakdown**:
-- `- [ ] T001 Update config.yml to add...` (Setup phase)
-- `- [ ] T005 [US1] Load default_documents_path...` (Story-specific)
+- `- [x] T001 Update config.yml to add...` (Setup phase)
+- `- [x] T005 [US1] Load default_documents_path...` (Story-specific)
 - `- [ ] T014 [P] [US2] Locate debounce timer...` (Parallelizable & story-specific)
 - `- [ ] T044 [P] Execute User Story 1 acceptance tests` (Parallelizable test)
 
