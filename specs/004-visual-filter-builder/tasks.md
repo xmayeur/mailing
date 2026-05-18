@@ -199,7 +199,7 @@ Add operator dropdown with conditional value input. **Prerequisite**: Phase 2-4.
   - Select "contains" → verify value input shown (text)
   - Select "one of" → verify value input shown (multiline)
 
-- [ ] T031 Unit test for operator dropdown:
+- [x] T031 Unit test for operator dropdown:
   - Test operators populated per field type
   - Test operator change triggers value input visibility
   - Test no-value operators hide input
