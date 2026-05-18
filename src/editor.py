@@ -1171,6 +1171,7 @@ class _ConfigDialog(QDialog):
             "message": "",
             "body": "",
             "database": "subscribers.csv",
+            "default_documents_path": "",
             "sa": "",
             "sheetid": "",
             "domain": "example.com",
@@ -1394,6 +1395,16 @@ class _ConfigDialog(QDialog):
                 tooltip="Local subscriber file path (CSV/XLSX/XLSM/XLS/ODS).",
                 browse_caption="Select database",
                 browse_filter="Data Files (*.csv *.xlsx *.xlsm *.xls *.ods);;All Files (*)",
+            ),
+        )
+        self._add_line_field(
+            layout,
+            _LineFieldSpec(
+                "default_documents_path",
+                "Default Documents Path",
+                tooltip="Default folder for Save As dialogs in the editor (per-profile). Defaults to Documents folder (Windows) or home directory (macOS/Linux).",
+                browse_caption="Select default folder",
+                browse_filter="",
             ),
         )
         self._add_line_field(layout, _LineFieldSpec("sa", "Service account (SA)",
@@ -1888,12 +1899,17 @@ class EditorWindow(QMainWindow):
         file_path: Optional markdown or HTML file to open on startup
     """
 
-    def __init__(self, file_path: str | None = None) -> None:
+    def __init__(self, file_path: str | None = None, profile: str | None = None) -> None:
         super().__init__()
         self._file_path: str | None = None
         self._css_path: str | None = None   # user-selected CSS stylesheet
         self._load_finished_connected = False
         self._send_in_progress = False
+        self._config_path = str(Path(__file__).parent / "config.yml")
+        self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
+        self._current_profile = profile or "default"
+        self._default_documents_path = self._get_default_documents_path()
+        self._load_config()
 
         # Web engine view
         self._view = QWebEngineView(self)
@@ -1929,6 +1945,61 @@ class EditorWindow(QMainWindow):
             self.open_file(file_path)
         else:
             self._load_editor_page("")
+
+    # ------------------------------------------------------------------
+    # Configuration & Path Handling
+    # ------------------------------------------------------------------
+
+    def _load_config(self) -> None:
+        """Load sendMail YAML config and extract default documents path for current profile."""
+        try:
+            if os.path.exists(self._config_path):
+                with open(self._config_path, encoding="utf-8") as f:
+                    self._config_data = yaml.safe_load(f) or {}
+                profile_cfg = self._config_data.get(self._current_profile, {})
+                stored_path_raw = profile_cfg.get("default_documents_path", "")
+                if isinstance(stored_path_raw, str) and stored_path_raw:
+                    if self._validate_documents_path(stored_path_raw):
+                        self._default_documents_path = stored_path_raw
+                    else:
+                        log.warning("Invalid stored documents path: %s, using OS default", stored_path_raw)
+        except Exception as exc:
+            log.warning("Failed to load config: %s", exc)
+
+    def _get_default_documents_path(self) -> str:
+        """Get OS-specific default documents folder (Windows: Documents, macOS/Linux: home)."""
+        if sys.platform == "win32":
+            return os.path.expandvars(r"%USERPROFILE%\Documents")
+        return os.path.expanduser("~")
+
+    def _validate_documents_path(self, path: str) -> bool:
+        """Check if path exists and is readable/writable."""
+        try:
+            return os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK)
+        except Exception:
+            return False
+
+    def _save_documents_path(self, path: str) -> None:
+        """Save documents folder path to config for current profile (atomic write)."""
+        try:
+            if not hasattr(self, "_config_path") or not hasattr(self, "_config_data"):
+                return
+            if not os.path.isdir(path):
+                log.warning("Documents path does not exist, not saving: %s", path)
+                return
+            if not self._config_data:
+                self._load_config()
+            if self._current_profile not in self._config_data:
+                self._config_data[self._current_profile] = {}
+            self._config_data[self._current_profile]["default_documents_path"] = path
+            tmp_path = self._config_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                yaml.dump(self._config_data, f, default_flow_style=False, sort_keys=False)
+            os.replace(tmp_path, self._config_path)
+            if hasattr(self, "_default_documents_path"):
+                self._default_documents_path = path
+        except Exception as exc:
+            log.error("Failed to save documents path: %s", exc)
 
     # ------------------------------------------------------------------
     # Page loading
@@ -2007,6 +2078,9 @@ class EditorWindow(QMainWindow):
         self._load_default_stylesheet()
 
         self._load_editor_page(body_html)
+
+        # Persist the opened file's directory to config
+        self._save_documents_path(str(Path(path).parent))
 
     def _md_to_body_html(self, md_path: str) -> str:
         """Convert a .md file to an HTML body string."""
@@ -2248,6 +2322,7 @@ class EditorWindow(QMainWindow):
             if statusbar:
                 statusbar.showMessage(f"Saved: {html_path}", 4000)
             log.info("Saved HTML: %s", html_path)
+            self._save_documents_path(str(Path(html_path).parent))
             return True
         except Exception as exc:
             QMessageBox.critical(self, "Save Error", f"Failed to save:\n{exc}")
@@ -2256,7 +2331,7 @@ class EditorWindow(QMainWindow):
 
     def _save_as(self) -> bool:
         """Prompt for an HTML filename then save. Returns True on success."""
-        initial_dir = str(Path(self._file_path).parent) if self._file_path else "data"
+        initial_dir = getattr(self, "_default_documents_path", "data")
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save As",
@@ -2266,7 +2341,10 @@ class EditorWindow(QMainWindow):
         if not path:
             return False
         self._file_path = str(Path(path).with_suffix(_HTML_EXT))
-        return self._save()
+        result = self._save()
+        if result:
+            self._save_documents_path(str(Path(self._file_path).parent))
+        return result
 
     def _write_html_file(self, path: str, body_html: str) -> None:
         """Write a complete HTML document file from body HTML."""

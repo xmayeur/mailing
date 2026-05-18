@@ -44,7 +44,7 @@ them through `sendMail`.
 
 The editor is a separate desktop app for creating and editing newsletter content visually.
 
-📖 **[Read the Editor Tutorial](TUTORIAL.md)** for a complete guide on using the editor.
+📖 **[Read the Editor Tutorial](docs/TUTORIAL.md)** for a complete guide on using the editor.
 
 ### Main Features
 
