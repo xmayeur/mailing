@@ -177,18 +177,18 @@ Add operator dropdown with conditional value input. **Prerequisite**: Phase 2-4.
 
 ### Operator Selection
 
-- [ ] T027 [P] Update FilterRowWidget.operator input to QComboBox:
+- [x] T027 [P] Update FilterRowWidget.operator input to QComboBox:
   - Populate with schema_info.get_operators_for_field(current_field)
   - Connect currentTextChanged → update _row.operator, emit row_changed
   - On operator change: show/hide value input (see T028)
 
-- [ ] T028 Implement dynamic value input visibility in FilterRowWidget:
+- [x] T028 Implement dynamic value input visibility in FilterRowWidget:
   - Operators with no value ("is empty", "is not empty"): hide value input
   - Operators with value ("equals", "contains"): show text input
   - Operators with list ("one of"): show multiline input
   - Update visibility when operator changes
 
-- [ ] T029 Update FilterRowWidget.value input based on operator type:
+- [x] T029 Update FilterRowWidget.value input based on operator type:
   - Single-value operators: QLineEdit
   - Multi-value operators ("one of", "none of"): QPlainTextEdit
   - No-value operators: hidden

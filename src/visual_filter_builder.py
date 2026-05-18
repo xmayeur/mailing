@@ -760,13 +760,26 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._field_combo.currentTextChanged.connect(self._on_field_changed)
             layout.addWidget(self._field_combo)
 
-            self._operator_edit = QLineEdit(row.operator)
-            self._operator_edit.textChanged.connect(self._on_operator_changed)
-            layout.addWidget(self._operator_edit)
+            self._operator_combo = QComboBox()
+            self._populate_operator_combo()
+            if row.operator:
+                try:
+                    self._operator_combo.setCurrentText(row.operator)
+                except Exception as e:
+                    log.debug("Failed to set operator: %s", e)
+            self._operator_combo.currentTextChanged.connect(self._on_operator_changed)
+            layout.addWidget(self._operator_combo)
 
             self._value_edit = QLineEdit(row.value if row.value else "")
             self._value_edit.textChanged.connect(self._on_value_changed)
+            self._value_edit_multiline = QPlainTextEdit()
+            self._value_edit_multiline.setPlainText(row.value if row.value else "")
+            self._value_edit_multiline.textChanged.connect(self._on_value_changed)
+            self._value_edit_multiline.setMaximumHeight(80)
+
+            self._update_value_input_visibility()
             layout.addWidget(self._value_edit)
+            layout.addWidget(self._value_edit_multiline)
 
             self._delete_btn = QPushButton("Delete")
             self._delete_btn.setMaximumWidth(60)
@@ -787,13 +800,27 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         """
         if PYQT_AVAILABLE:
             field = self._field_combo.currentText()
-            operator = self._operator_edit.text()
-            value = self._value_edit.text()
+            operator = self._operator_combo.currentText()
+            value = self._get_value_input()
             return FilterRow(field, operator, value if value else None)
         return self.row
 
+    def _get_value_input(self) -> str:
+        """Get value from whichever input is visible.
+
+        Returns:
+            Value from QLineEdit or QPlainTextEdit
+        """
+        if not PYQT_AVAILABLE:
+            return ""
+        if self._value_edit.isVisible():
+            return self._value_edit.text()
+        if self._value_edit_multiline.isVisible():
+            return self._value_edit_multiline.toPlainText()
+        return ""
+
     def refresh_schema(self, schema_info: DatabaseSchemaInfo) -> None:
-        """Refresh field dropdown with updated schema.
+        """Refresh field and operator dropdowns with updated schema.
 
         Args:
             schema_info: Updated DatabaseSchemaInfo
@@ -805,6 +832,8 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         self._populate_field_combo()
         if current_field in schema_info.field_names:
             self._field_combo.setCurrentText(current_field)
+        self._populate_operator_combo()
+        self._update_value_input_visibility()
 
     def _populate_field_combo(self) -> None:
         """Populate field combo with schema fields or 'Load database first' message."""
@@ -818,10 +847,63 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._field_combo.addItem("Load database first")
             self._field_combo.setEnabled(False)
 
+    def _populate_operator_combo(self) -> None:
+        """Populate operator combo with operators for current field."""
+        if not PYQT_AVAILABLE:
+            return
+        self._operator_combo.clear()
+        field = self._field_combo.currentText()
+        if field and field != "Load database first":
+            operators = self.schema_info.get_operators_for_field(field)
+            self._operator_combo.addItems(operators)
+        self._operator_combo.setEnabled(bool(self.schema_info.field_names))
+
+    def _operator_needs_value(self, operator: str) -> bool:
+        """Check if operator requires a value.
+
+        Args:
+            operator: Operator name
+
+        Returns:
+            True if operator needs value, False if operator is no-value type
+        """
+        no_value_ops = ["is empty", "is not empty", "Is empty", "Is not empty"]
+        return operator not in no_value_ops
+
+    def _operator_is_multiline(self, operator: str) -> bool:
+        """Check if operator supports multiple values.
+
+        Args:
+            operator: Operator name
+
+        Returns:
+            True if operator supports list (e.g., 'one of'), False otherwise
+        """
+        multiline_ops = ["one of", "none of", "One of", "None of"]
+        return operator in multiline_ops
+
+    def _update_value_input_visibility(self) -> None:
+        """Update visibility of value inputs based on current operator."""
+        if not PYQT_AVAILABLE:
+            return
+        operator = self._operator_combo.currentText()
+        needs_value = self._operator_needs_value(operator)
+        is_multiline = self._operator_is_multiline(operator)
+
+        if not needs_value:
+            self._value_edit.hide()
+            self._value_edit_multiline.hide()
+        elif is_multiline:
+            self._value_edit.hide()
+            self._value_edit_multiline.show()
+        else:
+            self._value_edit.show()
+            self._value_edit_multiline.hide()
+
     def _on_field_changed(self, field_text: str) -> None:
         """Update row and emit signal on field change.
 
-        Clear value input when field changes since field type may have changed.
+        Clear value input and refresh operators when field changes.
 
         Args:
             field_text: New field name from combo box
@@ -829,12 +911,22 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         if PYQT_AVAILABLE:
             self.row.field_name = field_text
             self._value_edit.clear()
+            self._value_edit_multiline.clear()
+            self._populate_operator_combo()
+            self._update_value_input_visibility()
             self.row_changed.emit()
 
-    def _on_operator_changed(self) -> None:
-        """Update row and emit signal on operator change."""
+    def _on_operator_changed(self, operator_text: str) -> None:
+        """Update row and emit signal on operator change.
+
+        Show/hide value input based on operator type.
+
+        Args:
+            operator_text: New operator name from combo box
+        """
         if PYQT_AVAILABLE:
-            self.row.operator = self._operator_edit.text()
+            self.row.operator = operator_text
+            self._update_value_input_visibility()
             self.row_changed.emit()
 
     def _on_value_changed(self) -> None:
