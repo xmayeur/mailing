@@ -784,12 +784,18 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
         if not PYQT_AVAILABLE:
             return
         self.schema_info = schema_info
+        # B051: Skip signal emission if no rows (profile load case)
+        # When there are no existing rows, emitting row_changed triggers
+        # filter_and_display_records which is unnecessary and slow.
+        # Let explicit filter_and_display_records call after profile load handle it.
+        has_rows = len(self._row_widgets) > 0
         for widget in self._row_widgets:
             widget.refresh_schema(schema_info)
         # B011: Enable/disable Add Row button based on whether database is loaded
         self._add_button.setEnabled(bool(schema_info.field_names))
-        # B008: Emit row_changed to trigger validation and dropdown updates
-        self.row_changed.emit()
+        # B008: Emit row_changed only if there were rows to refresh (not during profile load)
+        if has_rows:
+            self.row_changed.emit()
 
     def _add_row_widget(self, row_idx: int, row: FilterRow) -> None:
         """Create and insert FilterRowWidget.
