@@ -152,6 +152,13 @@ except Exception as exc:  # pragma: no cover
     log.warning("FilterValidator not importable: %s", exc)
     _VALIDATOR_AVAILABLE = False
 
+try:
+    from visual_filter_builder import DatabaseSchemaInfo, FilterBuilder  # noqa: E402
+    _FILTER_BUILDER_AVAILABLE = True
+except Exception as exc:  # pragma: no cover
+    log.warning("FilterBuilder not importable: %s", exc)
+    _FILTER_BUILDER_AVAILABLE = False
+
 # Fallback markdown support
 try:
     import markdown2  # noqa: E402
@@ -370,7 +377,9 @@ class _SendDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Send Mailing")
-        self.setMinimumWidth(720)
+        # B040: Dialog width extends beyond filter widget right edge
+        # Filter widget 900px + scroll area margins/scrollbar + dialog margins = 1150px
+        self.setMinimumWidth(1150)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
         self._current_profile = ""
@@ -380,12 +389,27 @@ class _SendDialog(QDialog):
         self._original_filter_text = ""
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
+        # B036: Make dialog vertically scrollable for many form fields
+        from PyQt6.QtWidgets import QScrollArea
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+
+        # Create scrollable content widget
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(16, 16, 16, 12)
+        scroll_layout.setSpacing(10)
+        scroll.setWidget(scroll_content)
+
+        root.addWidget(scroll)
+
+        # Form layout inside scrollable area
         form = QFormLayout()
         form.setLabelAlignment(form.labelAlignment())
-        root.addLayout(form)
+        scroll_layout.addLayout(form)
 
         self.config_input = QLineEdit(config_path, self)
         self.config_input.setReadOnly(True)
@@ -427,28 +451,82 @@ class _SendDialog(QDialog):
         database_browse.clicked.connect(self._browse_database)
         database_row_layout.addWidget(database_browse)
         form.addRow("Database", database_row)
+        # B015: Clear schema cache when database input changes (retry mechanism)
+        self.database_input.textChanged.connect(self._on_database_input_changed)
 
-        # Filter editor (T009, T010, T016-T021)
-        self.filter_text_edit = QPlainTextEdit(self)
-        self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
-        self.filter_text_edit.setMinimumHeight(60)
-        self.filter_status_label = QLabel("", self)
-        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
-        filter_widget = QWidget(self)
-        filter_layout = QVBoxLayout(filter_widget)
-        filter_layout.setContentsMargins(0, 0, 0, 0)
-        filter_layout.setSpacing(4)
-        filter_layout.addWidget(self.filter_text_edit)
-        filter_layout.addWidget(self.filter_status_label)
-        form.addRow("Filter (YAML)", filter_widget)
+        # Filter editor (T035: FilterBuilder with visual table + YAML tabs)
+        if _FILTER_BUILDER_AVAILABLE:
+            initial_filter_dict: dict[str, str] = {}
+            try:
+                if config_data and initial_profile in cast(Any, config_data):
+                    profile_cfg = cast(Any, config_data)[initial_profile]
+                    filter_obj = cast(Any, profile_cfg).get("filter") if isinstance(profile_cfg, dict) else None
+                    if isinstance(filter_obj, dict):
+                        initial_filter_dict = cast(dict[str, str], filter_obj)
+            except (KeyError, TypeError, AttributeError) as e:
+                log.debug("Could not extract initial filter from config: %s", e)
+            self._schema_info = DatabaseSchemaInfo([])
+            self._filter_builder = FilterBuilder(
+                self._schema_info,
+                initial_filter=initial_filter_dict,
+                parent=self,
+            )
+            self._filter_builder.filter_changed.connect(self._on_filter_changed)
+            self.filter_status_label = QLabel("", self)
+            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            filter_widget = QWidget(self)
+            filter_layout = QVBoxLayout(filter_widget)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+            filter_layout.setSpacing(4)
+            # B007: Wrap FilterBuilder in scroll area to prevent it from expanding
+            # and hiding elements below (buttons, preview pane)
+            from PyQt6.QtWidgets import QScrollArea
+            scroll = QScrollArea()
+            scroll.setWidget(self._filter_builder)
+            scroll.setWidgetResizable(True)
+            # B026-B027 & B031 & B043: Set explicit height/width for filter widget
+            # Height: Allow 5 rows (30px each) + button (30px) = 300px + scrollbar = 320px
+            # Width: minWidth 900px ensures dropdowns, operators, values all visible
+            scroll.setMinimumHeight(320)
+            scroll.setMaximumHeight(340)
+            scroll.setMinimumWidth(900)
+            scroll.setWidgetResizable(True)
+            filter_layout.addWidget(scroll)
+            filter_layout.addWidget(self.filter_status_label)
+            form.addRow("Filter", filter_widget)
+            # Keep filter_text_edit as reference to YAML tab for backward compat (used in _run_filter_validation)
+            self.filter_text_edit = self._filter_builder._yaml_edit
+        else:
+            self.filter_text_edit = QPlainTextEdit(self)
+            self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
+            self.filter_text_edit.setMinimumHeight(60)
+            self.filter_status_label = QLabel("", self)
+            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            filter_widget = QWidget(self)
+            filter_layout = QVBoxLayout(filter_widget)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+            filter_layout.setSpacing(4)
+            filter_layout.addWidget(self.filter_text_edit)
+            filter_layout.addWidget(self.filter_status_label)
+            form.addRow("Filter (YAML)", filter_widget)
+            self._filter_builder = None  # type: ignore[assignment]
 
         # Validation setup (T016, T017)
         self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
         self._schema_cache: Any = None  # Initialized lazily in _get_schema_cache()
+        # B053: Cache database records to avoid repeated Google Sheets API calls
+        self._cached_records: list[list[str]] | None = None  # Records cache
+        self._cached_headers: list[str] | None = None  # Headers cache
+        self._cached_for_profile: str | None = None  # Profile these records are for
+        self._cached_for_db: str | None = None  # Database path these records are for
         self._validation_timer = QTimer(self)
         self._validation_timer.setSingleShot(True)
         self._validation_timer.timeout.connect(self._run_filter_validation)
-        self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
+        if self._filter_builder:
+            # Connect to FilterBuilder filter_changed signal for debounced validation
+            pass  # FilterBuilder already emits on change, validation triggered via _on_filter_changed
+        else:
+            self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
 
         self.password_input = QLineEdit(self)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -596,8 +674,26 @@ class _SendDialog(QDialog):
         self._load_profile_defaults(self.profile_combo.currentText())
 
     def _load_profile_defaults(self, profile: str) -> None:
+        import time
         self._current_profile = profile
         profile_cfg = self._config_data.get(profile, {})
+        log.info("DEBUG: _load_profile_defaults: profile=%s, config_data keys=%s, profile_cfg keys=%s",
+                 profile, list(self._config_data.keys()), list(profile_cfg.keys()))
+
+        # B024-B025: Clear schema cache for new profile to force fresh load
+        # Ensures Google Sheets and CSV profiles refresh when switching
+        cache = self._get_schema_cache()
+        # Clear all cache entries for this profile
+        for key in list(cache._cache.keys()):
+            if key.startswith(f"{profile}_"):
+                cache.invalidate(key)
+
+        # B053: Also invalidate record cache when profile changes
+        # Records from previous profile must not be reused
+        self._cached_records = None
+        self._cached_headers = None
+        self._cached_for_profile = None
+        self._cached_for_db = None
 
         def _int_or_zero(value: object) -> int:
             try:
@@ -613,6 +709,26 @@ class _SendDialog(QDialog):
         # Process any pending Qt events to ensure database path is set before validation
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
+
+        # T035: Update FilterBuilder schema when database changes
+        # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
+        if self._filter_builder:
+            t1 = time.time()
+            schema_fields = self._get_database_schema()
+            t2 = time.time()
+            log.info("TIMING: _get_database_schema took %.2fs", t2-t1)
+            log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
+                     profile, self.database_input.text(), schema_fields)
+            self._schema_info = DatabaseSchemaInfo(schema_fields)
+            self._filter_builder.schema_info = self._schema_info
+            log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
+            # Call refresh_schema on table_widget to update all row dropdowns
+            t3 = time.time()
+            self._filter_builder._table_widget.refresh_schema(self._schema_info)
+            t4 = time.time()
+            log.info("TIMING: refresh_schema took %.2fs", t4-t3)
+            log.info("DEBUG: refresh_schema called, row_widgets=%d",
+                     len(self._filter_builder._table_widget._row_widgets))
 
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
@@ -633,29 +749,41 @@ class _SendDialog(QDialog):
         self.filter_and_display_records()
 
     def load_current_filter(self, profile: str) -> None:
-        """Load filter from profile config and display in filter field."""
+        """Load filter from profile config and display in filter field (T036)."""
         profile_cfg = self._config_data.get(profile, {})
         # Use filter_test if test mode enabled, otherwise use filter
         filter_key = "filter_test" if self.test_check.isChecked() else "filter"
-        filter_obj = profile_cfg.get(filter_key)
+        filter_obj: Any = profile_cfg.get(filter_key)
 
         if not filter_obj:
-            self.filter_text_edit.setPlainText("")
+            if self._filter_builder:
+                self._filter_builder.set_filter_from_yaml({})
+            else:
+                self.filter_text_edit.setPlainText("")
             self.filter_status_label.setText("")
             self._original_filter_text = ""
             self._session_filter = None
             return
 
-        # Format filter dict as YAML string for display
+        # Format filter dict for display
+        filter_dict: dict[str, str] = {}
         filter_str = ""
-        if isinstance(filter_obj, dict):  # type: ignore[unreachable]
-            for key, value in filter_obj.items():  # type: ignore[unreachable]
-                filter_str += f"{key}: {value}\n"
-            filter_str = filter_str.rstrip()
-        else:
+        try:
+            if isinstance(filter_obj, dict):
+                for key, value in filter_obj.items():
+                    filter_dict[key] = str(value)
+                    filter_str += f"{key}: {value}\n"
+                filter_str = filter_str.rstrip()
+            else:
+                filter_str = str(filter_obj)
+        except (TypeError, AttributeError):
             filter_str = str(filter_obj)
 
-        self.filter_text_edit.setPlainText(filter_str)
+        if self._filter_builder:
+            # T036: Load filter into visual editor (T035)
+            self._filter_builder.set_filter_from_yaml(filter_dict)
+        else:
+            self.filter_text_edit.setPlainText(filter_str)
         self.filter_status_label.setText("")
         self._original_filter_text = filter_str
         self._session_filter = None
@@ -667,10 +795,60 @@ class _SendDialog(QDialog):
         # Clear session filter since we're switching filter mode
         self._session_filter = None
 
+    def _on_filter_changed(self, filter_dict: dict[str, str]) -> None:
+        """Handle FilterBuilder filter_changed signal (T035, T041-T042).
+
+        Updates _session_filter and triggers validation.
+        Highlights invalid rows in visual table.
+
+        Args:
+            filter_dict: Updated filter dict from FilterBuilder
+        """
+        self._session_filter = filter_dict if filter_dict else None
+        # T041-T042: Validate rows and highlight errors in visual table
+        if self._filter_builder:
+            self._filter_builder.validate_and_highlight_errors()
+        # Trigger validation with debounced timer
+        self._validation_timer.stop()
+        self._validation_timer.start(50)
+        # B053: Do NOT call filter_and_display_records here - it blocks UI during editing
+        # User can apply filter via Apply button or trigger with debounce timer
+        # Each call hits Google Sheets API (1+ sec), blocking user input
+        # Only load records on explicit apply or after user stops editing (5+ sec debounce)
+        if not hasattr(self, '_filter_apply_timer'):
+            from PyQt6.QtCore import QTimer
+            self._filter_apply_timer = QTimer()
+            self._filter_apply_timer.setSingleShot(True)
+            self._filter_apply_timer.timeout.connect(self._deferred_filter_display)
+        self._filter_apply_timer.stop()
+        self._filter_apply_timer.start(5000)  # 5 second debounce before auto-loading
+
     def _on_filter_text_changed(self) -> None:
         """Handle filter text change with debounced validation (T016, T017)."""
         self._validation_timer.stop()
         self._validation_timer.start(50)
+
+    def _on_database_input_changed(self, _text: str) -> None:
+        """Clear schema cache when database input changes (B015 retry mechanism).
+
+        Allows user to fix database issues (e.g., move file to correct location)
+        and have schema reload on next use without restarting dialog.
+
+        B053: Also invalidate record cache since database changed.
+        """
+        cache = self._get_schema_cache()
+        profile = self._current_profile or "default"
+        # Clear all cache entries for this profile to force fresh schema load
+        db_path = self.database_input.text().strip()
+        if db_path:
+            cache.invalidate(f"{profile}_csv_{db_path}")
+        # Also clear Google Sheets cache entry if it exists
+        cache.invalidate(f"{profile}_gsheet")
+        # B053: Invalidate record cache since database path changed
+        self._cached_records = None
+        self._cached_headers = None
+        self._cached_for_profile = None
+        self._cached_for_db = None
 
     def _run_filter_validation(self) -> None:
         """Run filter validation and update UI (T018-T021)."""
@@ -702,24 +880,33 @@ class _SendDialog(QDialog):
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
-        if not db_path and profile_cfg.get("SHEETID"):
+        # B047: Handle both uppercase and lowercase config keys
+        sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
+        sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
+        log.info("DEBUG: _get_database_schema: profile=%s, db_path=%s, profile_cfg keys=%s, SHEETID=%s, SA=%s",
+                 self._current_profile, db_path, list(profile_cfg.keys()), sheet_id_val, sa_val)
+        if not db_path and sheet_id_val:
             # Google Sheets profile - try to load schema from Google Sheets
-            sa = profile_cfg.get("SA")
-            sheet_id = profile_cfg.get("SHEETID")
+            sa = sa_val
+            sheet_id = sheet_id_val
+            log.info("DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa, sheet_id)
             if sa and sheet_id:
                 def _load_gsheet_schema() -> list[str]:
                     try:
-                        import sendMail as sm  # noqa: N813
+                        from sendMail import get_google_sheets_schema  # Import directly
 
-                        if hasattr(sm, "get_google_sheets_schema"):
-                            result = sm.get_google_sheets_schema(str(sa), str(sheet_id))
-                            if isinstance(result, list):
-                                return result
+                        log.info("DEBUG: Calling get_google_sheets_schema(%s, %s)", str(sa), str(sheet_id))
+                        result = get_google_sheets_schema(str(sa), str(sheet_id))
+                        log.info("DEBUG: get_google_sheets_schema returned: %s", result)
+                        if isinstance(result, list):
+                            return result
                     except Exception as e:
-                        log.debug("Could not load Google Sheets schema: %s", e)
+                        log.error("ERROR: Could not load Google Sheets schema: %s", e, exc_info=True)
                     return []
 
-                return cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
+                schema = cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
+                log.info("DEBUG: Final schema from cache: %s", schema)
+                return schema
             return []
 
         if not db_path:
@@ -737,7 +924,7 @@ class _SendDialog(QDialog):
         return cast(list[str], cache.get(f"{profile_name}_csv_{db_path}", _load_csv_schema))
 
     def _update_validation_ui(self, status: dict[str, Any]) -> None:
-        """Update filter field UI based on validation status (T019, T020, T021)."""
+        """Update filter field UI based on validation status (T019, T020, T021, T041)."""
         is_valid = status.get("is_valid", True)
         syntax_errors = status.get("syntax_errors", [])
         missing_fields = status.get("missing_fields", [])
@@ -752,12 +939,15 @@ class _SendDialog(QDialog):
                 "QPlainTextEdit { border: 1px solid #f44336; background: #ffebee; }"
             )
 
-        # T020: Error message display
+        # T020, T041: Error message display with count
         error_msg = ""
+        error_count = len(syntax_errors) + len(missing_fields)
+        if error_count > 0:
+            error_msg = f"✗ {error_count} validation error{'s' if error_count != 1 else ''} "
         if syntax_errors:
-            error_msg += "Syntax: " + "; ".join(syntax_errors)
+            error_msg += "| Syntax: " + "; ".join(syntax_errors)
         if missing_fields:
-            if error_msg:
+            if syntax_errors:
                 error_msg += " | "
             error_msg += f"Fields not found: {', '.join(missing_fields)}"
 
@@ -772,15 +962,28 @@ class _SendDialog(QDialog):
             self.filter_and_display_records()
 
     def load_database_records(self) -> tuple[list[list[str]], list[str]]:
-        """Load database records from CSV or Google Sheets (T026)."""
+        """Load database records from CSV or Google Sheets (T026).
+
+        B053: Use cache to avoid repeated Google Sheets API calls during filter editing.
+        Records are cached per (profile, database_path) pair and only loaded once.
+        """
         db_path = self.database_input.text().strip()
+        # B053: Check cache first - avoid Google Sheets API call if we have cached records
+        if (self._cached_records is not None and
+            self._cached_for_profile == self._current_profile and
+            self._cached_for_db == db_path):
+            log.debug(f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers or [])} headers")
+            return self._cached_records, self._cached_headers or []
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
-        if not db_path and profile_cfg.get("SHEETID"):
+        # B047: Handle both uppercase and lowercase config keys
+        sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
+        sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
+        if not db_path and sheet_id_val:
             # Google Sheets profile - try to load records from Google Sheets
-            sa = profile_cfg.get("SA")
-            sheet_id = profile_cfg.get("SHEETID")
+            sa = sa_val
+            sheet_id = sheet_id_val
             if sa and sheet_id:
                 try:
                     import sendMail as sm  # noqa: N813
@@ -792,9 +995,19 @@ class _SendDialog(QDialog):
                             headers = [h.strip() for h in data[0] if h.strip()]
                             rows = data[1:]  # Skip header row
                             log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id}")
+                            # B053: Cache the loaded records
+                            self._cached_records = rows
+                            self._cached_headers = headers
+                            self._cached_for_profile = self._current_profile
+                            self._cached_for_db = db_path
                             return rows, headers
                 except Exception as e:
                     log.debug("Could not load Google Sheets records: %s", e)
+            # B053: Cache empty result too, so we don't retry failed loads
+            self._cached_records = []
+            self._cached_headers = []
+            self._cached_for_profile = self._current_profile
+            self._cached_for_db = db_path
             return [], []
 
         if not db_path:
@@ -815,24 +1028,57 @@ class _SendDialog(QDialog):
                             headers = next(reader, [])
                             rows = list(reader)
                             log.debug(f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})")
+                            # B053: Cache the loaded records
+                            self._cached_records = rows
+                            self._cached_headers = headers
+                            self._cached_for_profile = self._current_profile
+                            self._cached_for_db = db_path
                             return rows, headers
                     except (UnicodeDecodeError, UnicodeError):
                         continue
                 # If all encodings fail, raise error
                 raise ValueError(f"Could not decode {db_path} with any supported encoding")
+
+            # Handle Excel files (XLSX, XLS) using same approach as sendMail.py
+            if db_path.endswith((".xlsx", ".xls")):
+                from python_calamine import CalamineWorkbook
+                wb = CalamineWorkbook.from_path(db_path)
+                ws = wb.get_sheet_by_index(0)
+                data = ws.to_python()
+                if data and len(data) > 0:
+                    headers = [str(h).strip() for h in data[0] if h]
+                    rows = [[str(cell) if cell is not None else "" for cell in row] for row in data[1:]]
+                    log.debug(f"Loaded {len(rows)} records from {db_path}")
+                    # B053: Cache the loaded records
+                    self._cached_records = rows
+                    self._cached_headers = headers
+                    self._cached_for_profile = self._current_profile
+                    self._cached_for_db = db_path
+                    return rows, headers
+                else:
+                    log.debug(f"No data found in {db_path}")
+                    raise ValueError(f"No data in {db_path}")
         except Exception as e:
             log.debug("Could not load database: %s", e)
 
+        # B053: Cache empty result
+        self._cached_records = []
+        self._cached_headers = []
+        self._cached_for_profile = self._current_profile
+        self._cached_for_db = db_path
         return [], []
 
     def filter_and_display_records(self) -> None:
         """Load, filter, and display database records (T027, T028, T040, T041, T042)."""
+        import time
         # T041: Handle profile switching by tracking current profile
         if not hasattr(self, "_last_profile"):
             self._last_profile = self._current_profile
 
-        filter_text = self.filter_text_edit.toPlainText()
+        t1 = time.time()
         rows, headers = self.load_database_records()
+        t2 = time.time()
+        log.info("TIMING: load_database_records took %.2fs, %d rows, %d headers", t2-t1, len(rows), len(headers))
 
         # T040, T042: Better error and zero-record handling
         if not headers:
@@ -859,15 +1105,23 @@ class _SendDialog(QDialog):
             from filter_matcher import FilterMatcher
 
             matcher = FilterMatcher()
-            if filter_text and filter_text.strip():
-                import yaml
-
-                filter_dict = yaml.safe_load(filter_text) or {}
+            # Use _session_filter if set (from FilterBuilder), otherwise read from YAML editor
+            filter_dict: dict[str, str] = {}
+            if self._session_filter:
+                filter_dict = self._session_filter
                 filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
-                log.debug(f"Filter applied: {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+                log.debug(f"Filter applied (from session): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
             else:
-                filtered_rows = rows
-                log.debug(f"No filter, showing all {len(rows)} records")
+                filter_text = self.filter_text_edit.toPlainText()
+                if filter_text and filter_text.strip():
+                    import yaml
+
+                    filter_dict = yaml.safe_load(filter_text) or {}
+                    filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
+                    log.debug(f"Filter applied (from YAML): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+                else:
+                    filtered_rows = rows
+                    log.debug(f"No filter, showing all {len(rows)} records")
 
             self._update_record_display(filtered_rows, headers, len(rows))
             # Reset error state on success
@@ -891,11 +1145,34 @@ class _SendDialog(QDialog):
         # T029: Update count label
         self.record_count_label.setText(f"Matching Records: {len(rows)} / {total}")
 
+    def _deferred_filter_display(self) -> None:
+        """Deferred filter display after user stops editing (B053).
+
+        Called by _filter_apply_timer after 5 seconds of no filter changes.
+        Displays filtered records using cached data (no Google Sheets API call if cache valid).
+        """
+        log.debug("Deferred filter display triggered after 5 second debounce")
+        self.filter_and_display_records()
+
     def _apply_filter(self) -> None:
         """Apply edited filter as session-active filter (T034)."""
-        filter_text = self.filter_text_edit.toPlainText().strip()
+        if self._filter_builder:
+            # T037: Get filter from FilterBuilder (visual or YAML)
+            filter_dict = self._filter_builder.get_filter_as_yaml()
+        else:
+            filter_text = self.filter_text_edit.toPlainText().strip()
+            if not filter_text:
+                filter_dict = {}
+            else:
+                import yaml
+                try:
+                    filter_dict = yaml.safe_load(filter_text) or {}
+                except Exception as e:
+                    self.filter_status_label.setText(f"Parse error: {e}")
+                    self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+                    return
 
-        if not filter_text:
+        if not filter_dict:
             self._session_filter = None
             self.filter_status_label.setText("(Filter cleared - will use profile default)")
             self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
@@ -907,6 +1184,9 @@ class _SendDialog(QDialog):
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
             return
 
+        # Reconstruct YAML string for validator (expects text format)
+        import yaml
+        filter_text = yaml.dump(filter_dict, default_flow_style=False, sort_keys=False)
         schema = self._get_database_schema()
         status = self._filter_validator.get_validation_status(filter_text, schema)
 
@@ -916,29 +1196,36 @@ class _SendDialog(QDialog):
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
             return
 
-        import yaml
-
         try:
-            filter_dict = yaml.safe_load(filter_text) or {}
-            if isinstance(filter_dict, dict):
-                self._session_filter = filter_dict
-                self.filter_status_label.setText("✓ Session filter applied")
-                self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
-                self.filter_and_display_records()
-            else:
-                self.filter_status_label.setText("Filter must be YAML mapping (key: value)")
-                self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            self._session_filter = filter_dict
+            self.filter_status_label.setText("✓ Session filter applied")
+            self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+            self.filter_and_display_records()
         except Exception as e:
-            self.filter_status_label.setText(f"Parse error: {e}")
+            self.filter_status_label.setText(f"Error: {e}")
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
 
     def _reset_filter(self) -> None:
-        """Reset filter to original from profile config (T035)."""
-        self._session_filter = None
-        if self._original_filter_text:
-            self.filter_text_edit.setPlainText(self._original_filter_text)
+        """Reset filter to original from profile config."""
+        if self._filter_builder:
+            # Parse original filter text back to dict for FilterBuilder
+            if self._original_filter_text:
+                try:
+                    import yaml
+                    filter_dict = yaml.safe_load(self._original_filter_text) or {}
+                    if isinstance(filter_dict, dict):
+                        self._filter_builder.set_filter_from_yaml(filter_dict)
+                except Exception:
+                    self._filter_builder.set_filter_from_yaml({})
+            else:
+                self._filter_builder.set_filter_from_yaml({})
         else:
-            self.filter_text_edit.setPlainText("")
+            if self._original_filter_text:
+                self.filter_text_edit.setPlainText(self._original_filter_text)
+            else:
+                self.filter_text_edit.setPlainText("")
+        # B013: Set _session_filter to None AFTER loading filter (filter_changed signal already fired)
+        self._session_filter = None
         self.filter_status_label.setText("(Filter reset to profile default)")
         self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
 
