@@ -3,7 +3,7 @@
 **Feature**: 004-visual-filter-builder  
 **Date**: 2026-05-18  
 **Branch**: `004-visual-filter-builder`  
-**Total Tasks**: 55 (42 original + 4 old bugs + 5 Phase 10 bugs + 4 Phase 11 bugs) | **Completed**: 41/42 (T034 optional) + 13 bugs fixed | **Status**: ALL PHASES COMPLETE - READY FOR MERGE
+**Total Tasks**: 55 (42 original + 4 old bugs + 5 Phase 10 bugs + 4 Phase 11 bugs) | **Completed**: 41/42 (T034 optional) + 15 bugs fixed | **Status**: ALL PHASES COMPLETE - EXCEL SUPPORT ADDED
 
 ---
 
@@ -871,6 +871,31 @@ Fixes for remaining bugs discovered during integration testing and performance a
     - Uses existing _operator_is_multiline() to identify list operators
   - **Result**: More intuitive UX for entering multiple values
   - **Files**: src/visual_filter_builder.py lines 970-989, 1165-1178
+  - **Status**: COMPLETE
+
+### Excel File Support
+
+- [x] B055 Enable Excel file support in schema provider in `src/schema_provider.py`:
+  - **Issue**: Excel files (.xlsx, .xls) not readable despite b009 claiming support
+  - **Root cause**: from_excel() method existed but returned empty on ImportError
+  - **Implementation**:
+    - Uses python-calamine (already in dependencies, same as sendMail.py)
+    - CalamineWorkbook.from_path() → get_sheet_by_index(0) → to_python()
+    - Extracts headers and converts to list[str]
+  - **Result**: Excel schema detection works for filter field dropdowns
+  - **Files**: src/schema_provider.py lines 42-66 (from_excel method)
+  - **Status**: COMPLETE
+
+- [x] B056 Add Excel file loading to editor in `src/editor.py`:
+  - **Issue**: Editor load_database_records() only handled CSV + Google Sheets
+  - **Root cause**: Missing elif for .xlsx/.xls file handling
+  - **Implementation**:
+    - Detects file extension (.xlsx, .xls)
+    - Uses CalamineWorkbook (consistent with schema_provider and sendMail.py)
+    - Converts None cells to empty strings
+    - Caches records per (profile, database_path)
+  - **Result**: Excel databases now populate filter preview and record display
+  - **Files**: src/editor.py lines 1041-1063 (Excel loading in load_database_records)
   - **Status**: COMPLETE
 
 All fixes are **blocking** for usable filter editor experience.
