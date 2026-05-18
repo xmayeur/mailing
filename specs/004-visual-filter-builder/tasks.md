@@ -212,7 +212,7 @@ Refine row management (already basic buttons added in US1). **Prerequisite**: Ph
 
 ### Row Management Polish
 
-- [ ] T032 [P] Implement row validation on edit in FilterRowWidget:
+- [x] T032 [P] Implement row validation on edit in FilterRowWidget:
   - Validate field exists in schema
   - Validate operator is in allowed set
   - Show error indicator on invalid row
@@ -237,22 +237,22 @@ Load/save filters from config.yml profiles. **Prerequisite**: Phase 2-5.
 
 ### Configuration Integration
 
-- [ ] T035 Update _SendDialog to instantiate FilterBuilder:
+- [x] T035 Update _SendDialog to instantiate FilterBuilder:
   - In _SendDialog.__init__, create FilterBuilder with initial_filter from profile
   - Replace existing filter_text_edit with FilterBuilder widget
   - Connect filter_changed signal → update _session_filter dict
 
-- [ ] T036 Implement profile filter loading:
+- [x] T036 Implement profile filter loading:
   - When profile selected in _SendDialog, get filter from config: `config[profile].get('filter', {})`
   - Call `filter_builder.set_filter_from_yaml(filter_dict)`
   - Update visual table
 
-- [ ] T037 Implement filter persistence (on send):
+- [x] T037 Implement filter persistence (on send):
   - When user clicks "Send", get filter via `filter_builder.get_filter_as_yaml()`
   - Pass to sendMail.py (existing flow)
   - Optionally save to profile config (requires config write—deferred for Phase 2)
 
-- [ ] T038 Handle missing fields in loaded filter (per clarification):
+- [x] T038 Handle missing fields in loaded filter (per clarification):
   - When loading filter, validate field existence via schema
   - Rows with missing fields: load but disable with error icon
   - User can remove bad rows or load correct database
