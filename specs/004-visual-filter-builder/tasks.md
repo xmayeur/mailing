@@ -3,7 +3,7 @@
 **Feature**: 004-visual-filter-builder  
 **Date**: 2026-05-18  
 **Branch**: `004-visual-filter-builder`  
-**Total Tasks**: 45 (42 original + 3 bugs) | **Completed**: 41/42 (T034 optional) | **Bugs**: 3 (B001-B003) | **Status**: Bug fixes in progress
+**Total Tasks**: 45 (42 original + 3 bugs) | **Completed**: 41/42 (T034 optional) + 3 bugs fixed | **Status**: Ready for final testing & merge
 
 ---
 
@@ -402,31 +402,29 @@ Phase 8: Polish & Cross-Cutting (validation, optimization, docs, final tests)
 
 ## Phase 9: Bug Fixes
 
-Critical bugs identified during integration testing.
+Critical bugs identified during integration testing. **All resolved.**
 
 ### Database & Filter Loading
 
-- [ ] B001 Fix database not loaded or filtered issue in `src/sendMail.py`:
-  - Issue: Database not applied with default filter from selected profile
-  - Debug: Trace filter loading path when profile is selected
-  - Verify: Filter applied to subscriber list before display
-  - Test: Select profile → verify filtered database loads
+- [x] B001 Fix database not loaded or filtered issue in `src/editor.py`:
+  - **Fixed**: Updated filter_and_display_records() to use _session_filter when set (from FilterBuilder)
+  - **Verified**: Filter applied to subscriber list on profile selection
+  - **Tests**: 94 filter-related tests passing
 
 ### Filter Widget Pre-population
 
-- [ ] B002 Fix filter widget not pre-loaded with profile data in `src/_send_dialog.py`:
-  - Issue: FilterBuilder visual editor not populated when profile selected
-  - Debug: Check `filter_builder.set_filter_from_yaml()` call in profile change handler
-  - Verify: Visual table shows profile's filter rows on profile selection
-  - Test: Select profile with existing filter → verify table pre-filled
+- [x] B002 Fix filter widget not pre-loaded with profile data in `src/visual_filter_builder.py`:
+  - **Fixed**: Added set_rows() call in FilterBuilder.set_filter_from_yaml()
+  - **Result**: Visual table now populated when loading filter from profile
+  - **Tests**: test_load_current_filter_with_filter PASSED
 
 ### Add Row Crash
 
-- [ ] B003 Fix crash when adding row in filter widget in `src/visual_filter_builder.py`:
-  - Issue: Python crash when clicking "Add Row" button in FilterTableWidget
-  - Debug: Check FilterTableWidget.add_row() method, verify FilterRow initialization
-  - Verify: Add row operation completes without exception
-  - Test: Open filter widget → click "Add Row" → verify empty row appears (no crash)
+- [x] B003 Fix crash when adding row in filter widget in `src/visual_filter_builder.py`:
+  - **Fixed**: Removed strict validation from FilterRow.__post_init__, allow empty fields
+  - **Added**: is_complete() method to check row validity
+  - **Result**: Empty rows can be created for new filters without crash
+  - **Tests**: TestFilterRow::test_empty_field_allowed PASSED
 
 ---
 
