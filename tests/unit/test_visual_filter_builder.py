@@ -35,15 +35,19 @@ class TestFilterRow:
         assert row.operator == "is not empty"
         assert row.value is None
 
-    def test_empty_field_raises_error(self) -> None:
-        """Test empty field name raises ValueError."""
-        with pytest.raises(ValueError, match="field_name cannot be empty"):
-            FilterRow("", "is", "value")
+    def test_empty_field_allowed(self) -> None:
+        """Test empty field name is allowed (for new/placeholder rows)."""
+        row = FilterRow("", "is", "value")
+        assert row.field_name == ""
+        assert row.operator == "is"
+        assert not row.is_complete()
 
-    def test_empty_operator_raises_error(self) -> None:
-        """Test empty operator raises ValueError."""
-        with pytest.raises(ValueError, match="operator cannot be empty"):
-            FilterRow("email", "", "value")
+    def test_empty_operator_allowed(self) -> None:
+        """Test empty operator is allowed (for new/placeholder rows)."""
+        row = FilterRow("email", "", "value")
+        assert row.field_name == "email"
+        assert row.operator == ""
+        assert not row.is_complete()
 
     def test_whitespace_trimmed(self) -> None:
         """Test whitespace is trimmed from field and operator."""

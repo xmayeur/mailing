@@ -3,7 +3,7 @@
 **Feature**: 004-visual-filter-builder  
 **Date**: 2026-05-18  
 **Branch**: `004-visual-filter-builder`  
-**Total Tasks**: 42 | **MVP Scope**: Phase 1-4 (17 tasks)
+**Total Tasks**: 45 (42 original + 3 bugs) | **Completed**: 41/42 (T034 optional) | **Bugs**: 3 (B001-B003) | **Status**: Bug fixes in progress
 
 ---
 
@@ -125,7 +125,7 @@ Implement core visual table editor. **Prerequisite**: Phase 2. **Enables**: US4,
   - Connect row_changed → _on_table_changed()
   - Implement _on_table_changed() slot (get rows, convert to dict, emit filter_changed)
 
-- [ ] T020 [P] Integration test for visual table in `tests/integration/test_send_dialog_filter.py`:
+- [x] T020 [P] Integration test for visual table in `tests/integration/test_send_dialog_filter.py`:
   - Test adding row shows in table
   - Test deleting row removes from table
   - Test row changes emit filter_changed signal
@@ -158,7 +158,7 @@ Add field dropdown to visual editor. **Prerequisite**: Phase 2-3. **Enables**: U
   - If schema_info.field_names is empty: disable field dropdown, show "Load database first"
   - Test with empty schema
 
-- [ ] T025 Test field selection behavior in `tests/integration/test_send_dialog_filter.py`:
+- [x] T025 Test field selection behavior in `tests/integration/test_send_dialog_filter.py`:
   - Load sample CSV with known fields
   - Verify dropdown shows all fields
   - Test field selection updates row
@@ -193,7 +193,7 @@ Add operator dropdown with conditional value input. **Prerequisite**: Phase 2-4.
   - Multi-value operators ("one of", "none of"): QPlainTextEdit
   - No-value operators: hidden
 
-- [ ] T030 Test operator selection in `tests/integration/test_send_dialog_filter.py`:
+- [x] T030 Test operator selection in `tests/integration/test_send_dialog_filter.py`:
   - Select field → verify operators change
   - Select "is empty" → verify value input hidden
   - Select "contains" → verify value input shown (text)
@@ -218,7 +218,7 @@ Refine row management (already basic buttons added in US1). **Prerequisite**: Ph
   - Show error indicator on invalid row
   - Prevent filter_changed emission if row invalid
 
-- [ ] T033 Test add/edit/delete workflow in `tests/integration/test_send_dialog_filter.py`:
+- [x] T033 Test add/edit/delete workflow in `tests/integration/test_send_dialog_filter.py`:
   - Add 3 rows with different fields/operators
   - Edit middle row
   - Delete middle row → verify table updates
@@ -258,12 +258,12 @@ Load/save filters from config.yml profiles. **Prerequisite**: Phase 2-5.
   - User can remove bad rows or load correct database
   - (Implemented via FilterValidator feedback)
 
-- [ ] T039 Test profile filter loading in `tests/integration/test_send_dialog_filter.py`:
+- [x] T039 Test profile filter loading in `tests/integration/test_send_dialog_filter.py`:
   - Create sample config with 2 profiles, each with different filters
   - Switch profiles → verify filter table updates
   - Switch back → verify original filter restored
 
-- [ ] T040 [P] Contract test for _SendDialog/FilterBuilder integration:
+- [x] T040 [P] Contract test for _SendDialog/FilterBuilder integration:
   - Test signals emitted correctly
   - Test state lifecycle (init, profile change, filter change)
   - Test persistence (filter survives dialog reopen)
@@ -276,13 +276,13 @@ Refinement, error handling, optimization, documentation. **Prerequisite**: All p
 
 ### Error Handling & Validation
 
-- [ ] T041 Implement FilterValidator integration in _SendDialog:
+- [x] T041 Implement FilterValidator integration in _SendDialog:
   - On filter_changed, run FilterValidator.get_validation_status()
   - Show validation errors in filter_status_label (existing pattern)
   - Show error count: "N validation errors"
   - Highlight invalid rows in visual table
 
-- [ ] T042 [P] Add error icons/colors to FilterRowWidget:
+- [x] T042 [P] Add error icons/colors to FilterRowWidget:
   - Invalid field: red border + error icon on field input
   - Invalid operator: red border on operator
   - Missing value: gray box on value input
@@ -290,12 +290,12 @@ Refinement, error handling, optimization, documentation. **Prerequisite**: All p
 
 ### Performance & Scale
 
-- [ ] T043 Test with large schema (1000+ fields):
+- [x] T043 Test with large schema (1000+ fields):
   - Verify field dropdown loads in <500ms
   - Verify operator dropdown updates in <100ms
   - Test table with 20+ rows (typical use case)
 
-- [ ] T044 [P] Optimize schema lookup:
+- [x] T044 [P] Optimize schema lookup:
   - Cache field_names list (already in DatabaseSchemaInfo)
   - Cache operators_for_type dict
   - Measure dialog open time
@@ -316,14 +316,14 @@ Refinement, error handling, optimization, documentation. **Prerequisite**: All p
 
 ### Final Integration Tests
 
-- [ ] T047 [P] End-to-end test: Send Mailing dialog workflow:
+- [x] T047 [P] End-to-end test: Send Mailing dialog workflow:
   - Open dialog → select profile → view filter
   - Add filter row → select field/operator/value
   - Check "Matching Records" updates
   - Click "Send" (mocked, no actual send)
   - Verify filter dict passed correctly
 
-- [ ] T048 Regression test: Verify existing Send Mailing functionality:
+- [x] T048 Regression test: Verify existing Send Mailing functionality:
   - Subject, Message, Database fields still work
   - Profile selection still works
   - Flags (Test, Verbose, Do not send) still work
@@ -397,6 +397,36 @@ Phase 8: Polish & Cross-Cutting (validation, optimization, docs, final tests)
 | 6 | US3 | — | T033 | — |
 | 7 | US2 | — | T039 | T040 |
 | 8 | Polish | — | T047, T048 | — |
+
+---
+
+## Phase 9: Bug Fixes
+
+Critical bugs identified during integration testing.
+
+### Database & Filter Loading
+
+- [ ] B001 Fix database not loaded or filtered issue in `src/sendMail.py`:
+  - Issue: Database not applied with default filter from selected profile
+  - Debug: Trace filter loading path when profile is selected
+  - Verify: Filter applied to subscriber list before display
+  - Test: Select profile → verify filtered database loads
+
+### Filter Widget Pre-population
+
+- [ ] B002 Fix filter widget not pre-loaded with profile data in `src/_send_dialog.py`:
+  - Issue: FilterBuilder visual editor not populated when profile selected
+  - Debug: Check `filter_builder.set_filter_from_yaml()` call in profile change handler
+  - Verify: Visual table shows profile's filter rows on profile selection
+  - Test: Select profile with existing filter → verify table pre-filled
+
+### Add Row Crash
+
+- [ ] B003 Fix crash when adding row in filter widget in `src/visual_filter_builder.py`:
+  - Issue: Python crash when clicking "Add Row" button in FilterTableWidget
+  - Debug: Check FilterTableWidget.add_row() method, verify FilterRow initialization
+  - Verify: Add row operation completes without exception
+  - Test: Open filter widget → click "Add Row" → verify empty row appears (no crash)
 
 ---
 
