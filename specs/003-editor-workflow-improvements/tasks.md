@@ -73,11 +73,11 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 **Independent Test**: Type rapidly in filter field at normal typing speed → all characters appear immediately → validation feedback appears after pausing
 
 ### Implementation Tasks
-- [ ] T014 [P] [US2] Locate debounce timer in `_SendDialog._on_filter_text_changed()` at line ~675
-- [ ] T015 [P] [US2] Analyze current debounce timeout value (expected 200ms) in `_validation_timer.start()`
+- [x] T014 [P] [US2] Locate debounce timer in `_SendDialog._on_filter_text_changed()` at line ~675
+- [x] T015 [P] [US2] Analyze current debounce timeout value (expected 200ms) in `_validation_timer.start()`
 - [x] T016 [US2] Reduce debounce timeout from 200ms to 50ms in `_SendDialog._on_filter_text_changed()` at line 675
-- [ ] T017 [US2] Implement debounce separation: delay validation display without blocking character input in `_SendDialog._run_filter_validation()`
-- [ ] T018 [US2] Update `_SendDialog._update_validation_ui()` to show feedback non-intrusively after user pauses typing
+- [x] T017 [US2] Implement debounce separation: delay validation display without blocking character input in `_SendDialog._run_filter_validation()`
+- [x] T018 [US2] Update `_SendDialog._update_validation_ui()` to show feedback non-intrusively after user pauses typing
 - [x] T019 [P] [US2] Test rapid typing: compose filter "email: is not empty" at normal speed, measure perceived latency
 - [x] T020 [US2] Verify no characters are dropped or delayed during rapid input to filter field
 
@@ -101,8 +101,8 @@ This feature improves editor usability across 5 independent user stories (P1, P1
 
 ### Implementation Tasks
 - [x] T023 [P] [US3] Update `_SendDialog.__init__()` at line 372: change `setWindowTitle("Send Newsletter")` to `setWindowTitle("Send Mailing")`
-- [ ] T024 [P] [US3] Search codebase for any references to "Send Newsletter" dialog title and update or remove them
-- [ ] T025 [P] [US3] Update CLAUDE.md or user documentation that references old dialog name
+- [x] T024 [P] [US3] Search codebase for any references to "Send Newsletter" dialog title and update or remove them
+- [x] T025 [P] [US3] Update CLAUDE.md or user documentation that references old dialog name
 
 **Acceptance Criteria**:
 - Dialog window title displays "Send Mailing" when opened
