@@ -847,20 +847,24 @@ class _SendDialog(QDialog):
             # Google Sheets profile - try to load schema from Google Sheets
             sa = profile_cfg.get("SA")
             sheet_id = profile_cfg.get("SHEETID")
+            log.info("DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa, sheet_id)
             if sa and sheet_id:
                 def _load_gsheet_schema() -> list[str]:
                     try:
-                        import sendMail as sm  # noqa: N813
+                        from sendMail import get_google_sheets_schema  # Import directly
 
-                        if hasattr(sm, "get_google_sheets_schema"):
-                            result = sm.get_google_sheets_schema(str(sa), str(sheet_id))
-                            if isinstance(result, list):
-                                return result
+                        log.info("DEBUG: Calling get_google_sheets_schema(%s, %s)", str(sa), str(sheet_id))
+                        result = get_google_sheets_schema(str(sa), str(sheet_id))
+                        log.info("DEBUG: get_google_sheets_schema returned: %s", result)
+                        if isinstance(result, list):
+                            return result
                     except Exception as e:
-                        log.debug("Could not load Google Sheets schema: %s", e)
+                        log.error("ERROR: Could not load Google Sheets schema: %s", e, exc_info=True)
                     return []
 
-                return cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
+                schema = cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
+                log.info("DEBUG: Final schema from cache: %s", schema)
+                return schema
             return []
 
         if not db_path:
