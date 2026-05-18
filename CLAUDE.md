@@ -14,12 +14,51 @@ Key flags: `-t` (test mode), `-x` (dry run), `-db` (CSV database), `-f/-to` (ind
 
 ## Key files
 
-| File                    | Role                                                                              |
-|-------------------------|-----------------------------------------------------------------------------------|
-| `src/sendMail.py`       | Main application — email logic, subscriber filtering, templating, HTML processing |
-| `src/editor.py`         | WYSIWYG HTML editor GUI (PyQt6 + Quill.js) — compose/edit newsletters             |
-| `src/googleDriveLib.py` | Google Drive integration (download/upload/rename)                                 |
-| `config.yml`            | Email profiles — SMTP/IMAP settings, rate limits, filtering rules                 |
+| File                      | Role                                                                              |
+|---------------------------|-----------------------------------------------------------------------------------|
+| `src/sendMail.py`         | Main application — email logic, subscriber filtering, templating, HTML processing |
+| `src/editor.py`           | WYSIWYG HTML editor GUI (PyQt6 + Quill.js) — compose/edit newsletters             |
+| `src/visual_filter_builder.py` | Visual filter builder for subscriber filtering (table + YAML sync)            |
+| `src/googleDriveLib.py`   | Google Drive integration (download/upload/rename)                                 |
+| `config.yml`              | Email profiles — SMTP/IMAP settings, rate limits, filtering rules                 |
+
+## Visual Filter Builder
+
+PyQt6-based GUI for composing subscriber filters without YAML syntax.
+
+### Core Classes
+
+- **FilterRow**: Immutable dataclass representing single filter condition (field + operator + optional value)
+- **FilterTable**: Collection manager with CRUD operations (`add_row`, `delete_row`, `update_row`, `to_dict`, `from_dict`)
+- **DatabaseSchemaInfo**: Schema metadata for field type tracking and operator filtering by type
+- **FilterBuilder**: Main Qt widget combining visual table + YAML text editor with bidirectional sync
+- **FilterTableWidget**: Visual table container managing per-row editors
+- **FilterRowWidget**: Per-row editor with field dropdown (QComboBox), operator dropdown (QComboBox), dynamic value input (QLineEdit or QPlainTextEdit)
+
+### Public API
+
+```python
+# Create filter builder with schema
+schema = DatabaseSchemaInfo(["email", "status", "age"], {"age": "numeric"})
+builder = FilterBuilder(schema, initial_filter={"email": "is not empty"})
+
+# Connect signal to listen for filter changes
+builder.filter_changed.connect(on_filter_changed)
+
+# Get current filter as dict
+filter_dict = builder.get_filter_as_yaml()  # Returns {"field": "operator value"}
+
+# Load filter from dict
+builder.set_filter_from_yaml({"email": "is not empty", "status": "is active"})
+```
+
+### Integration with _SendDialog
+
+FilterBuilder replaces existing YAML filter_text_edit in _SendDialog. Provides:
+- Real-time field/operator dropdowns from database schema
+- Dynamic value input visibility (hidden for no-value ops, multiline for list ops)
+- Bidirectional sync between visual table and YAML representation
+- Seamless integration with existing FilterValidator
 
 ## WYSIWYG Editor
 

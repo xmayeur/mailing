@@ -1,37 +1,10 @@
-#
-# Profile Configuration Guide
-#
-# default_documents_path (optional):
-#   - Absolute path to the user's preferred document folder for Save As dialogs
-#   - Per-profile: each profile maintains its own remembered folder
-#   - Updated automatically after successful file save/open
-#   - Windows default: %USERPROFILE%\Documents
-#   - macOS/Linux default: ~ (home directory)
-#   - If path is invalid/missing, editor falls back to OS default
-#   - Example: default_documents_path: "/Users/xavier/newsletters"
-#
-# Filtering options
-# if all of the conditions are met, the subscriber is added to the mailing list
-# - syntax:
-#   filter:
-#     <field_name>: <operation> <value>
-#
-#   where:
-# <field_name>: is a field from the subscriber database (email, first_name...)
-#   <operation>: is one of  "is", "is not", "gt", "lt", "ge", "le", "in", "not in"
-#                           "is empty", "is not empty", "greater than", "less than"
-#                           ,"greater or equal to", "less or equal to", "one of", "none of",
-#                           "is equal to", "is not equal to"
-#   <value>: is the value to compare with
-#
-
 artscroises:
-  default_documents_path: ""
-  MAILCONFIG: 'artscroisesmailing'
-  SHEETID: "artscroisesDBmembreID"
-  SA: "artscroisesServiceAccount"
-  domain: "artscroises.be"
-  styles: "./css/styles.css"
+  default_documents_path: ''
+  MAILCONFIG: artscroisesmailing
+  SHEETID: artscroisesDBmembreID
+  SA: artscroisesServiceAccount
+  domain: artscroises.be
+  styles: ./css/styles.css
   filter:
     email: is not empty
     status: is active
@@ -39,36 +12,29 @@ artscroises:
     email: is not empty
     status: is active
     group: is Test
-  default_message: |
-    
-    Chers amies et amis des Arts Croisés,
-    ${body}
-    Veuillez trouver en pièce jointe notre newsletter '${newsletter_name}'.
-    Bonne lecture!
-    
-    L'équipe Arts Croisés, asbl.
-
-
+  default_message: "\nChers amies et amis des Arts Crois\xE9s,\n${body}\nVeuillez\
+    \ trouver en pi\xE8ce jointe notre newsletter '${newsletter_name}'.\nBonne lecture!\n\
+    \nL'\xE9quipe Arts Crois\xE9s, asbl.\n"
 cambristi:
-  default_documents_path: ""
+  default_documents_path: ''
   SCOPES:
-    - 'https://www.googleapis.com/auth/gmail.readonly'
-    - 'https://www.googleapis.com/auth/gmail.modify'
-    - 'https://www.googleapis.com/auth/gmail.send'
-  TOKEN_FILE: 'token.json'
-  TOKEN_ID: "GmailToken"
-  CREDENTIALS_ID: "GmailCredentials"
-  WIX_API_TOKEN_ID: "cambristiApiToken"
-  FOLDER: "news_to_send"
-  MAIL: 'icambristi@gmail.com'
-  SA: 'cambristiGoogleServiceAccount'
+  - https://www.googleapis.com/auth/gmail.readonly
+  - https://www.googleapis.com/auth/gmail.modify
+  - https://www.googleapis.com/auth/gmail.send
+  TOKEN_FILE: token.json
+  TOKEN_ID: GmailToken
+  CREDENTIALS_ID: GmailCredentials
+  WIX_API_TOKEN_ID: cambristiApiToken
+  FOLDER: news_to_send
+  MAIL: icambristi@gmail.com
+  SA: cambristiGoogleServiceAccount
   max_addr_per_mail: 50
   max_mails_per_hour: 100
   pause: 1
-  sendername: "I Cambristi ASBL"
-  sender: "icambristi@gmail.com"   # "x@gmailapi.google.com"
+  sendername: I Cambristi ASBL
+  sender: icambristi@gmail.com
   members: https://www.cambristi.com/_functions/members/
-  SHEETID: 'cambristiMemberSheetID'
+  SHEETID: cambristiMemberSheetID
   filter:
     title: in member, participant, inactive
     email: is not empty
@@ -76,30 +42,28 @@ cambristi:
   filter_test:
     title: in test, Test
     email: is not empty
-  styles: "./css/styles.css"
+  styles: ./css/styles.css
   default_message: ''
-
-
 cambristiEffective:
-  default_documents_path: ""
+  default_documents_path: ''
   SCOPES:
-    - 'https://www.googleapis.com/auth/gmail.readonly'
-    - 'https://www.googleapis.com/auth/gmail.modify'
-    - 'https://www.googleapis.com/auth/gmail.send'
-  TOKEN_FILE: 'token.json'
-  TOKEN_ID: "GmailToken"
-  CREDENTIALS_ID: "GmailCredentials"
-  WIX_API_TOKEN_ID: "cambristiApiToken"
-  FOLDER: "news_to_send"
-  MAIL: 'icambristi@gmail.com'
-  SA: 'cambristiGoogleServiceAccount'
+  - https://www.googleapis.com/auth/gmail.readonly
+  - https://www.googleapis.com/auth/gmail.modify
+  - https://www.googleapis.com/auth/gmail.send
+  TOKEN_FILE: token.json
+  TOKEN_ID: GmailToken
+  CREDENTIALS_ID: GmailCredentials
+  WIX_API_TOKEN_ID: cambristiApiToken
+  FOLDER: news_to_send
+  MAIL: icambristi@gmail.com
+  SA: cambristiGoogleServiceAccount
   max_addr_per_mail: 50
   max_mails_per_hour: 100
   pause: 1
-  sendername: "I Cambristi ASBL"
-  sender: "icambristi@gmail.com"   # "x@gmailapi.google.com"
+  sendername: I Cambristi ASBL
+  sender: icambristi@gmail.com
   members: https://www.cambristi.com/_functions/members/
-  SHEETID: 'cambristiMemberSheetID'
+  SHEETID: cambristiMemberSheetID
   filter:
     membreEffectif: is True
     email: is not empty
@@ -107,11 +71,10 @@ cambristiEffective:
   filter_test:
     title: in test, Test
     email: is not empty
-  styles: "./css/styles.css"
+  styles: ./css/styles.css
   default_message: ''
-
 default:
-  default_documents_path: ""
+  default_documents_path: /Users/xavier/PycharmProjects/sendMail/data
   username: jdoe
   password: foobar
   sender: john.doe@example.com
@@ -121,10 +84,10 @@ default:
   smtp_port: 587
   imap_host: imap.example.com
   imap_port: 993
-  sent_folder: "Sent"
-  default_message: ""
+  sent_folder: Sent
+  default_message: ''
   pause: 1
-  styles: "./css/styles.css"
+  styles: ./css/styles.css
   filter:
     email: is not empty
     bounced: is not bounced
@@ -132,4 +95,3 @@ default:
     first_name: one of "Jean", "Xavier"
   filter_test:
     email: is "Toto the Tester"
-
