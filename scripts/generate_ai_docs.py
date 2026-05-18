@@ -46,9 +46,19 @@ def build_context() -> str:
     """Collect docs/ markdown files as context string for claude (T006)."""
     parts: list[str] = []
     if DOCS_DIR.exists():
-        for md_file in sorted(DOCS_DIR.glob("**/*.md")):
-            parts.append(f"## {md_file.name}\n\n{md_file.read_text(encoding='utf-8')}")
-    return "\n\n---\n\n".join(parts) if parts else "(No documentation found in docs/.)"
+        # Try .md files first, then .rst files
+        for ext in ["*.md", "**/*.md", "*.rst", "**/*.rst"]:
+            if parts:
+                break
+            for doc_file in sorted(DOCS_DIR.glob(ext)):
+                if doc_file.is_file() and doc_file.name not in [".DS_Store"]:
+                    parts.append(f"## {doc_file.name}\n\n{doc_file.read_text(encoding='utf-8')}")
+    # Fallback: use CLAUDE.md if available
+    if not parts:
+        claude_md = REPO_ROOT / "CLAUDE.md"
+        if claude_md.exists():
+            parts.append(f"## CLAUDE.md\n\n{claude_md.read_text(encoding='utf-8')}")
+    return "\n\n---\n\n".join(parts) if parts else "(No documentation found in docs/ or CLAUDE.md)"
 
 
 def validate_markdown_structure(content: str) -> list[str]:
@@ -99,7 +109,7 @@ def generate_ai_md() -> None:
     context = build_context()
     sections = ", ".join(REQUIRED_SECTIONS)
     prompt = (
-        "Generate a structured AI.md file for the pyArchimate Python library. "
+        "Generate a structured AI.md file for the sendMail Python application. "
         f"It MUST contain these top-level # headings: {sections}. "
         "No conversational language, filler phrases, or first-person narrative. "
         f"Base content strictly on this documentation:\n\n{context}"
