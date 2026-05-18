@@ -896,6 +896,8 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             layout = QHBoxLayout()
 
             self._field_combo = QComboBox()
+            # B041: Set consistent combo size
+            self._field_combo.setMinimumHeight(26)
             self._populate_field_combo()
             if schema_info.field_names:
                 self._field_combo.setCurrentText(row.field_name)
@@ -903,6 +905,8 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             layout.addWidget(self._field_combo, 1)  # stretch: equal width
 
             self._operator_combo = QComboBox()
+            # B041: Match field combo size for consistent appearance
+            self._operator_combo.setMinimumHeight(26)
             self._populate_operator_combo()
             if row.operator:
                 # Map canonical operator to display label (case-insensitive)
@@ -921,6 +925,8 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
 
             value_str = self._row_value_to_str(row.value)
             self._value_edit = QLineEdit(value_str)
+            # B041: Set minimum height so text isn't vertically truncated
+            self._value_edit.setMinimumHeight(26)
             self._value_edit.textChanged.connect(self._on_value_changed)
             self._value_edit_multiline = QPlainTextEdit()
             self._value_edit_multiline.setPlainText(value_str)
