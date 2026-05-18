@@ -975,6 +975,7 @@ class _LineFieldSpec:
     password: bool = False
     browse_caption: str | None = None
     browse_filter: str = "All Files (*)"
+    browse_type: str = "file"  # "file" or "directory"
 
 
 # ---------------------------------------------------------------------------
@@ -1274,9 +1275,14 @@ class _ConfigDialog(QDialog):
 
         def _pick_path() -> None:
             start_dir = str(Path(edit.text()).parent) if edit.text() else str(Path.home())
-            path, _ = QFileDialog.getOpenFileName(
-                self, spec.browse_caption, start_dir, spec.browse_filter
-            )
+            if spec.browse_type == "directory":
+                path = QFileDialog.getExistingDirectory(
+                    self, spec.browse_caption, start_dir
+                )
+            else:
+                path, _ = QFileDialog.getOpenFileName(
+                    self, spec.browse_caption, start_dir, spec.browse_filter
+                )
             if path:
                 edit.setText(path)
 
@@ -1402,6 +1408,7 @@ class _ConfigDialog(QDialog):
                 tooltip="Default folder for Save As dialogs in the editor (per-profile). Defaults to Documents folder (Windows) or home directory (macOS/Linux).",
                 browse_caption="Select default folder",
                 browse_filter="",
+                browse_type="directory",
             ),
         )
         self._add_line_field(layout, _LineFieldSpec("sa", "Service account (SA)",
