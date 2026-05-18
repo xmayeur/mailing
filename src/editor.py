@@ -514,6 +514,11 @@ class _SendDialog(QDialog):
         # Validation setup (T016, T017)
         self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
         self._schema_cache: Any = None  # Initialized lazily in _get_schema_cache()
+        # B053: Cache database records to avoid repeated Google Sheets API calls
+        self._cached_records: list[list[str]] | None = None  # Records cache
+        self._cached_headers: list[str] | None = None  # Headers cache
+        self._cached_for_profile: str | None = None  # Profile these records are for
+        self._cached_for_db: str | None = None  # Database path these records are for
         self._validation_timer = QTimer(self)
         self._validation_timer.setSingleShot(True)
         self._validation_timer.timeout.connect(self._run_filter_validation)
@@ -683,6 +688,13 @@ class _SendDialog(QDialog):
             if key.startswith(f"{profile}_"):
                 cache.invalidate(key)
 
+        # B053: Also invalidate record cache when profile changes
+        # Records from previous profile must not be reused
+        self._cached_records = None
+        self._cached_headers = None
+        self._cached_for_profile = None
+        self._cached_for_db = None
+
         def _int_or_zero(value: object) -> int:
             try:
                 if isinstance(value, int):
@@ -799,8 +811,17 @@ class _SendDialog(QDialog):
         # Trigger validation with debounced timer
         self._validation_timer.stop()
         self._validation_timer.start(50)
-        # Update record preview
-        self.filter_and_display_records()
+        # B053: Do NOT call filter_and_display_records here - it blocks UI during editing
+        # User can apply filter via Apply button or trigger with debounce timer
+        # Each call hits Google Sheets API (1+ sec), blocking user input
+        # Only load records on explicit apply or after user stops editing (5+ sec debounce)
+        if not hasattr(self, '_filter_apply_timer'):
+            from PyQt6.QtCore import QTimer
+            self._filter_apply_timer = QTimer()
+            self._filter_apply_timer.setSingleShot(True)
+            self._filter_apply_timer.timeout.connect(self._deferred_filter_display)
+        self._filter_apply_timer.stop()
+        self._filter_apply_timer.start(5000)  # 5 second debounce before auto-loading
 
     def _on_filter_text_changed(self) -> None:
         """Handle filter text change with debounced validation (T016, T017)."""
@@ -812,6 +833,8 @@ class _SendDialog(QDialog):
 
         Allows user to fix database issues (e.g., move file to correct location)
         and have schema reload on next use without restarting dialog.
+
+        B053: Also invalidate record cache since database changed.
         """
         cache = self._get_schema_cache()
         profile = self._current_profile or "default"
@@ -821,6 +844,11 @@ class _SendDialog(QDialog):
             cache.invalidate(f"{profile}_csv_{db_path}")
         # Also clear Google Sheets cache entry if it exists
         cache.invalidate(f"{profile}_gsheet")
+        # B053: Invalidate record cache since database path changed
+        self._cached_records = None
+        self._cached_headers = None
+        self._cached_for_profile = None
+        self._cached_for_db = None
 
     def _run_filter_validation(self) -> None:
         """Run filter validation and update UI (T018-T021)."""
@@ -934,8 +962,18 @@ class _SendDialog(QDialog):
             self.filter_and_display_records()
 
     def load_database_records(self) -> tuple[list[list[str]], list[str]]:
-        """Load database records from CSV or Google Sheets (T026)."""
+        """Load database records from CSV or Google Sheets (T026).
+
+        B053: Use cache to avoid repeated Google Sheets API calls during filter editing.
+        Records are cached per (profile, database_path) pair and only loaded once.
+        """
         db_path = self.database_input.text().strip()
+        # B053: Check cache first - avoid Google Sheets API call if we have cached records
+        if (self._cached_records is not None and
+            self._cached_for_profile == self._current_profile and
+            self._cached_for_db == db_path):
+            log.debug(f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers or [])} headers")
+            return self._cached_records, self._cached_headers or []
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
@@ -957,9 +995,19 @@ class _SendDialog(QDialog):
                             headers = [h.strip() for h in data[0] if h.strip()]
                             rows = data[1:]  # Skip header row
                             log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id}")
+                            # B053: Cache the loaded records
+                            self._cached_records = rows
+                            self._cached_headers = headers
+                            self._cached_for_profile = self._current_profile
+                            self._cached_for_db = db_path
                             return rows, headers
                 except Exception as e:
                     log.debug("Could not load Google Sheets records: %s", e)
+            # B053: Cache empty result too, so we don't retry failed loads
+            self._cached_records = []
+            self._cached_headers = []
+            self._cached_for_profile = self._current_profile
+            self._cached_for_db = db_path
             return [], []
 
         if not db_path:
@@ -980,6 +1028,11 @@ class _SendDialog(QDialog):
                             headers = next(reader, [])
                             rows = list(reader)
                             log.debug(f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})")
+                            # B053: Cache the loaded records
+                            self._cached_records = rows
+                            self._cached_headers = headers
+                            self._cached_for_profile = self._current_profile
+                            self._cached_for_db = db_path
                             return rows, headers
                     except (UnicodeDecodeError, UnicodeError):
                         continue
@@ -988,6 +1041,11 @@ class _SendDialog(QDialog):
         except Exception as e:
             log.debug("Could not load database: %s", e)
 
+        # B053: Cache empty result
+        self._cached_records = []
+        self._cached_headers = []
+        self._cached_for_profile = self._current_profile
+        self._cached_for_db = db_path
         return [], []
 
     def filter_and_display_records(self) -> None:
@@ -1066,6 +1124,15 @@ class _SendDialog(QDialog):
 
         # T029: Update count label
         self.record_count_label.setText(f"Matching Records: {len(rows)} / {total}")
+
+    def _deferred_filter_display(self) -> None:
+        """Deferred filter display after user stops editing (B053).
+
+        Called by _filter_apply_timer after 5 seconds of no filter changes.
+        Displays filtered records using cached data (no Google Sheets API call if cache valid).
+        """
+        log.debug("Deferred filter display triggered after 5 second debounce")
+        self.filter_and_display_records()
 
     def _apply_filter(self) -> None:
         """Apply edited filter as session-active filter (T034)."""
