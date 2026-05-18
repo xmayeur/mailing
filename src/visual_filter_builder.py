@@ -442,6 +442,43 @@ OPERATORS_FOR_TYPE: dict[str, list[str]] = {
 }
 
 
+def _canonical_to_display_operator(canonical_op: str) -> str:
+    """Map canonical operator to display label (case-insensitive).
+
+    Canonical operators come from YAML/sendMail and are lowercase.
+    Display labels are title-case for UI.
+
+    Args:
+        canonical_op: Operator from YAML (lowercase, e.g., "is empty")
+
+    Returns:
+        Display label (e.g., "Is empty"), or original if no mapping found
+    """
+    canonical_lower = canonical_op.lower().strip()
+    for display_label, canonical_forms in OPERATOR_LABELS.items():
+        if canonical_lower in [op.lower() for op in canonical_forms]:
+            return display_label
+    return canonical_op
+
+
+def _display_to_canonical_operator(display_op: str) -> str:
+    """Map display label to canonical operator (case-insensitive).
+
+    Inverse of _canonical_to_display_operator. Used when user selects
+    from dropdown (display label) to store canonical form in row/YAML.
+
+    Args:
+        display_op: Display label from dropdown (e.g., "Is empty")
+
+    Returns:
+        Canonical operator (lowercase, e.g., "is empty")
+    """
+    if display_op in OPERATOR_LABELS:
+        # Return first canonical form (preferred)
+        return OPERATOR_LABELS[display_op][0]
+    return display_op.lower()
+
+
 class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
     """Main visual filter editor widget with bidirectional YAML sync.
 
@@ -861,10 +898,12 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
             self._operator_combo = QComboBox()
             self._populate_operator_combo()
             if row.operator:
+                # Map canonical operator to display label (case-insensitive)
+                display_op = _canonical_to_display_operator(row.operator)
                 try:
-                    self._operator_combo.setCurrentText(row.operator)
+                    self._operator_combo.setCurrentText(display_op)
                 except Exception as e:
-                    log.debug("Failed to set operator: %s", e)
+                    log.debug("Failed to set operator '%s': %s", display_op, e)
             self._operator_combo.currentTextChanged.connect(self._on_operator_changed)
             layout.addWidget(self._operator_combo)
 
@@ -976,28 +1015,30 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         self._operator_combo.setEnabled(True)
 
     def _operator_needs_value(self, operator: str) -> bool:
-        """Check if operator requires a value.
+        """Check if operator requires a value (case-insensitive).
 
         Args:
-            operator: Operator name
+            operator: Operator name (can be canonical or display label)
 
         Returns:
             True if operator needs value, False if operator is no-value type
         """
-        no_value_ops = ["is empty", "is not empty", "Is empty", "Is not empty"]
-        return operator not in no_value_ops
+        no_value_ops = ["is empty", "is not empty"]
+        op_lower = operator.lower().strip()
+        return op_lower not in no_value_ops
 
     def _operator_is_multiline(self, operator: str) -> bool:
-        """Check if operator supports multiple values.
+        """Check if operator supports multiple values (case-insensitive).
 
         Args:
-            operator: Operator name
+            operator: Operator name (can be canonical or display label)
 
         Returns:
             True if operator supports list (e.g., 'one of'), False otherwise
         """
-        multiline_ops = ["one of", "none of", "One of", "None of"]
-        return operator in multiline_ops
+        multiline_ops = ["one of", "none of", "in list", "not in list"]
+        op_lower = operator.lower().strip()
+        return op_lower in multiline_ops
 
     def _update_value_input_visibility(self) -> None:
         """Update visibility of value inputs based on current operator."""
@@ -1039,10 +1080,12 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[mi
         Show/hide value input based on operator type.
 
         Args:
-            operator_text: New operator name from combo box
+            operator_text: New operator name from combo box (display label)
         """
         if PYQT_AVAILABLE:
-            self.row.operator = operator_text
+            # Map display label to canonical operator for storage
+            canonical_op = _display_to_canonical_operator(operator_text)
+            self.row.operator = canonical_op
             self._update_value_input_visibility()
             self.row_changed.emit()
 
