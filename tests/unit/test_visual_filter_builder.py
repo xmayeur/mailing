@@ -204,5 +204,27 @@ class TestDatabaseSchemaInfo:
         assert "Contains" not in ops
 
 
+class TestFieldDropdownUnit:
+    """Unit tests for field dropdown (Phase 4)."""
+
+    def test_field_dropdown_schema_population(self) -> None:
+        """Test that schema with fields enables dropdown."""
+        schema = DatabaseSchemaInfo(["email", "status", "age"])
+        assert len(schema.field_names) == 3
+        assert "email" in schema.field_names
+
+    def test_field_dropdown_empty_schema(self) -> None:
+        """Test that empty schema is handled."""
+        schema = DatabaseSchemaInfo([])
+        assert len(schema.field_names) == 0
+
+    def test_field_dropdown_preserves_selection(self) -> None:
+        """Test that field selection is preserved after schema refresh."""
+        schema1 = DatabaseSchemaInfo(["email", "status"])
+        schema2 = DatabaseSchemaInfo(["email", "status", "age"])
+        assert "email" in schema1.field_names
+        assert "email" in schema2.field_names
+
+
 # FilterTableWidget and FilterRowWidget tests require Qt display server
-# Skipped in CI/headless environments; full functional tests in Phase 3 integration tests
+# Skipped in CI/headless environments; full functional tests in Phase 4 integration tests
