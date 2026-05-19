@@ -2059,7 +2059,7 @@ class ConfigLoader:
         self.load_profiles_from_config()
 
     def load_profiles_from_config(self) -> None:
-        """Load profiles from config.yml and parse default_document_path field."""
+        """Load profiles from config.yml and parse default_documents_path field."""
         try:
             if not os.path.exists(self.config_path):
                 log.warning("Config file not found: %s", self.config_path)
@@ -2070,7 +2070,7 @@ class ConfigLoader:
                 if isinstance(profile_config, dict):
                     self.profiles[profile_name] = {
                         "name": profile_name,
-                        "default_document_path": profile_config.get("default_document_path"),
+                        "default_documents_path": profile_config.get("default_documents_path"),
                         "config": profile_config,
                     }
         except Exception as exc:
@@ -3088,7 +3088,7 @@ class EditorWindow(QMainWindow):
         profiles = self._config_loader.get_profiles()
         if profile_name in profiles:
             profile_info = profiles[profile_name]
-            default_path = profile_info.get("default_document_path")
+            default_path = profile_info.get("default_documents_path")
             if default_path:
                 self._default_documents_path = default_path
                 self._editor_session.active_profile_default_path = default_path
