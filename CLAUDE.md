@@ -130,6 +130,36 @@ cp "$(find $(brew --prefix) -name qwebchannel.js | head -1)" editor_assets/qwebc
 - `_clear_profile_stylesheet()` — remove previous stylesheet before switching profiles
 - Stylesheet path read from profile's `styles:` config key in config.yml
 
+### Send Dialog Enhancements (006-send-dialog-improvements feature)
+
+**_SendDialog Class Extensions**:
+- `_extract_subject_from_html(html_path: str)` — extract subject from `<h1>` heading or filename (max 50 chars)
+- `_on_add_attachment()` — file picker callback to add files to attachment list
+- `_on_remove_attachment(row: int)` — remove individual file from attachment list
+- `_on_attachment_context_menu(pos)` — context menu (right-click) to delete attachments
+- `_update_test_mode_lock()` — enforce test checkbox locked until test email sent
+- `_unlock_test_mode()` — unlock test checkbox after successful test send
+
+**Subject Auto-Population**:
+- Extracts first `<h1>` heading text from HTML document on dialog open
+- Fallback to filename (without extension) if no `<h1>` found
+- Truncates to 50 characters maximum
+- User can edit after population
+
+**File Attachments**:
+- "Add File(s)" button opens multi-file picker
+- Selected files displayed in list widget (right of HTML input, above filter)
+- Right-click context menu to delete individual files
+- Attachment list cleared when dialog reopens for new campaign
+- Files passed to sendMail CLI via `namespace.attachment` in build_args()
+
+**Test Mode Enforcement**:
+- Test checkbox checked by default and locked (disabled) on dialog open
+- Remains locked until test email successfully sent (returns "OK_TEST")
+- EditorWindow._menu_send() detects "OK_TEST" and calls dialog._unlock_test_mode()
+- After unlock, user can uncheck to send to full list
+- Resets to checked (locked) on dialog reopen for new campaign
+
 ### Building the editor binary
 
 ```bash
@@ -186,6 +216,8 @@ CI enforces:
 - N/A (filter definitions stored in YAML config) (004-visual-filter-builder)
 - Python 3.12+ + PyQt6 (≥6.7.0), PyQt6-WebEngine (≥6.7.0), Quill.js v2 (via HTML5), pyyaml, google-api-python-clien (005-editor-profile-clipboard)
 - YAML (config.yml), Markdown/HTML files (documents) (005-editor-profile-clipboard)
+- Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, google-api-python-clien (006-send-dialog-improvements)
+- N/A (state tracked in dialog instance, not persisted) (006-send-dialog-improvements)
 
 ## Recent Changes
 - 004-visual-filter-builder: Added Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, gspread, google-api-python-clien
