@@ -152,6 +152,13 @@ except Exception as exc:  # pragma: no cover
     log.warning("FilterValidator not importable: %s", exc)
     _VALIDATOR_AVAILABLE = False
 
+try:
+    from visual_filter_builder import DatabaseSchemaInfo, FilterBuilder  # noqa: E402
+    _FILTER_BUILDER_AVAILABLE = True
+except Exception as exc:  # pragma: no cover
+    log.warning("FilterBuilder not importable: %s", exc)
+    _FILTER_BUILDER_AVAILABLE = False
+
 # Fallback markdown support
 try:
     import markdown2  # noqa: E402
@@ -370,7 +377,9 @@ class _SendDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Send Mailing")
-        self.setMinimumWidth(720)
+        # B040: Dialog width extends beyond filter widget right edge
+        # Filter widget 900px + scroll area margins/scrollbar + dialog margins = 1150px
+        self.setMinimumWidth(1150)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
         self._current_profile = ""
@@ -380,12 +389,27 @@ class _SendDialog(QDialog):
         self._original_filter_text = ""
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
+        # B036: Make dialog vertically scrollable for many form fields
+        from PyQt6.QtWidgets import QScrollArea
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+
+        # Create scrollable content widget
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(16, 16, 16, 12)
+        scroll_layout.setSpacing(10)
+        scroll.setWidget(scroll_content)
+
+        root.addWidget(scroll)
+
+        # Form layout inside scrollable area
         form = QFormLayout()
         form.setLabelAlignment(form.labelAlignment())
-        root.addLayout(form)
+        scroll_layout.addLayout(form)
 
         self.config_input = QLineEdit(config_path, self)
         self.config_input.setReadOnly(True)
@@ -427,28 +451,82 @@ class _SendDialog(QDialog):
         database_browse.clicked.connect(self._browse_database)
         database_row_layout.addWidget(database_browse)
         form.addRow("Database", database_row)
+        # B015: Clear schema cache when database input changes (retry mechanism)
+        self.database_input.textChanged.connect(self._on_database_input_changed)
 
-        # Filter editor (T009, T010, T016-T021)
-        self.filter_text_edit = QPlainTextEdit(self)
-        self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
-        self.filter_text_edit.setMinimumHeight(60)
-        self.filter_status_label = QLabel("", self)
-        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
-        filter_widget = QWidget(self)
-        filter_layout = QVBoxLayout(filter_widget)
-        filter_layout.setContentsMargins(0, 0, 0, 0)
-        filter_layout.setSpacing(4)
-        filter_layout.addWidget(self.filter_text_edit)
-        filter_layout.addWidget(self.filter_status_label)
-        form.addRow("Filter (YAML)", filter_widget)
+        # Filter editor (T035: FilterBuilder with visual table + YAML tabs)
+        if _FILTER_BUILDER_AVAILABLE:
+            initial_filter_dict: dict[str, str] = {}
+            try:
+                if config_data and initial_profile in cast(Any, config_data):
+                    profile_cfg = cast(Any, config_data)[initial_profile]
+                    filter_obj = cast(Any, profile_cfg).get("filter") if isinstance(profile_cfg, dict) else None
+                    if isinstance(filter_obj, dict):
+                        initial_filter_dict = cast(dict[str, str], filter_obj)
+            except (KeyError, TypeError, AttributeError) as e:
+                log.debug("Could not extract initial filter from config: %s", e)
+            self._schema_info = DatabaseSchemaInfo([])
+            self._filter_builder = FilterBuilder(
+                self._schema_info,
+                initial_filter=initial_filter_dict,
+                parent=self,
+            )
+            self._filter_builder.filter_changed.connect(self._on_filter_changed)
+            self.filter_status_label = QLabel("", self)
+            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            filter_widget = QWidget(self)
+            filter_layout = QVBoxLayout(filter_widget)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+            filter_layout.setSpacing(4)
+            # B007: Wrap FilterBuilder in scroll area to prevent it from expanding
+            # and hiding elements below (buttons, preview pane)
+            from PyQt6.QtWidgets import QScrollArea
+            scroll = QScrollArea()
+            scroll.setWidget(self._filter_builder)
+            scroll.setWidgetResizable(True)
+            # B026-B027 & B031 & B043: Set explicit height/width for filter widget
+            # Height: Allow 5 rows (30px each) + button (30px) = 300px + scrollbar = 320px
+            # Width: minWidth 900px ensures dropdowns, operators, values all visible
+            scroll.setMinimumHeight(320)
+            scroll.setMaximumHeight(340)
+            scroll.setMinimumWidth(900)
+            scroll.setWidgetResizable(True)
+            filter_layout.addWidget(scroll)
+            filter_layout.addWidget(self.filter_status_label)
+            form.addRow("Filter", filter_widget)
+            # Keep filter_text_edit as reference to YAML tab for backward compat (used in _run_filter_validation)
+            self.filter_text_edit = self._filter_builder._yaml_edit
+        else:
+            self.filter_text_edit = QPlainTextEdit(self)
+            self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
+            self.filter_text_edit.setMinimumHeight(60)
+            self.filter_status_label = QLabel("", self)
+            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            filter_widget = QWidget(self)
+            filter_layout = QVBoxLayout(filter_widget)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+            filter_layout.setSpacing(4)
+            filter_layout.addWidget(self.filter_text_edit)
+            filter_layout.addWidget(self.filter_status_label)
+            form.addRow("Filter (YAML)", filter_widget)
+            self._filter_builder = None  # type: ignore[assignment]
 
         # Validation setup (T016, T017)
         self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
         self._schema_cache: Any = None  # Initialized lazily in _get_schema_cache()
+        # B053: Cache database records to avoid repeated Google Sheets API calls
+        self._cached_records: list[list[str]] | None = None  # Records cache
+        self._cached_headers: list[str] | None = None  # Headers cache
+        self._cached_for_profile: str | None = None  # Profile these records are for
+        self._cached_for_db: str | None = None  # Database path these records are for
         self._validation_timer = QTimer(self)
         self._validation_timer.setSingleShot(True)
         self._validation_timer.timeout.connect(self._run_filter_validation)
-        self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
+        if self._filter_builder:
+            # Connect to FilterBuilder filter_changed signal for debounced validation
+            pass  # FilterBuilder already emits on change, validation triggered via _on_filter_changed
+        else:
+            self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
 
         self.password_input = QLineEdit(self)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -596,8 +674,26 @@ class _SendDialog(QDialog):
         self._load_profile_defaults(self.profile_combo.currentText())
 
     def _load_profile_defaults(self, profile: str) -> None:
+        import time
         self._current_profile = profile
         profile_cfg = self._config_data.get(profile, {})
+        log.info("DEBUG: _load_profile_defaults: profile=%s, config_data keys=%s, profile_cfg keys=%s",
+                 profile, list(self._config_data.keys()), list(profile_cfg.keys()))
+
+        # B024-B025: Clear schema cache for new profile to force fresh load
+        # Ensures Google Sheets and CSV profiles refresh when switching
+        cache = self._get_schema_cache()
+        # Clear all cache entries for this profile
+        for key in list(cache._cache.keys()):
+            if key.startswith(f"{profile}_"):
+                cache.invalidate(key)
+
+        # B053: Also invalidate record cache when profile changes
+        # Records from previous profile must not be reused
+        self._cached_records = None
+        self._cached_headers = None
+        self._cached_for_profile = None
+        self._cached_for_db = None
 
         def _int_or_zero(value: object) -> int:
             try:
@@ -613,6 +709,26 @@ class _SendDialog(QDialog):
         # Process any pending Qt events to ensure database path is set before validation
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
+
+        # T035: Update FilterBuilder schema when database changes
+        # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
+        if self._filter_builder:
+            t1 = time.time()
+            schema_fields = self._get_database_schema()
+            t2 = time.time()
+            log.info("TIMING: _get_database_schema took %.2fs", t2-t1)
+            log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
+                     profile, self.database_input.text(), schema_fields)
+            self._schema_info = DatabaseSchemaInfo(schema_fields)
+            self._filter_builder.schema_info = self._schema_info
+            log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
+            # Call refresh_schema on table_widget to update all row dropdowns
+            t3 = time.time()
+            self._filter_builder._table_widget.refresh_schema(self._schema_info)
+            t4 = time.time()
+            log.info("TIMING: refresh_schema took %.2fs", t4-t3)
+            log.info("DEBUG: refresh_schema called, row_widgets=%d",
+                     len(self._filter_builder._table_widget._row_widgets))
 
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
@@ -633,29 +749,41 @@ class _SendDialog(QDialog):
         self.filter_and_display_records()
 
     def load_current_filter(self, profile: str) -> None:
-        """Load filter from profile config and display in filter field."""
+        """Load filter from profile config and display in filter field (T036)."""
         profile_cfg = self._config_data.get(profile, {})
         # Use filter_test if test mode enabled, otherwise use filter
         filter_key = "filter_test" if self.test_check.isChecked() else "filter"
-        filter_obj = profile_cfg.get(filter_key)
+        filter_obj: Any = profile_cfg.get(filter_key)
 
         if not filter_obj:
-            self.filter_text_edit.setPlainText("")
+            if self._filter_builder:
+                self._filter_builder.set_filter_from_yaml({})
+            else:
+                self.filter_text_edit.setPlainText("")
             self.filter_status_label.setText("")
             self._original_filter_text = ""
             self._session_filter = None
             return
 
-        # Format filter dict as YAML string for display
+        # Format filter dict for display
+        filter_dict: dict[str, str] = {}
         filter_str = ""
-        if isinstance(filter_obj, dict):  # type: ignore[unreachable]
-            for key, value in filter_obj.items():  # type: ignore[unreachable]
-                filter_str += f"{key}: {value}\n"
-            filter_str = filter_str.rstrip()
-        else:
+        try:
+            if isinstance(filter_obj, dict):
+                for key, value in filter_obj.items():
+                    filter_dict[key] = str(value)
+                    filter_str += f"{key}: {value}\n"
+                filter_str = filter_str.rstrip()
+            else:
+                filter_str = str(filter_obj)
+        except (TypeError, AttributeError):
             filter_str = str(filter_obj)
 
-        self.filter_text_edit.setPlainText(filter_str)
+        if self._filter_builder:
+            # T036: Load filter into visual editor (T035)
+            self._filter_builder.set_filter_from_yaml(filter_dict)
+        else:
+            self.filter_text_edit.setPlainText(filter_str)
         self.filter_status_label.setText("")
         self._original_filter_text = filter_str
         self._session_filter = None
@@ -667,10 +795,60 @@ class _SendDialog(QDialog):
         # Clear session filter since we're switching filter mode
         self._session_filter = None
 
+    def _on_filter_changed(self, filter_dict: dict[str, str]) -> None:
+        """Handle FilterBuilder filter_changed signal (T035, T041-T042).
+
+        Updates _session_filter and triggers validation.
+        Highlights invalid rows in visual table.
+
+        Args:
+            filter_dict: Updated filter dict from FilterBuilder
+        """
+        self._session_filter = filter_dict if filter_dict else None
+        # T041-T042: Validate rows and highlight errors in visual table
+        if self._filter_builder:
+            self._filter_builder.validate_and_highlight_errors()
+        # Trigger validation with debounced timer
+        self._validation_timer.stop()
+        self._validation_timer.start(50)
+        # B053: Do NOT call filter_and_display_records here - it blocks UI during editing
+        # User can apply filter via Apply button or trigger with debounce timer
+        # Each call hits Google Sheets API (1+ sec), blocking user input
+        # Only load records on explicit apply or after user stops editing (5+ sec debounce)
+        if not hasattr(self, '_filter_apply_timer'):
+            from PyQt6.QtCore import QTimer
+            self._filter_apply_timer = QTimer()
+            self._filter_apply_timer.setSingleShot(True)
+            self._filter_apply_timer.timeout.connect(self._deferred_filter_display)
+        self._filter_apply_timer.stop()
+        self._filter_apply_timer.start(5000)  # 5 second debounce before auto-loading
+
     def _on_filter_text_changed(self) -> None:
         """Handle filter text change with debounced validation (T016, T017)."""
         self._validation_timer.stop()
         self._validation_timer.start(50)
+
+    def _on_database_input_changed(self, _text: str) -> None:
+        """Clear schema cache when database input changes (B015 retry mechanism).
+
+        Allows user to fix database issues (e.g., move file to correct location)
+        and have schema reload on next use without restarting dialog.
+
+        B053: Also invalidate record cache since database changed.
+        """
+        cache = self._get_schema_cache()
+        profile = self._current_profile or "default"
+        # Clear all cache entries for this profile to force fresh schema load
+        db_path = self.database_input.text().strip()
+        if db_path:
+            cache.invalidate(f"{profile}_csv_{db_path}")
+        # Also clear Google Sheets cache entry if it exists
+        cache.invalidate(f"{profile}_gsheet")
+        # B053: Invalidate record cache since database path changed
+        self._cached_records = None
+        self._cached_headers = None
+        self._cached_for_profile = None
+        self._cached_for_db = None
 
     def _run_filter_validation(self) -> None:
         """Run filter validation and update UI (T018-T021)."""
@@ -702,24 +880,33 @@ class _SendDialog(QDialog):
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
-        if not db_path and profile_cfg.get("SHEETID"):
+        # B047: Handle both uppercase and lowercase config keys
+        sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
+        sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
+        log.info("DEBUG: _get_database_schema: profile=%s, db_path=%s, profile_cfg keys=%s, SHEETID=%s, SA=%s",
+                 self._current_profile, db_path, list(profile_cfg.keys()), sheet_id_val, sa_val)
+        if not db_path and sheet_id_val:
             # Google Sheets profile - try to load schema from Google Sheets
-            sa = profile_cfg.get("SA")
-            sheet_id = profile_cfg.get("SHEETID")
+            sa = sa_val
+            sheet_id = sheet_id_val
+            log.info("DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa, sheet_id)
             if sa and sheet_id:
                 def _load_gsheet_schema() -> list[str]:
                     try:
-                        import sendMail as sm  # noqa: N813
+                        from sendMail import get_google_sheets_schema  # Import directly
 
-                        if hasattr(sm, "get_google_sheets_schema"):
-                            result = sm.get_google_sheets_schema(str(sa), str(sheet_id))
-                            if isinstance(result, list):
-                                return result
+                        log.info("DEBUG: Calling get_google_sheets_schema(%s, %s)", str(sa), str(sheet_id))
+                        result = get_google_sheets_schema(str(sa), str(sheet_id))
+                        log.info("DEBUG: get_google_sheets_schema returned: %s", result)
+                        if isinstance(result, list):
+                            return result
                     except Exception as e:
-                        log.debug("Could not load Google Sheets schema: %s", e)
+                        log.error("ERROR: Could not load Google Sheets schema: %s", e, exc_info=True)
                     return []
 
-                return cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
+                schema = cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
+                log.info("DEBUG: Final schema from cache: %s", schema)
+                return schema
             return []
 
         if not db_path:
@@ -737,7 +924,7 @@ class _SendDialog(QDialog):
         return cast(list[str], cache.get(f"{profile_name}_csv_{db_path}", _load_csv_schema))
 
     def _update_validation_ui(self, status: dict[str, Any]) -> None:
-        """Update filter field UI based on validation status (T019, T020, T021)."""
+        """Update filter field UI based on validation status (T019, T020, T021, T041)."""
         is_valid = status.get("is_valid", True)
         syntax_errors = status.get("syntax_errors", [])
         missing_fields = status.get("missing_fields", [])
@@ -752,12 +939,15 @@ class _SendDialog(QDialog):
                 "QPlainTextEdit { border: 1px solid #f44336; background: #ffebee; }"
             )
 
-        # T020: Error message display
+        # T020, T041: Error message display with count
         error_msg = ""
+        error_count = len(syntax_errors) + len(missing_fields)
+        if error_count > 0:
+            error_msg = f"✗ {error_count} validation error{'s' if error_count != 1 else ''} "
         if syntax_errors:
-            error_msg += "Syntax: " + "; ".join(syntax_errors)
+            error_msg += "| Syntax: " + "; ".join(syntax_errors)
         if missing_fields:
-            if error_msg:
+            if syntax_errors:
                 error_msg += " | "
             error_msg += f"Fields not found: {', '.join(missing_fields)}"
 
@@ -772,15 +962,28 @@ class _SendDialog(QDialog):
             self.filter_and_display_records()
 
     def load_database_records(self) -> tuple[list[list[str]], list[str]]:
-        """Load database records from CSV or Google Sheets (T026)."""
+        """Load database records from CSV or Google Sheets (T026).
+
+        B053: Use cache to avoid repeated Google Sheets API calls during filter editing.
+        Records are cached per (profile, database_path) pair and only loaded once.
+        """
         db_path = self.database_input.text().strip()
+        # B053: Check cache first - avoid Google Sheets API call if we have cached records
+        if (self._cached_records is not None and
+            self._cached_for_profile == self._current_profile and
+            self._cached_for_db == db_path):
+            log.debug(f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers or [])} headers")
+            return self._cached_records, self._cached_headers or []
 
         # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
-        if not db_path and profile_cfg.get("SHEETID"):
+        # B047: Handle both uppercase and lowercase config keys
+        sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
+        sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
+        if not db_path and sheet_id_val:
             # Google Sheets profile - try to load records from Google Sheets
-            sa = profile_cfg.get("SA")
-            sheet_id = profile_cfg.get("SHEETID")
+            sa = sa_val
+            sheet_id = sheet_id_val
             if sa and sheet_id:
                 try:
                     import sendMail as sm  # noqa: N813
@@ -792,9 +995,19 @@ class _SendDialog(QDialog):
                             headers = [h.strip() for h in data[0] if h.strip()]
                             rows = data[1:]  # Skip header row
                             log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id}")
+                            # B053: Cache the loaded records
+                            self._cached_records = rows
+                            self._cached_headers = headers
+                            self._cached_for_profile = self._current_profile
+                            self._cached_for_db = db_path
                             return rows, headers
                 except Exception as e:
                     log.debug("Could not load Google Sheets records: %s", e)
+            # B053: Cache empty result too, so we don't retry failed loads
+            self._cached_records = []
+            self._cached_headers = []
+            self._cached_for_profile = self._current_profile
+            self._cached_for_db = db_path
             return [], []
 
         if not db_path:
@@ -815,24 +1028,57 @@ class _SendDialog(QDialog):
                             headers = next(reader, [])
                             rows = list(reader)
                             log.debug(f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})")
+                            # B053: Cache the loaded records
+                            self._cached_records = rows
+                            self._cached_headers = headers
+                            self._cached_for_profile = self._current_profile
+                            self._cached_for_db = db_path
                             return rows, headers
                     except (UnicodeDecodeError, UnicodeError):
                         continue
                 # If all encodings fail, raise error
                 raise ValueError(f"Could not decode {db_path} with any supported encoding")
+
+            # Handle Excel files (XLSX, XLS) using same approach as sendMail.py
+            if db_path.endswith((".xlsx", ".xls")):
+                from python_calamine import CalamineWorkbook
+                wb = CalamineWorkbook.from_path(db_path)
+                ws = wb.get_sheet_by_index(0)
+                data = ws.to_python()
+                if data and len(data) > 0:
+                    headers = [str(h).strip() for h in data[0] if h]
+                    rows = [[str(cell) if cell is not None else "" for cell in row] for row in data[1:]]
+                    log.debug(f"Loaded {len(rows)} records from {db_path}")
+                    # B053: Cache the loaded records
+                    self._cached_records = rows
+                    self._cached_headers = headers
+                    self._cached_for_profile = self._current_profile
+                    self._cached_for_db = db_path
+                    return rows, headers
+                else:
+                    log.debug(f"No data found in {db_path}")
+                    raise ValueError(f"No data in {db_path}")
         except Exception as e:
             log.debug("Could not load database: %s", e)
 
+        # B053: Cache empty result
+        self._cached_records = []
+        self._cached_headers = []
+        self._cached_for_profile = self._current_profile
+        self._cached_for_db = db_path
         return [], []
 
     def filter_and_display_records(self) -> None:
         """Load, filter, and display database records (T027, T028, T040, T041, T042)."""
+        import time
         # T041: Handle profile switching by tracking current profile
         if not hasattr(self, "_last_profile"):
             self._last_profile = self._current_profile
 
-        filter_text = self.filter_text_edit.toPlainText()
+        t1 = time.time()
         rows, headers = self.load_database_records()
+        t2 = time.time()
+        log.info("TIMING: load_database_records took %.2fs, %d rows, %d headers", t2-t1, len(rows), len(headers))
 
         # T040, T042: Better error and zero-record handling
         if not headers:
@@ -859,15 +1105,23 @@ class _SendDialog(QDialog):
             from filter_matcher import FilterMatcher
 
             matcher = FilterMatcher()
-            if filter_text and filter_text.strip():
-                import yaml
-
-                filter_dict = yaml.safe_load(filter_text) or {}
+            # Use _session_filter if set (from FilterBuilder), otherwise read from YAML editor
+            filter_dict: dict[str, str] = {}
+            if self._session_filter:
+                filter_dict = self._session_filter
                 filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
-                log.debug(f"Filter applied: {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+                log.debug(f"Filter applied (from session): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
             else:
-                filtered_rows = rows
-                log.debug(f"No filter, showing all {len(rows)} records")
+                filter_text = self.filter_text_edit.toPlainText()
+                if filter_text and filter_text.strip():
+                    import yaml
+
+                    filter_dict = yaml.safe_load(filter_text) or {}
+                    filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
+                    log.debug(f"Filter applied (from YAML): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+                else:
+                    filtered_rows = rows
+                    log.debug(f"No filter, showing all {len(rows)} records")
 
             self._update_record_display(filtered_rows, headers, len(rows))
             # Reset error state on success
@@ -891,11 +1145,34 @@ class _SendDialog(QDialog):
         # T029: Update count label
         self.record_count_label.setText(f"Matching Records: {len(rows)} / {total}")
 
+    def _deferred_filter_display(self) -> None:
+        """Deferred filter display after user stops editing (B053).
+
+        Called by _filter_apply_timer after 5 seconds of no filter changes.
+        Displays filtered records using cached data (no Google Sheets API call if cache valid).
+        """
+        log.debug("Deferred filter display triggered after 5 second debounce")
+        self.filter_and_display_records()
+
     def _apply_filter(self) -> None:
         """Apply edited filter as session-active filter (T034)."""
-        filter_text = self.filter_text_edit.toPlainText().strip()
+        if self._filter_builder:
+            # T037: Get filter from FilterBuilder (visual or YAML)
+            filter_dict = self._filter_builder.get_filter_as_yaml()
+        else:
+            filter_text = self.filter_text_edit.toPlainText().strip()
+            if not filter_text:
+                filter_dict = {}
+            else:
+                import yaml
+                try:
+                    filter_dict = yaml.safe_load(filter_text) or {}
+                except Exception as e:
+                    self.filter_status_label.setText(f"Parse error: {e}")
+                    self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+                    return
 
-        if not filter_text:
+        if not filter_dict:
             self._session_filter = None
             self.filter_status_label.setText("(Filter cleared - will use profile default)")
             self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
@@ -907,6 +1184,9 @@ class _SendDialog(QDialog):
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
             return
 
+        # Reconstruct YAML string for validator (expects text format)
+        import yaml
+        filter_text = yaml.dump(filter_dict, default_flow_style=False, sort_keys=False)
         schema = self._get_database_schema()
         status = self._filter_validator.get_validation_status(filter_text, schema)
 
@@ -916,29 +1196,36 @@ class _SendDialog(QDialog):
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
             return
 
-        import yaml
-
         try:
-            filter_dict = yaml.safe_load(filter_text) or {}
-            if isinstance(filter_dict, dict):
-                self._session_filter = filter_dict
-                self.filter_status_label.setText("✓ Session filter applied")
-                self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
-                self.filter_and_display_records()
-            else:
-                self.filter_status_label.setText("Filter must be YAML mapping (key: value)")
-                self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            self._session_filter = filter_dict
+            self.filter_status_label.setText("✓ Session filter applied")
+            self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+            self.filter_and_display_records()
         except Exception as e:
-            self.filter_status_label.setText(f"Parse error: {e}")
+            self.filter_status_label.setText(f"Error: {e}")
             self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
 
     def _reset_filter(self) -> None:
-        """Reset filter to original from profile config (T035)."""
-        self._session_filter = None
-        if self._original_filter_text:
-            self.filter_text_edit.setPlainText(self._original_filter_text)
+        """Reset filter to original from profile config."""
+        if self._filter_builder:
+            # Parse original filter text back to dict for FilterBuilder
+            if self._original_filter_text:
+                try:
+                    import yaml
+                    filter_dict = yaml.safe_load(self._original_filter_text) or {}
+                    if isinstance(filter_dict, dict):
+                        self._filter_builder.set_filter_from_yaml(filter_dict)
+                except Exception:
+                    self._filter_builder.set_filter_from_yaml({})
+            else:
+                self._filter_builder.set_filter_from_yaml({})
         else:
-            self.filter_text_edit.setPlainText("")
+            if self._original_filter_text:
+                self.filter_text_edit.setPlainText(self._original_filter_text)
+            else:
+                self.filter_text_edit.setPlainText("")
+        # B013: Set _session_filter to None AFTER loading filter (filter_changed signal already fired)
+        self._session_filter = None
         self.filter_status_label.setText("(Filter reset to profile default)")
         self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
 
@@ -1234,7 +1521,10 @@ class _ConfigDialog(QDialog):
                 data = yaml.safe_load(f) or {}
             return self._normalize_config_data(data if isinstance(data, dict) else {})
         except Exception as exc:
-            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
+            try:
+                QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
+            except Exception as e:
+                log.debug("Could not show warning dialog: %s", e)
             return {}
 
     def _browse_config(self) -> None:
@@ -1760,6 +2050,159 @@ class _ConfigDialog(QDialog):
 
 
 # ---------------------------------------------------------------------------
+# Profile, Clipboard, and Session Management
+# ---------------------------------------------------------------------------
+
+class ConfigLoader:
+    """Load email profiles from config.yml."""
+
+    def __init__(self, config_path: str) -> None:
+        self.config_path = config_path
+        self.profiles: dict[str, dict[str, Any]] = {}
+        self.load_profiles_from_config()
+
+    def load_profiles_from_config(self) -> None:
+        """Load profiles from config.yml and parse default_documents_path field."""
+        try:
+            if not os.path.exists(self.config_path):
+                log.warning("Config file not found: %s", self.config_path)
+                return
+            with open(self.config_path, encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            for profile_name, profile_config in config.items():
+                if isinstance(profile_config, dict):
+                    self.profiles[profile_name] = {
+                        "name": profile_name,
+                        "default_documents_path": profile_config.get("default_documents_path"),
+                        "config": profile_config,
+                    }
+        except Exception as exc:
+            log.warning("Failed to load profiles from config: %s", exc)
+
+    def get_profiles(self) -> dict[str, dict[str, Any]]:
+        """Return loaded profiles."""
+        return self.profiles
+
+
+@dataclass
+class ClipboardOperation:
+    """Represents clipboard paste operation with content analysis."""
+
+    content_type: str  # "html_rich", "plain_text", "markdown"
+    has_urls: bool
+    detected_urls: list[str]
+    has_existing_links: bool
+    raw_html: str | None
+    raw_text: str
+
+
+class ClipboardProcessor:
+    """Analyze clipboard content for content type and URL detection."""
+
+    URL_PATTERN = r"https?://[^\s<>\"{}|\\^`\[\]]+|ftp://[^\s<>\"{}|\\^`\[\]]+"
+
+    def analyze_paste(self, raw_text: str, raw_html: str | None = None) -> ClipboardOperation:
+        """Determine clipboard content type and detect URLs."""
+        has_existing_links = self._check_existing_links(raw_html) if raw_html else False
+        detected_urls: list[str] = []
+
+        if raw_html and "<a" in raw_html:
+            content_type = "html_rich"
+        elif raw_html:
+            content_type = "html_rich"
+        elif self._is_markdown_link(raw_text):
+            content_type = "markdown"
+        else:
+            content_type = "plain_text"
+            detected_urls = self.detect_urls_in_text(raw_text)
+
+        return ClipboardOperation(
+            content_type=content_type,
+            has_urls=len(detected_urls) > 0,
+            detected_urls=detected_urls,
+            has_existing_links=has_existing_links,
+            raw_html=raw_html,
+            raw_text=raw_text,
+        )
+
+    def detect_urls_in_text(self, text: str) -> list[str]:
+        """Find http(s)/ftp URLs in plain text."""
+        return re.findall(self.URL_PATTERN, text)
+
+    def _check_existing_links(self, html: str) -> bool:
+        """Check if HTML contains link markup."""
+        return bool(re.search(r"<a\s+[^>]*href\s*=", html))
+
+    def _is_markdown_link(self, text: str) -> bool:
+        """Check if text is already in markdown link format [text](url)."""
+        return bool(re.search(r"\[.+\]\(.+\)", text))
+
+    def detect_html_links(self, html: str) -> list[str]:
+        """Extract URLs from HTML link attributes."""
+        return re.findall(r'href\s*=\s*["\']([^"\']+)["\']', html)
+
+
+@dataclass
+class EditorSession:
+    """Track editor runtime state."""
+
+    active_profile_name: str | None = None
+    active_document_path: str | None = None
+    active_profile_default_path: str | None = None
+    unsaved_changes: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dict for JSON serialization."""
+        return {
+            "active_profile_name": self.active_profile_name,
+            "active_document_path": self.active_document_path,
+            "active_profile_default_path": self.active_profile_default_path,
+            "unsaved_changes": self.unsaved_changes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EditorSession:
+        """Create from dict loaded from JSON."""
+        return cls(
+            active_profile_name=data.get("active_profile_name"),
+            active_document_path=data.get("active_document_path"),
+            active_profile_default_path=data.get("active_profile_default_path"),
+            unsaved_changes=data.get("unsaved_changes", False),
+        )
+
+
+class EditorPasteHandler:
+    """Handle paste operations with link preservation and URL linkification."""
+
+    def __init__(self, clipboard_processor: ClipboardProcessor) -> None:
+        self.processor = clipboard_processor
+
+    def handle_paste(self, clipboard_op: ClipboardOperation) -> dict[str, Any]:
+        """Process paste operation and return instructions for Quill."""
+        if clipboard_op.content_type == "html_rich":
+            return {"action": "paste_html", "html": clipboard_op.raw_html}
+        elif clipboard_op.content_type == "plain_text" and clipboard_op.has_urls:
+            linkified_html = self.linkify_urls(clipboard_op.raw_text, clipboard_op.detected_urls)
+            return {
+                "action": "linkify_urls",
+                "text": clipboard_op.raw_text,
+                "urls": clipboard_op.detected_urls,
+                "html": linkified_html,
+            }
+        else:
+            return {"action": "paste_text", "text": clipboard_op.raw_text}
+
+    def linkify_urls(self, text: str, urls: list[str]) -> str:
+        """Convert plain-text URLs to HTML links, return linkified HTML."""
+        if not urls:
+            return text
+        html = text
+        for url in urls:
+            html = html.replace(url, f'<a href="{url}" target="_blank">{url}</a>')
+        return html
+
+
+# ---------------------------------------------------------------------------
 # JS ↔ Python bridge
 # ---------------------------------------------------------------------------
 class EditorBridge(QObject):
@@ -1771,10 +2214,12 @@ class EditorBridge(QObject):
     Signals:
         dirty_changed: Emitted when content modification state changes
         css_changed: Emitted when user selects custom CSS stylesheet
+        clipboard_analyzed: Emitted when JS detects clipboard content on paste
     """
 
     dirty_changed = pyqtSignal(bool)
     css_changed = pyqtSignal(str)   # emits absolute CSS file path when user selects a stylesheet
+    clipboard_analyzed = pyqtSignal(str, bool, list)  # content_type, has_html_links, detected_urls
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -1869,6 +2314,11 @@ class EditorBridge(QObject):
         """Receives JS-side errors forwarded via window.onerror."""
         log.warning("JS: %s", msg)
 
+    @pyqtSlot(str, bool, list)
+    def on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
+        """Receives clipboard analysis result from JavaScript paste handler."""
+        self.clipboard_analyzed.emit(content_type, has_html_links, detected_urls)
+
     # ------------------------------------------------------------------
     # Python-side accessors
     # ------------------------------------------------------------------
@@ -1909,11 +2359,20 @@ class EditorWindow(QMainWindow):
         self._load_finished_connected = False
         self._send_in_progress = False
         self._is_template = False
-        self._config_path = str(Path(__file__).parent / "config.yml")
+        # Use same config path as Send mailing dialog (not hardcoded src/config.yml)
+        self._config_path = self._resolve_send_config_path()
         self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
         self._current_profile = profile or "default"
         self._default_documents_path = self._get_default_documents_path()
         self._load_config()
+
+        # Profile loader and session management (new for 005-editor-profile-clipboard)
+        self._config_loader = ConfigLoader(self._config_path)
+        self._clipboard_processor = ClipboardProcessor()
+        self._paste_handler = EditorPasteHandler(self._clipboard_processor)
+        self._editor_session = EditorSession()
+        self._profile_selector: QComboBox | None = None
+        self._load_editor_session()
 
         # Web engine view
         self._view = QWebEngineView(self)
@@ -1930,6 +2389,7 @@ class EditorWindow(QMainWindow):
         # Connect signals
         self._bridge.dirty_changed.connect(self._on_dirty_changed)
         self._bridge.css_changed.connect(self._on_css_changed)
+        self._bridge.clipboard_analyzed.connect(self._on_clipboard_analyzed)
 
         # Build menus and status bar
         self._build_menus()
@@ -1982,6 +2442,103 @@ class EditorWindow(QMainWindow):
             return os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK)
         except Exception:
             return False
+
+    def _get_stylesheet_path(self) -> Path:
+        """Get stylesheet path: profile's styles → HOME/css/styles.css → project default."""
+        # Try to get from current profile config
+        if hasattr(self, "_current_profile") and hasattr(self, "_config_data"):
+            profile_cfg = self._config_data.get(self._current_profile, {})
+            profile_styles = profile_cfg.get("styles")
+            if profile_styles and isinstance(profile_styles, str):
+                styles_path = Path(profile_styles).expanduser().absolute()
+                if styles_path.exists():
+                    return styles_path
+
+        # Try HOME/css/styles.css
+        home_css = Path.home() / "css" / "styles.css"
+        if home_css.exists():
+            return home_css
+
+        # Fall back to project default
+        default_css = (_BASE / "Resources" / "css" / "styles.css") if _IS_FROZEN else (_BASE / "css" / "styles.css")
+        return default_css
+
+    def _get_css_directory(self) -> Path:
+        """Get CSS directory: profile's styles dir → HOME/css → project default."""
+        # Try to get directory from profile config
+        if hasattr(self, "_current_profile") and hasattr(self, "_config_data"):
+            profile_cfg = self._config_data.get(self._current_profile, {})
+            profile_styles = profile_cfg.get("styles")
+            if profile_styles and isinstance(profile_styles, str):
+                styles_dir = Path(profile_styles).expanduser().absolute().parent
+                if styles_dir.exists():
+                    return styles_dir
+
+        # Try HOME/css
+        home_css_dir = Path.home() / "css"
+        if home_css_dir.exists():
+            return home_css_dir
+
+        # Fall back to project default
+        default_css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
+        return default_css_dir
+
+    def _resolve_stylesheet_path(self, styles_value: str) -> Path | None:
+        """Resolve stylesheet path from config value, expanding user home and making absolute."""
+        if not styles_value:
+            return None
+        try:
+            path = Path(styles_value).expanduser().absolute()
+            return path if path.exists() else None
+        except Exception as exc:
+            log.warning("Failed to resolve stylesheet path %r: %s", styles_value, exc)
+            return None
+
+    def _clear_profile_stylesheet(self) -> None:
+        """Clear previously applied profile stylesheet."""
+        if hasattr(self, "_view") and self._view:
+            # Clear the user-css element by applying empty CSS (must happen BEFORE new stylesheet)
+            self._run_js("""
+            setTimeout(function() {
+              if (typeof applyCSS === 'function') {
+                applyCSS('');
+              }
+            }, 10);
+            """)
+        log.debug("Cleared profile stylesheet")
+
+    def _apply_profile_stylesheet(self, css_path: Path) -> None:
+        """Load and apply CSS stylesheet to editor canvas.
+
+        Clears any previously applied stylesheet and applies the new one.
+        Defers JS execution until page is ready.
+        """
+        try:
+            with open(css_path, encoding="utf-8") as f:
+                css_text = f.read()
+            self._css_path = str(css_path)
+            css_hash = hash(css_text) % 10000  # For debug logging
+            log.info("Loading CSS (hash=%d): %s", css_hash, css_path)
+
+            # Update status label if it exists (might not during initialization)
+            if hasattr(self, "_css_status_label"):
+                self._css_status_label.setText(f"CSS: {css_path.name}")
+            # Defer JS call until page is ready (setTimeout ensures applyCSS is defined)
+            if hasattr(self, "_view") and self._view:
+                # Defer until after clear completes (clear uses 10ms, so apply at 200ms to be safe)
+                script = f"""
+                setTimeout(function() {{
+                  if (typeof applyCSS === 'function') {{
+                    applyCSS({json.dumps(css_text)});
+                  }}
+                }}, 200);
+                """
+                self._run_js(script)
+                log.info("Queued stylesheet application (hash=%d): %s", css_hash, css_path)
+            else:
+                log.info("Deferred stylesheet application (UI not ready yet): %s", css_path)
+        except Exception as exc:
+            log.error("Failed to apply profile stylesheet %s: %s", css_path, exc)
 
     def _save_documents_path(self, path: str) -> None:
         """Save documents folder path to config for current profile (atomic write)."""
@@ -2366,9 +2923,8 @@ class EditorWindow(QMainWindow):
 
     def _write_html_file(self, path: str, body_html: str) -> None:
         """Write a complete HTML document file from body HTML."""
-        # Use user-selected CSS if set; otherwise fall back to project default
-        css_path = (_BASE / "Resources" / "css" / "styles.css") if _IS_FROZEN else (_BASE / "css" / "styles.css")
-        css_source = Path(self._css_path) if self._css_path else css_path
+        # Use user-selected CSS if set; otherwise use profile/home/project default
+        css_source = Path(self._css_path) if self._css_path else self._get_stylesheet_path()
         if css_source.exists():
             with open(css_source, encoding="utf-8") as f:
                 css_content = f.read()
@@ -2615,6 +3171,18 @@ class EditorWindow(QMainWindow):
         toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
 
+        # Profile selector dropdown (new for 005-editor-profile-clipboard)
+        if hasattr(self, "_config_loader"):
+            profile_label = QLabel("Profile: ")
+            self._profile_selector = QComboBox(self)
+            self._profile_selector.addItems(list(self._config_loader.get_profiles().keys()))
+            self._profile_selector.currentTextChanged.connect(self._on_profile_selected)
+            if hasattr(self, "_current_profile") and self._current_profile in self._config_loader.get_profiles():
+                self._profile_selector.setCurrentText(self._current_profile)
+            toolbar.addWidget(profile_label)
+            toolbar.addWidget(self._profile_selector)
+            toolbar.addSeparator()
+
         style = self.style()
         if style:
             save_action = toolbar.addAction(
@@ -2631,31 +3199,113 @@ class EditorWindow(QMainWindow):
             send_action.triggered.connect(self._menu_send)
 
     # ------------------------------------------------------------------
+    # Profile selection and session management (new for 005-editor-profile-clipboard)
+    # ------------------------------------------------------------------
+
+    def _on_profile_selected(self, profile_name: str) -> None:
+        """Handle profile selection from dropdown.
+
+        Updates default documents path and applies profile stylesheet if defined.
+        """
+        self._current_profile = profile_name
+        profiles = self._config_loader.get_profiles()
+        log.info("Profile selected: %s", profile_name)
+        log.info("Available profiles: %s", list(profiles.keys()))
+        if profile_name in profiles:
+            profile_info = profiles[profile_name]
+            log.info("Profile keys in config: %s", list(profile_info.keys())[:10])  # First 10 keys
+            default_path = profile_info.get("default_documents_path")
+            log.info("Profile '%s' default_documents_path: %r", profile_name, default_path)
+            # Use profile's path if set (not None and not empty); fallback to system default
+            if default_path and default_path != "":
+                self._default_documents_path = default_path
+                self._editor_session.active_profile_default_path = default_path
+                log.info("Updated editor default path to: %s", default_path)
+            else:
+                # Profile has no custom path set; use system default documents folder
+                default_docs_path = self._get_default_documents_path()
+                self._default_documents_path = default_docs_path
+                self._editor_session.active_profile_default_path = default_docs_path
+                log.info("Profile has no default_documents_path; using system default: %s", default_docs_path)
+
+            # Apply profile stylesheet if defined (load directly from raw config, not transformed profile_info)
+            # Always clear previous stylesheet first
+            self._clear_profile_stylesheet()
+
+            if hasattr(self, "_config_data") and profile_name in self._config_data:
+                raw_profile = self._config_data[profile_name]
+                styles_path = raw_profile.get("styles") if isinstance(raw_profile, dict) else None
+                log.info("Profile stylesheet path: %s", styles_path)
+                if styles_path and isinstance(styles_path, str):
+                    css_path = self._resolve_stylesheet_path(styles_path)
+                    if css_path and css_path.exists():
+                        self._apply_profile_stylesheet(css_path)
+                        log.info("✓ Applied profile stylesheet: %s", css_path)
+                    else:
+                        log.warning("✗ Profile stylesheet not found: %s", styles_path)
+                else:
+                    log.info("Profile %s has no stylesheet defined", profile_name)
+
+            self._editor_session.active_profile_name = profile_name
+        self._save_editor_session()
+
+    def _load_editor_session(self) -> None:
+        """Load active profile and document state from session file."""
+        session_file = Path.home() / ".claude" / "editor-session.json"
+        try:
+            if session_file.exists():
+                with open(session_file, encoding="utf-8") as f:
+                    session_data = json.load(f)
+                self._editor_session = EditorSession.from_dict(session_data)
+                if self._editor_session.active_profile_name:
+                    self._current_profile = self._editor_session.active_profile_name
+                if self._editor_session.active_profile_default_path:
+                    self._default_documents_path = self._editor_session.active_profile_default_path
+        except Exception as exc:
+            log.debug("Failed to load editor session: %s", exc)
+
+    def _save_editor_session(self) -> None:
+        """Save active profile and document state to session file."""
+        session_file = Path.home() / ".claude" / "editor-session.json"
+        try:
+            session_file.parent.mkdir(parents=True, exist_ok=True)
+            self._editor_session.active_profile_name = self._current_profile
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump(self._editor_session.to_dict(), f, indent=2)
+        except Exception as exc:
+            log.warning("Failed to save editor session: %s", exc)
+
+    # ------------------------------------------------------------------
     # Menu action handlers
     # ------------------------------------------------------------------
 
     def _menu_open(self) -> None:
         if not self._ask_save_if_dirty():
             return
+        # Use profile's default_documents_path; fallback to system default documents folder
+        default_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
+        log.info("_menu_open: using directory: %r (current profile: %s)", default_dir, getattr(self, "_current_profile", "unknown"))
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Open File",
-            "data",
+            default_dir,
             "Supported files (*.md *.html *.htm);;Markdown (*.md);;HTML (*.html *.htm);;All Files (*)",
         )
         if path:
             self.open_file(path)
 
     def _open_template(self) -> None:
-        """Open data/template.md if it exists."""
+        """Open data/template.md if it exists, or browse templates from default_documents_path."""
         if not self._ask_save_if_dirty():
             return
         template_path = _BASE / "data" / "template.md"
         if template_path.exists():
             self.open_file(str(template_path))
         else:
+            # Use profile's default_documents_path for template browsing; fallback to system default
+            template_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
             path, _ = QFileDialog.getOpenFileName(
-                self, "Open Template", "data", "Markdown (*.md);;HTML (*.html)"
+                self, "Open Template", template_dir, "Markdown (*.md);;HTML (*.html)"
             )
             if path:
                 self.open_file(path)
@@ -2777,12 +3427,14 @@ class EditorWindow(QMainWindow):
 
         config_path = self._resolve_send_config_path()
         config_data = self._load_send_config(config_path)
+        # Use currently selected profile in main window (not hardcoded "default")
+        initial_profile = getattr(self, "_current_profile", "default")
         dialog = _SendDialog(
             self,
             attachment_path=str(self._file_path),
             config_path=config_path,
             config_data=config_data,  # type: ignore[arg-type]
-            initial_profile="default",
+            initial_profile=initial_profile,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -2811,11 +3463,13 @@ class EditorWindow(QMainWindow):
         """Open the settings dialog to edit the sendMail YAML config file."""
         config_path = self._resolve_send_config_path()
         config_data = self._load_send_config(config_path)
+        # Use currently selected profile in main window (not hardcoded "default")
+        initial_profile = getattr(self, "_current_profile", "default")
         dialog = _ConfigDialog(
             self,
             config_path=config_path,
             config_data=config_data,
-            initial_profile="default",
+            initial_profile=initial_profile,
         )
         dialog.exec()
 
@@ -2828,8 +3482,7 @@ class EditorWindow(QMainWindow):
 
     def _menu_apply_css(self) -> None:
         """Open a CSS file picker and apply the stylesheet to the editor canvas."""
-        css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
-        initial = str(Path(self._css_path).parent) if self._css_path else str(css_dir)
+        initial = str(Path(self._css_path).parent) if self._css_path else str(self._get_css_directory())
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Apply Stylesheet",
@@ -2871,6 +3524,62 @@ class EditorWindow(QMainWindow):
 
     def _on_dirty_changed(self, _dirty: bool) -> None:  # noqa: ARG002
         self._update_title()
+
+    def _on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
+        """Handle clipboard analysis from paste event.
+
+        For html_rich: Quill natively preserves links.
+        For plain_text with URLs: Apply linkification to convert URLs to clickable links.
+        """
+        if content_type == "html_rich":
+            log.debug("Clipboard: HTML content with links=%s, urls=%s", has_html_links, len(detected_urls))
+        elif content_type == "plain_text" and detected_urls:
+            log.debug("Clipboard: Plain text with %d URLs detected: %s", len(detected_urls), detected_urls)
+            # Apply linkification to detected URLs in editor content
+            self._apply_url_linkification(detected_urls)
+        else:
+            log.debug("Clipboard: Plain text without URLs")
+
+    def _apply_url_linkification(self, urls: list[str]) -> None:
+        """Apply link formatting to detected plain-text URLs in editor.
+
+        Converts detected plain-text URLs to clickable hyperlinks.
+        Skips URLs that are already formatted as links.
+        """
+        if not urls:
+            return
+        # Create JavaScript to find and linkify plain-text URLs
+        url_json = json.dumps(urls)
+        script = f"""
+        (function() {{
+          const urls = {url_json};
+          const content = quill.getContents();
+          let offset = 0;
+
+          // Iterate through editor operations to find and format URLs
+          content.ops.forEach(function(op) {{
+            if (op.insert && typeof op.insert === 'string') {{
+              const text = op.insert;
+              const isLink = op.attributes && op.attributes.link;
+
+              // Only linkify plain text (not already formatted)
+              if (!isLink) {{
+                urls.forEach(function(url) {{
+                  let index = text.indexOf(url);
+                  while (index >= 0) {{
+                    quill.formatText(offset + index, url.length, 'link', url, 'silent');
+                    index = text.indexOf(url, index + url.length);
+                  }}
+                }});
+              }}
+              offset += text.length;
+            }} else if (op.insert) {{
+              offset += 1; // For embeds (images, etc.)
+            }}
+          }});
+        }})();
+        """
+        self._run_js(script)
 
     def _update_title(self) -> None:
         dirty_marker = " *" if self._bridge.is_dirty else ""
