@@ -343,9 +343,6 @@ class TestHtmlFileWriter:
         """Call _write_html_file with a temp _BASE that has no css/ dir."""
         class _FakeWindow:
             _css_path = css_path
-            def _get_stylesheet_path(self) -> Path:
-                """Mock method - returns temp dir default stylesheet path."""
-                return Path(tempfile.gettempdir()) / "css" / "styles.css"
         with patch.object(editor, "_BASE", Path(tempfile.gettempdir())):
             editor.EditorWindow._write_html_file(_FakeWindow(), path, body_html)
 

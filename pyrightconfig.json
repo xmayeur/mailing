@@ -1,0 +1,12 @@
+{
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "ignore": [
+    "src/editor.py",
+    "tests/test_editor.py",
+    "tests/unit/test_editor.py",
+    "dist",
+    "release",
+    "docs"
+  ]
+}

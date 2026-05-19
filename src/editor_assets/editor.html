@@ -487,44 +487,6 @@
         return new Delta().insert({ image: src }, attrs);
       });
 
-      // Auto-linkify plain-text URLs via text-change event (debounced)
-      let linkifyTimer;
-      quill.on('text-change', function(delta, oldDelta, source) {
-        if (source === 'user') {
-          clearTimeout(linkifyTimer);
-          // Wait for paste/typing to complete before linkifying (1000ms allows full URL entry)
-          linkifyTimer = setTimeout(function() {
-            linkifyAllURLs();
-          }, 1000);
-        }
-      });
-
-      function linkifyAllURLs() {
-        const content = quill.getContents();
-        let offset = 0;
-        const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+|ftp:\/\/[^\s<>"{}|\\^`\[\]]+/g;
-
-        content.ops.forEach(function(op) {
-          if (op.insert && typeof op.insert === 'string' && !op.attributes) {
-            const text = op.insert;
-            let match;
-            const matches = [];
-            while ((match = urlRegex.exec(text)) !== null) {
-              matches.push({ start: offset + match.index, url: match[0] });
-            }
-            // Apply in reverse to preserve offsets
-            matches.reverse().forEach(function(m) {
-              quill.formatText(m.start, m.url.length, 'link', m.url, 'silent');
-            });
-            offset += text.length;
-          } else if (op.insert && typeof op.insert === 'string') {
-            offset += op.insert.length;
-          } else {
-            offset += 1;
-          }
-        });
-      }
-
       function _copyAttributes(sourceNode, targetNode) {
         Array.from(targetNode.attributes).forEach(function(attr) {
           targetNode.removeAttribute(attr.name);
@@ -855,52 +817,6 @@
             quill.setSelection(range.index + displayText.length, Quill.sources.SILENT);
           }
         });
-      }
-
-      // ----------------------------------------------------------------
-      // Clipboard analysis on paste (T013: paste event handler hook)
-      // ----------------------------------------------------------------
-      quill.on('editor-change', function(delta, oldDelta, source) {
-        if (source === 'user') {
-          // Analyze clipboard content when user pastes
-          analyzeClipboardContent();
-        }
-      });
-
-      async function analyzeClipboardContent() {
-        try {
-          // Try to read clipboard content
-          const clipboardData = await navigator.clipboard.read();
-          const urlPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]]+|ftp:\/\/[^\s<>"{}|\\^`\[\]]+/g;
-
-          for (let item of clipboardData) {
-            if (item.types.includes('text/html')) {
-              const blob = await item.getType('text/html');
-              const htmlString = await blob.text();
-              // Send clipboard analysis to Python via QWebChannel
-              if (window.bridge && window.bridge.on_clipboard_analyzed) {
-                // Extract URLs from HTML and detect existing links
-                const urls = htmlString.match(urlPattern) || [];
-                const hasLinks = /<a\s+[^>]*href\s*=/.test(htmlString);
-                window.bridge.on_clipboard_analyzed('html_rich', hasLinks, urls);
-              }
-              return;
-            } else if (item.types.includes('text/plain')) {
-              const blob = await item.getType('text/plain');
-              const plainText = await blob.text();
-              // Send plain text analysis to Python via QWebChannel
-              if (window.bridge && window.bridge.on_clipboard_analyzed) {
-                const urls = plainText.match(urlPattern) || [];
-                const hasUrls = urls.length > 0;
-                window.bridge.on_clipboard_analyzed('plain_text', hasUrls, urls);
-              }
-              return;
-            }
-          }
-        } catch (e) {
-          // Clipboard API not available or access denied
-          // Fallback: let Quill handle native paste
-        }
       }
 
       // ----------------------------------------------------------------

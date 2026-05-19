@@ -39,49 +39,6 @@ class DatabaseSchemaProvider:
             return []
 
     @staticmethod
-    def from_excel(excel_path: str, sheet_name: str | None = None) -> list[str]:
-        """Extract field names from Excel file (XLSX/XLS) headers.
-
-        Uses python-calamine (same as sendMail.py) for reading Excel files.
-
-        Args:
-            excel_path: Path to Excel file
-            sheet_name: Sheet name (if None, uses first sheet)
-
-        Returns:
-            List of field names from first row (headers)
-        """
-        try:
-            from python_calamine import CalamineWorkbook
-
-            wb = CalamineWorkbook.from_path(excel_path)
-            # Get sheet by name if specified, otherwise first sheet
-            ws = None
-            if sheet_name:
-                for i, name in enumerate(wb.sheet_names):
-                    if name == sheet_name:
-                        ws = wb.get_sheet_by_index(i)
-                        break
-                if ws is None:
-                    log.debug("Could not find sheet in Excel file: %s", sheet_name)
-                    return []
-            else:
-                ws = wb.get_sheet_by_index(0)
-
-            # First row contains headers
-            data = ws.to_python()
-            if data and len(data) > 0:
-                headers = data[0]
-                return [str(h).strip() for h in headers if h and str(h).strip()]
-            return []
-        except ImportError:
-            log.error("python-calamine not available for Excel support")
-            return []
-        except Exception as e:
-            log.debug("Could not read Excel headers: %s", e)
-            return []
-
-    @staticmethod
     def from_google_sheets(
         service: Any, spreadsheet_id: str, sheet_name: str | None = None  # noqa: ARG004
     ) -> list[str]:
@@ -124,11 +81,9 @@ class DatabaseSchemaProvider:
     ) -> list[str]:
         """Detect database type and extract schema.
 
-        B009: Support CSV, Excel (XLSX/XLS), and Google Sheets databases.
-
         Args:
-            database_path: Path to CSV/Excel file or Google Sheets URL/ID
-            sheet_name: Sheet name for Excel/Google Sheets
+            database_path: Path to CSV file or Google Sheets URL/ID
+            sheet_name: Sheet name for Google Sheets
             gsheet_service: Google Sheets service object
 
         Returns:
@@ -138,29 +93,14 @@ class DatabaseSchemaProvider:
             return []
 
         path = Path(database_path)
-        suffix = path.suffix.lower()
 
-        if suffix == ".csv":
-            if path.exists():
-                return DatabaseSchemaProvider.from_csv(database_path)
-            log.warning("CSV database file not found: %s", database_path)
-            return []
-
-        # B009: Handle Excel files (XLSX, XLS)
-        if suffix in (".xlsx", ".xls"):
-            if path.exists():
-                return DatabaseSchemaProvider.from_excel(database_path, sheet_name)
-            log.warning("Excel database file not found: %s", database_path)
-            return []
+        if path.suffix.lower() == ".csv" and path.exists():
+            return DatabaseSchemaProvider.from_csv(database_path)
 
         if gsheet_service and ("docs.google" in database_path or len(database_path) > 20):
             return DatabaseSchemaProvider.from_google_sheets(
                 gsheet_service, database_path, sheet_name
             )
 
-        # B016: Distinguish between file not found and unknown type
-        if suffix in (".csv", ".xlsx", ".xls"):
-            log.warning("Database file not found: %s", database_path)
-        else:
-            log.debug("Unknown database type: %s", database_path)
+        log.debug("Unknown database type: %s", database_path)
         return []
