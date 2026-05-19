@@ -73,23 +73,23 @@ cambristiEffective:
     email: is not empty
   styles: ./css/styles.css
   default_message: ''
-default:
-  default_documents_path: /Users/xavier/PycharmProjects/sendMail/data
-  username: jdoe
-  password: foobar
-  sender: john.doe@example.com
-  sendername: John Doe
-  database: Subscribers.csv
-  smtp_host: smtp.example.com
-  smtp_port: 587
-  imap_host: imap.example.com
-  imap_port: 993
-  sent_folder: Sent
-  default_message: ''
-  pause: 1
-  styles: ./css/styles.css
-  filter:
-    Email: is not empty
-    First Name: one of "Jean", "Xavier"
-  filter_test:
-    email: is "Toto the Tester"
+#default:
+#  default_documents_path: /Users/xavier/PycharmProjects/sendMail/data
+#  username: jdoe
+#  password: foobar
+#  sender: john.doe@example.com
+#  sendername: John Doe
+#  database: Subscribers.csv
+#  smtp_host: smtp.example.com
+#  smtp_port: 587
+#  imap_host: imap.example.com
+#  imap_port: 993
+#  sent_folder: Sent
+#  default_message: ''
+#  pause: 1
+#  styles: ./css/styles.css
+#  filter:
+#    Email: is not empty
+#    First Name: one of "Jean", "Xavier"
+#  filter_test:
+#    email: is "Toto the Tester"
