@@ -3140,15 +3140,17 @@ class EditorWindow(QMainWindow):
             self.open_file(path)
 
     def _open_template(self) -> None:
-        """Open data/template.md if it exists."""
+        """Open data/template.md if it exists, or browse templates from default_documents_path."""
         if not self._ask_save_if_dirty():
             return
         template_path = _BASE / "data" / "template.md"
         if template_path.exists():
             self.open_file(str(template_path))
         else:
+            # Use profile's default_documents_path for template browsing; fallback to "data"
+            template_dir = getattr(self, "_default_documents_path", None) or "data"
             path, _ = QFileDialog.getOpenFileName(
-                self, "Open Template", "data", "Markdown (*.md);;HTML (*.html)"
+                self, "Open Template", template_dir, "Markdown (*.md);;HTML (*.html)"
             )
             if path:
                 self.open_file(path)
