@@ -3319,11 +3319,13 @@ class EditorWindow(QMainWindow):
         """Open the settings dialog to edit the sendMail YAML config file."""
         config_path = self._resolve_send_config_path()
         config_data = self._load_send_config(config_path)
+        # Use currently selected profile in main window (not hardcoded "default")
+        initial_profile = getattr(self, "_current_profile", "default")
         dialog = _ConfigDialog(
             self,
             config_path=config_path,
             config_data=config_data,
-            initial_profile="default",
+            initial_profile=initial_profile,
         )
         dialog.exec()
 
