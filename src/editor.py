@@ -100,7 +100,7 @@ class _LogCapture(logging.Handler):
 # ---------------------------------------------------------------------------
 # Qt imports
 # ---------------------------------------------------------------------------
-from PyQt6.QtCore import QByteArray, QObject, QSize, QTimer, QUrl, pyqtSignal, pyqtSlot  # noqa: E402
+from PyQt6.QtCore import QByteArray, QObject, QSize, Qt, QTimer, QUrl, pyqtSignal, pyqtSlot  # noqa: E402
 from PyQt6.QtGui import QIcon, QPixmap  # noqa: E402
 from PyQt6.QtWebChannel import QWebChannel  # noqa: E402
 from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
@@ -116,7 +116,10 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QInputDialog,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -370,7 +373,11 @@ class _SendDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Send Mailing")
-        self.setMinimumWidth(720)
+        # Keep dialog on top of main window (non-blocking show)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        # B040: Dialog width extends beyond filter widget right edge
+        # Filter widget 900px + scroll area margins/scrollbar + dialog margins = 1150px
+        self.setMinimumWidth(1150)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
         self._current_profile = ""
@@ -378,6 +385,8 @@ class _SendDialog(QDialog):
         self._initial_config_data = config_data or {}
         self._session_filter: dict[str, str] | None = None
         self._original_filter_text = ""
+        self._test_sent: bool = False
+        self.attachments: list[str] = []
 
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 12)
@@ -404,9 +413,28 @@ class _SendDialog(QDialog):
 
         attachment_label = QLabel(Path(attachment_path).name, self)
         attachment_label.setToolTip(attachment_path)
-        form.addRow("Attachment", attachment_label)
+        attachment_widget = QWidget(self)
+        attachment_layout = QVBoxLayout(attachment_widget)
+        attachment_layout.setContentsMargins(0, 0, 0, 0)
+        attachment_layout.setSpacing(4)
+        attachment_layout.addWidget(attachment_label)
+        self.attachment_list = QListWidget(self)
+        self.attachment_list.setMinimumHeight(80)
+        self.attachment_list.setMaximumHeight(120)
+        self.attachment_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.attachment_list.customContextMenuRequested.connect(self._on_attachment_context_menu)
+        add_attachment_btn = QPushButton("Add File(s)", attachment_widget)
+        add_attachment_btn.clicked.connect(self._on_add_attachment)
+        attachment_layout.addWidget(add_attachment_btn)
+        attachment_layout.addWidget(self.attachment_list)
+        help_label = QLabel("(Right-click on file to remove)", attachment_widget)
+        help_label.setStyleSheet("color: #999; font-size: 10px;")
+        attachment_layout.addWidget(help_label)
+        form.addRow("Attachments", attachment_widget)
 
         self.subject_input = QLineEdit(self)
+        extracted_subject = self._extract_subject_from_html(attachment_path)
+        self.subject_input.setText(extracted_subject)
         form.addRow("Subject", self.subject_input)
 
         self.message_input = QPlainTextEdit(self)
@@ -483,7 +511,11 @@ class _SendDialog(QDialog):
         flag_layout.setContentsMargins(0, 0, 0, 0)
         flag_layout.setSpacing(10)
         self.test_check = QCheckBox("Test", flag_row)
+        self.test_check.blockSignals(True)
+        self.test_check.setChecked(True)
         self.test_check.toggled.connect(self._on_test_mode_toggled)
+        self.test_check.blockSignals(False)
+        self._update_test_mode_lock()
         self.verbose_check = QCheckBox("Verbose", flag_row)
         self.do_not_send_check = QCheckBox("Do not send", flag_row)
         for widget in (self.test_check, self.verbose_check, self.do_not_send_check):
@@ -534,15 +566,21 @@ class _SendDialog(QDialog):
         filter_buttons_layout.addStretch(1)
         root.addWidget(filter_buttons)
 
+        # Spinner label (shown during send)
+        self.spinner_label = QLabel("Sending...", self)
+        self.spinner_label.setStyleSheet("color: #666; font-style: italic;")
+        self.spinner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.spinner_label.hide()
+        root.addWidget(self.spinner_label)
+
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            QDialogButtonBox.StandardButton.Cancel,
             parent=self,
         )
-        ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        if ok_button:
-            ok_button.setText("Send")
-        buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        # Add custom Send button (don't auto-close dialog on click)
+        self.send_button = QPushButton("Send", self)
+        buttons.addButton(self.send_button, QDialogButtonBox.ButtonRole.AcceptRole)
         root.addWidget(buttons)
 
         self._reload_profiles()
@@ -614,7 +652,26 @@ class _SendDialog(QDialog):
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
 
-        self.subject_input.setText(Path(self._attachment_path).stem)
+        # T035: Update FilterBuilder schema when database changes
+        # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
+        if self._filter_builder:
+            t1 = time.time()
+            schema_fields = self._get_database_schema()
+            t2 = time.time()
+            log.info("TIMING: _get_database_schema took %.2fs", t2-t1)
+            log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
+                     profile, self.database_input.text(), schema_fields)
+            self._schema_info = DatabaseSchemaInfo(schema_fields)
+            self._filter_builder.schema_info = self._schema_info
+            log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
+            # Call refresh_schema on table_widget to update all row dropdowns
+            t3 = time.time()
+            self._filter_builder._table_widget.refresh_schema(self._schema_info)
+            t4 = time.time()
+            log.info("TIMING: refresh_schema took %.2fs", t4-t3)
+            log.info("DEBUG: refresh_schema called, row_widgets=%d",
+                     len(self._filter_builder._table_widget._row_widgets))
+
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
         self.body_input.setText("")
         self.password_input.setText(str(profile_cfg.get("password", "")))
@@ -625,7 +682,6 @@ class _SendDialog(QDialog):
         self.max_mails_input.setValue(max(1, _int_or_zero(profile_cfg.get("max_mails_per_hour", 1000)) or 1000))
         self.max_addr_input.setValue(max(1, _int_or_zero(profile_cfg.get("max_addr_per_mail", 50)) or 50))
         self.pause_input.setValue(max(0, _int_or_zero(profile_cfg.get("pause", 3))))
-        self.test_check.setChecked(bool(profile_cfg.get("test", False)))
         self.verbose_check.setChecked(bool(profile_cfg.get("verbose", False)))
         self.do_not_send_check.setChecked(bool(profile_cfg.get("doNotSend", False)))
 
@@ -659,6 +715,72 @@ class _SendDialog(QDialog):
         self.filter_status_label.setText("")
         self._original_filter_text = filter_str
         self._session_filter = None
+
+    def _extract_subject_from_html(self, html_path: str) -> str:
+        """Extract subject from <h1> heading or filename (T005-T008).
+
+        Returns: Subject text (up to 50 characters)
+        """
+        try:
+            from bs4 import BeautifulSoup
+            with open(html_path, encoding="utf-8") as f:
+                soup = BeautifulSoup(f, "html.parser")
+                h1 = soup.find("h1")
+                if h1:
+                    text = h1.get_text(strip=True)
+                    log.info("Extracted h1 from HTML: %s", text[:50])
+                    return text[:50]
+                else:
+                    log.info("No h1 found in HTML file")
+        except Exception as e:
+            log.warning("Could not extract h1 from HTML: %s", e)
+        filename = Path(html_path).stem
+        log.info("Using filename fallback: %s", filename[:50])
+        return filename[:50]
+
+    def _on_add_attachment(self) -> None:
+        """Open file picker and add selected files to attachment list (T012-T013)."""
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select files to attach",
+            str(Path.home()),
+            "All Files (*)",
+        )
+        for file_path in files:
+            self.attachments.append(file_path)
+            item = QListWidgetItem(Path(file_path).name)
+            self.attachment_list.addItem(item)
+
+    def _on_remove_attachment(self, row: int) -> None:
+        """Remove file from attachment list (T014)."""
+        if 0 <= row < len(self.attachments):
+            self.attachments.pop(row)
+            self.attachment_list.takeItem(row)
+
+    def _on_attachment_context_menu(self, pos: Any) -> None:
+        """Show context menu for attachment list (T014)."""
+        item = self.attachment_list.itemAt(pos)
+        if not item:
+            return
+        row = self.attachment_list.row(item)
+        menu = QMenu(self)
+        delete_action = menu.addAction("Delete")
+        if delete_action:
+            delete_action.triggered.connect(lambda: self._on_remove_attachment(row))
+        menu.exec(self.attachment_list.mapToGlobal(pos))
+
+    def _update_test_mode_lock(self) -> None:
+        """Update test checkbox lock state based on _test_sent (T020)."""
+        if not self._test_sent:
+            self.test_check.setChecked(True)
+            self.test_check.setEnabled(False)
+        else:
+            self.test_check.setEnabled(True)
+
+    def _unlock_test_mode(self) -> None:
+        """Unlock test checkbox after successful test send (T022)."""
+        self._test_sent = True
+        self._update_test_mode_lock()
 
     def _on_test_mode_toggled(self, _checked: bool) -> None:
         """Update filter when test mode is toggled (T041)."""
@@ -952,6 +1074,7 @@ class _SendDialog(QDialog):
         namespace.message = self.message_input.toPlainText().strip()
         namespace.body = self.body_input.text().strip() or None
         namespace.file = [self._attachment_path]
+        namespace.attachment = self.attachments if self.attachments else None
         namespace.test = self.test_check.isChecked()
         namespace.verbose = self.verbose_check.isChecked()
         namespace.doNotSend = self.do_not_send_check.isChecked()
@@ -2762,6 +2885,59 @@ class EditorWindow(QMainWindow):
             return True
         return bool(result)
 
+    def _on_send_dialog_send(self, dialog: _SendDialog) -> None:
+        """Handle Send button click in Send Mailing dialog (T023: keep dialog open during send)."""
+        dialog.send_button.setEnabled(False)
+        dialog.spinner_label.show()
+        self._send_in_progress = True
+        log_entries: list[str] = []
+        log_handler = _LogCapture(log_entries)
+        logging.getLogger().addHandler(log_handler)
+        try:
+            result = self._send_with_sendmail(dialog)
+        except Exception as exc:
+            QMessageBox.critical(self, "Send Error", f"Failed to send:\n{exc}")
+            log.error("Send failed: %s", exc)
+            dialog.send_button.setEnabled(True)
+            dialog.spinner_label.hide()
+            return
+        finally:
+            self._send_in_progress = False
+            logging.getLogger().removeHandler(log_handler)
+
+        dialog.spinner_label.hide()
+
+        if not self._send_result_is_success(result):
+            log.warning("sendMail returned non-success status after send attempt: %r", result)
+            dialog.send_button.setEnabled(True)
+        elif result.strip().upper() == "OK_TEST":
+            # Show confirmation dialog for test email (US3)
+            confirm_result = QMessageBox.question(
+                dialog,
+                "Test Email Sent",
+                "Test email sent successfully.\n\nHave the test recipients confirmed\nthe mailing looks good?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if confirm_result == QMessageBox.StandardButton.Yes:
+                dialog._unlock_test_mode()
+                # After confirmation, clear test checkbox and refresh data for bulk send
+                dialog.test_check.blockSignals(True)
+                dialog.test_check.setChecked(False)
+                dialog.test_check.blockSignals(False)
+                # Switch from test filter to regular filter and refresh data
+                dialog.load_current_filter(dialog._current_profile)
+                dialog.filter_and_display_records()
+            dialog.send_button.setEnabled(True)
+            return  # Don't close dialog after test
+
+        log_dialog = _SessionLogDialog(self, log_entries=log_entries)
+        log_dialog.exec()
+
+        # Close dialog only after successful bulk send (not after test)
+        if result.strip().upper() == "OK" and self._send_result_is_success(result):
+            dialog.accept()
+
     def _menu_send(self) -> None:
         """Open the send dialog and send the current HTML file if confirmed."""
         if self._send_in_progress:
@@ -2784,28 +2960,9 @@ class EditorWindow(QMainWindow):
             config_data=config_data,  # type: ignore[arg-type]
             initial_profile="default",
         )
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        self._send_in_progress = True
-        log_entries: list[str] = []
-        log_handler = _LogCapture(log_entries)
-        logging.getLogger().addHandler(log_handler)
-        try:
-            result = self._send_with_sendmail(dialog)
-        except Exception as exc:
-            QMessageBox.critical(self, "Send Error", f"Failed to send:\n{exc}")
-            log.error("Send failed: %s", exc)
-            return
-        finally:
-            self._send_in_progress = False
-            logging.getLogger().removeHandler(log_handler)
-
-        if not self._send_result_is_success(result):
-            log.warning("sendMail returned non-success status after send attempt: %r", result)
-
-        log_dialog = _SessionLogDialog(self, log_entries=log_entries)
-        log_dialog.exec()
+        # Use show() instead of exec() so send can happen while dialog is visible (T023: test mode confirmation)
+        dialog.send_button.clicked.connect(lambda: self._on_send_dialog_send(dialog))
+        dialog.show()
 
     def _menu_edit_config(self) -> None:
         """Open the settings dialog to edit the sendMail YAML config file."""
