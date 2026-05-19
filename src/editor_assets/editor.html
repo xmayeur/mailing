@@ -820,6 +820,37 @@
       }
 
       // ----------------------------------------------------------------
+      // Clipboard analysis on paste (T013: paste event handler hook)
+      // ----------------------------------------------------------------
+      quill.on('editor-change', function(delta, oldDelta, source) {
+        if (source === 'user') {
+          // Analyze clipboard content when user pastes
+          analyzeClipboardContent();
+        }
+      });
+
+      async function analyzeClipboardContent() {
+        try {
+          // Try to read HTML from clipboard
+          const clipboardData = await navigator.clipboard.read();
+          for (let item of clipboardData) {
+            if (item.types.includes('text/html')) {
+              const blob = await item.getType('text/html');
+              const htmlString = await blob.text();
+              // Emit clipboard analyzed signal (T012: expose qtBridge.clipboardAnalyzed)
+              if (window.bridge && window.bridge.clipboardAnalyzed) {
+                window.bridge.clipboardAnalyzed('html_rich', true, []);
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          // Clipboard API not available or access denied
+          // Fallback: let Quill handle native paste
+        }
+      }
+
+      // ----------------------------------------------------------------
       // Forward unhandled JS errors to Python
       // ----------------------------------------------------------------
       window.onerror = function(msg, src, line) {
