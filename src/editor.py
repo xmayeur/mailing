@@ -3086,13 +3086,22 @@ class EditorWindow(QMainWindow):
         """Handle profile selection from dropdown."""
         self._current_profile = profile_name
         profiles = self._config_loader.get_profiles()
+        log.info("Profile selected: %s", profile_name)
+        log.info("Available profiles: %s", list(profiles.keys()))
         if profile_name in profiles:
             profile_info = profiles[profile_name]
             default_path = profile_info.get("default_documents_path")
-            # Check for not None AND not empty string (empty string is falsy but exists in config)
-            if default_path is not None and default_path != "":
+            log.info("Profile '%s' default_documents_path: %r", profile_name, default_path)
+            # Use profile's path if set (not None and not empty); fallback to 'data'
+            if default_path and default_path != "":
                 self._default_documents_path = default_path
                 self._editor_session.active_profile_default_path = default_path
+                log.info("Updated editor default path to: %s", default_path)
+            else:
+                # Profile has no custom path set; use 'data' as default
+                self._default_documents_path = "data"
+                self._editor_session.active_profile_default_path = "data"
+                log.info("Profile has no default_documents_path; using 'data'")
             self._editor_session.active_profile_name = profile_name
         self._save_editor_session()
 
@@ -3131,6 +3140,7 @@ class EditorWindow(QMainWindow):
             return
         # Use profile's default_document_path; fallback to "data" if not set (BF001 fix)
         default_dir = getattr(self, "_default_documents_path", None) or "data"
+        log.info("_menu_open: using directory: %r (current profile: %s)", default_dir, getattr(self, "_current_profile", "unknown"))
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Open File",
