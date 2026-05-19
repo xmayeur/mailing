@@ -1038,36 +1038,32 @@ def generate_mailing(param):
 
 
 _FILTER_OPS = [
-    # Longer operators first to avoid substring matches
-    # E.g., "is equal to" before "is", "is not equal to" before "is not"
-    "does not contain",
-    "does not match",
-    "does not",
-    "is not empty",
-    _OP_IS_NOT_EQUAL_TO,  # "is not equal to"
-    "is not",
-    "greater or equal to",
-    "less or equal to",
-    _OP_IS_EQUAL_TO,  # "is equal to"
-    "greater than",
-    "less than",
-    "is empty",
-    _OP_IS_NOT_EMPTY,  # "is not empty"
-    "starts with",
-    "ends with",
-    "matches",
-    "one of",
-    "none of",
-    "not in",
     "is",
-    "in",
+    "is not",
     "gt",
     "lt",
     "ge",
     "le",
+    "in",
+    "not in",
+    "is empty",
+    _OP_IS_NOT_EMPTY,
+    "greater than",
+    "less than",
+    "greater or equal to",
+    "less or equal to",
+    "one of",
+    "none of",
+    _OP_IS_EQUAL_TO,
+    _OP_IS_NOT_EQUAL_TO,
     "eq",
     "ne",
     "contains",
+    "does not contain",
+    "starts with",
+    "ends with",
+    "matches",
+    "does not match",
 ]
 
 
