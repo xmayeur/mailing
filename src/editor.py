@@ -2420,6 +2420,46 @@ class EditorWindow(QMainWindow):
         except Exception:
             return False
 
+    def _get_stylesheet_path(self) -> Path:
+        """Get stylesheet path: profile's styles → HOME/css/styles.css → project default."""
+        # Try to get from current profile config
+        if hasattr(self, "_current_profile") and hasattr(self, "_config_data"):
+            profile_cfg = self._config_data.get(self._current_profile, {})
+            profile_styles = profile_cfg.get("styles")
+            if profile_styles and isinstance(profile_styles, str):
+                styles_path = Path(profile_styles).expanduser().absolute()
+                if styles_path.exists():
+                    return styles_path
+
+        # Try HOME/css/styles.css
+        home_css = Path.home() / "css" / "styles.css"
+        if home_css.exists():
+            return home_css
+
+        # Fall back to project default
+        default_css = (_BASE / "Resources" / "css" / "styles.css") if _IS_FROZEN else (_BASE / "css" / "styles.css")
+        return default_css
+
+    def _get_css_directory(self) -> Path:
+        """Get CSS directory: profile's styles dir → HOME/css → project default."""
+        # Try to get directory from profile config
+        if hasattr(self, "_current_profile") and hasattr(self, "_config_data"):
+            profile_cfg = self._config_data.get(self._current_profile, {})
+            profile_styles = profile_cfg.get("styles")
+            if profile_styles and isinstance(profile_styles, str):
+                styles_dir = Path(profile_styles).expanduser().absolute().parent
+                if styles_dir.exists():
+                    return styles_dir
+
+        # Try HOME/css
+        home_css_dir = Path.home() / "css"
+        if home_css_dir.exists():
+            return home_css_dir
+
+        # Fall back to project default
+        default_css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
+        return default_css_dir
+
     def _save_documents_path(self, path: str) -> None:
         """Save documents folder path to config for current profile (atomic write)."""
         try:
@@ -2803,9 +2843,8 @@ class EditorWindow(QMainWindow):
 
     def _write_html_file(self, path: str, body_html: str) -> None:
         """Write a complete HTML document file from body HTML."""
-        # Use user-selected CSS if set; otherwise fall back to project default
-        css_path = (_BASE / "Resources" / "css" / "styles.css") if _IS_FROZEN else (_BASE / "css" / "styles.css")
-        css_source = Path(self._css_path) if self._css_path else css_path
+        # Use user-selected CSS if set; otherwise use profile/home/project default
+        css_source = Path(self._css_path) if self._css_path else self._get_stylesheet_path()
         if css_source.exists():
             with open(css_source, encoding="utf-8") as f:
                 css_content = f.read()
@@ -3099,10 +3138,11 @@ class EditorWindow(QMainWindow):
                 self._editor_session.active_profile_default_path = default_path
                 log.info("Updated editor default path to: %s", default_path)
             else:
-                # Profile has no custom path set; use 'data' as default
-                self._default_documents_path = "data"
-                self._editor_session.active_profile_default_path = "data"
-                log.info("Profile has no default_documents_path; using 'data'")
+                # Profile has no custom path set; use system default documents folder
+                default_docs_path = self._get_default_documents_path()
+                self._default_documents_path = default_docs_path
+                self._editor_session.active_profile_default_path = default_docs_path
+                log.info("Profile has no default_documents_path; using system default: %s", default_docs_path)
             self._editor_session.active_profile_name = profile_name
         self._save_editor_session()
 
@@ -3139,8 +3179,8 @@ class EditorWindow(QMainWindow):
     def _menu_open(self) -> None:
         if not self._ask_save_if_dirty():
             return
-        # Use profile's default_document_path; fallback to "data" if not set (BF001 fix)
-        default_dir = getattr(self, "_default_documents_path", None) or "data"
+        # Use profile's default_documents_path; fallback to system default documents folder
+        default_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
         log.info("_menu_open: using directory: %r (current profile: %s)", default_dir, getattr(self, "_current_profile", "unknown"))
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -3159,8 +3199,8 @@ class EditorWindow(QMainWindow):
         if template_path.exists():
             self.open_file(str(template_path))
         else:
-            # Use profile's default_documents_path for template browsing; fallback to "data"
-            template_dir = getattr(self, "_default_documents_path", None) or "data"
+            # Use profile's default_documents_path for template browsing; fallback to system default
+            template_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
             path, _ = QFileDialog.getOpenFileName(
                 self, "Open Template", template_dir, "Markdown (*.md);;HTML (*.html)"
             )
@@ -3339,8 +3379,7 @@ class EditorWindow(QMainWindow):
 
     def _menu_apply_css(self) -> None:
         """Open a CSS file picker and apply the stylesheet to the editor canvas."""
-        css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
-        initial = str(Path(self._css_path).parent) if self._css_path else str(css_dir)
+        initial = str(Path(self._css_path).parent) if self._css_path else str(self._get_css_directory())
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Apply Stylesheet",
