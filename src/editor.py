@@ -2047,6 +2047,148 @@ class _ConfigDialog(QDialog):
 
 
 # ---------------------------------------------------------------------------
+# Profile, Clipboard, and Session Management
+# ---------------------------------------------------------------------------
+
+class ConfigLoader:
+    """Load email profiles from config.yml."""
+
+    def __init__(self, config_path: str) -> None:
+        self.config_path = config_path
+        self.profiles: dict[str, dict[str, Any]] = {}
+        self.load_profiles_from_config()
+
+    def load_profiles_from_config(self) -> None:
+        """Load profiles from config.yml and parse default_document_path field."""
+        try:
+            if not os.path.exists(self.config_path):
+                log.warning("Config file not found: %s", self.config_path)
+                return
+            with open(self.config_path, encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            for profile_name, profile_config in config.items():
+                if isinstance(profile_config, dict):
+                    self.profiles[profile_name] = {
+                        "name": profile_name,
+                        "default_document_path": profile_config.get("default_document_path"),
+                        "config": profile_config,
+                    }
+        except Exception as exc:
+            log.warning("Failed to load profiles from config: %s", exc)
+
+    def get_profiles(self) -> dict[str, dict[str, Any]]:
+        """Return loaded profiles."""
+        return self.profiles
+
+
+@dataclass
+class ClipboardOperation:
+    """Represents clipboard paste operation with content analysis."""
+
+    content_type: str  # "html_rich", "plain_text", "markdown"
+    has_urls: bool
+    detected_urls: list[str]
+    has_existing_links: bool
+    raw_html: str | None
+    raw_text: str
+
+
+class ClipboardProcessor:
+    """Analyze clipboard content for content type and URL detection."""
+
+    URL_PATTERN = r"https?://[^\s<>\"{}|\\^`\[\]]+|ftp://[^\s<>\"{}|\\^`\[\]]+"
+
+    def analyze_paste(self, raw_text: str, raw_html: str | None = None) -> ClipboardOperation:
+        """Determine clipboard content type and detect URLs."""
+        has_existing_links = self._check_existing_links(raw_html) if raw_html else False
+        detected_urls: list[str] = []
+
+        if raw_html and "<a" in raw_html:
+            content_type = "html_rich"
+        elif raw_html:
+            content_type = "html_rich"
+        elif self._is_markdown_link(raw_text):
+            content_type = "markdown"
+        else:
+            content_type = "plain_text"
+            detected_urls = self.detect_urls_in_text(raw_text)
+
+        return ClipboardOperation(
+            content_type=content_type,
+            has_urls=len(detected_urls) > 0,
+            detected_urls=detected_urls,
+            has_existing_links=has_existing_links,
+            raw_html=raw_html,
+            raw_text=raw_text,
+        )
+
+    def detect_urls_in_text(self, text: str) -> list[str]:
+        """Find http(s)/ftp URLs in plain text."""
+        return re.findall(self.URL_PATTERN, text)
+
+    def _check_existing_links(self, html: str) -> bool:
+        """Check if HTML contains link markup."""
+        return bool(re.search(r"<a\s+[^>]*href\s*=", html))
+
+    def _is_markdown_link(self, text: str) -> bool:
+        """Check if text is already in markdown link format [text](url)."""
+        return bool(re.search(r"\[.+\]\(.+\)", text))
+
+    def detect_html_links(self, html: str) -> list[str]:
+        """Extract URLs from HTML link attributes."""
+        return re.findall(r'href\s*=\s*["\']([^"\']+)["\']', html)
+
+
+@dataclass
+class EditorSession:
+    """Track editor runtime state."""
+
+    active_profile_name: str | None = None
+    active_document_path: str | None = None
+    active_profile_default_path: str | None = None
+    unsaved_changes: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dict for JSON serialization."""
+        return {
+            "active_profile_name": self.active_profile_name,
+            "active_document_path": self.active_document_path,
+            "active_profile_default_path": self.active_profile_default_path,
+            "unsaved_changes": self.unsaved_changes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EditorSession:
+        """Create from dict loaded from JSON."""
+        return cls(
+            active_profile_name=data.get("active_profile_name"),
+            active_document_path=data.get("active_document_path"),
+            active_profile_default_path=data.get("active_profile_default_path"),
+            unsaved_changes=data.get("unsaved_changes", False),
+        )
+
+
+class EditorPasteHandler:
+    """Handle paste operations with link preservation and URL linkification."""
+
+    def __init__(self, clipboard_processor: ClipboardProcessor) -> None:
+        self.processor = clipboard_processor
+
+    def handle_paste(self, clipboard_op: ClipboardOperation) -> dict[str, Any]:
+        """Process paste operation and return instructions for Quill."""
+        if clipboard_op.content_type == "html_rich":
+            return {"action": "paste_html", "html": clipboard_op.raw_html}
+        elif clipboard_op.content_type == "plain_text" and clipboard_op.has_urls:
+            return {
+                "action": "linkify_urls",
+                "text": clipboard_op.raw_text,
+                "urls": clipboard_op.detected_urls,
+            }
+        else:
+            return {"action": "paste_text", "text": clipboard_op.raw_text}
+
+
+# ---------------------------------------------------------------------------
 # JS ↔ Python bridge
 # ---------------------------------------------------------------------------
 class EditorBridge(QObject):
@@ -2201,6 +2343,13 @@ class EditorWindow(QMainWindow):
         self._current_profile = profile or "default"
         self._default_documents_path = self._get_default_documents_path()
         self._load_config()
+
+        # Profile loader and session management (new for 005-editor-profile-clipboard)
+        self._config_loader = ConfigLoader(self._config_path)
+        self._clipboard_processor = ClipboardProcessor()
+        self._editor_session = EditorSession()
+        self._profile_selector: QComboBox | None = None
+        self._load_editor_session()
 
         # Web engine view
         self._view = QWebEngineView(self)
@@ -2902,6 +3051,18 @@ class EditorWindow(QMainWindow):
         toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
 
+        # Profile selector dropdown (new for 005-editor-profile-clipboard)
+        if hasattr(self, "_config_loader"):
+            profile_label = QLabel("Profile: ")
+            self._profile_selector = QComboBox(self)
+            self._profile_selector.addItems(list(self._config_loader.get_profiles().keys()))
+            if hasattr(self, "_current_profile") and self._current_profile in self._config_loader.get_profiles():
+                self._profile_selector.setCurrentText(self._current_profile)
+            self._profile_selector.currentTextChanged.connect(self._on_profile_selected)
+            toolbar.addWidget(profile_label)
+            toolbar.addWidget(self._profile_selector)
+            toolbar.addSeparator()
+
         style = self.style()
         if style:
             save_action = toolbar.addAction(
@@ -2916,6 +3077,49 @@ class EditorWindow(QMainWindow):
         if send_action:
             send_action.setToolTip("Save and send the edited file")
             send_action.triggered.connect(self._menu_send)
+
+    # ------------------------------------------------------------------
+    # Profile selection and session management (new for 005-editor-profile-clipboard)
+    # ------------------------------------------------------------------
+
+    def _on_profile_selected(self, profile_name: str) -> None:
+        """Handle profile selection from dropdown."""
+        self._current_profile = profile_name
+        profiles = self._config_loader.get_profiles()
+        if profile_name in profiles:
+            profile_info = profiles[profile_name]
+            default_path = profile_info.get("default_document_path")
+            if default_path:
+                self._default_documents_path = default_path
+                self._editor_session.active_profile_default_path = default_path
+            self._editor_session.active_profile_name = profile_name
+        self._save_editor_session()
+
+    def _load_editor_session(self) -> None:
+        """Load active profile and document state from session file."""
+        session_file = Path.home() / ".claude" / "editor-session.json"
+        try:
+            if session_file.exists():
+                with open(session_file, encoding="utf-8") as f:
+                    session_data = json.load(f)
+                self._editor_session = EditorSession.from_dict(session_data)
+                if self._editor_session.active_profile_name:
+                    self._current_profile = self._editor_session.active_profile_name
+                if self._editor_session.active_profile_default_path:
+                    self._default_documents_path = self._editor_session.active_profile_default_path
+        except Exception as exc:
+            log.debug("Failed to load editor session: %s", exc)
+
+    def _save_editor_session(self) -> None:
+        """Save active profile and document state to session file."""
+        session_file = Path.home() / ".claude" / "editor-session.json"
+        try:
+            session_file.parent.mkdir(parents=True, exist_ok=True)
+            self._editor_session.active_profile_name = self._current_profile
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump(self._editor_session.to_dict(), f, indent=2)
+        except Exception as exc:
+            log.warning("Failed to save editor session: %s", exc)
 
     # ------------------------------------------------------------------
     # Menu action handlers
