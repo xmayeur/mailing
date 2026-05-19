@@ -1521,7 +1521,10 @@ class _ConfigDialog(QDialog):
                 data = yaml.safe_load(f) or {}
             return self._normalize_config_data(data if isinstance(data, dict) else {})
         except Exception as exc:
-            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
+            try:
+                QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
+            except Exception as e:
+                log.debug("Could not show warning dialog: %s", e)
             return {}
 
     def _browse_config(self) -> None:
@@ -2179,13 +2182,24 @@ class EditorPasteHandler:
         if clipboard_op.content_type == "html_rich":
             return {"action": "paste_html", "html": clipboard_op.raw_html}
         elif clipboard_op.content_type == "plain_text" and clipboard_op.has_urls:
+            linkified_html = self.linkify_urls(clipboard_op.raw_text, clipboard_op.detected_urls)
             return {
                 "action": "linkify_urls",
                 "text": clipboard_op.raw_text,
                 "urls": clipboard_op.detected_urls,
+                "html": linkified_html,
             }
         else:
             return {"action": "paste_text", "text": clipboard_op.raw_text}
+
+    def linkify_urls(self, text: str, urls: list[str]) -> str:
+        """Convert plain-text URLs to HTML links, return linkified HTML."""
+        if not urls:
+            return text
+        html = text
+        for url in urls:
+            html = html.replace(url, f'<a href="{url}" target="_blank">{url}</a>')
+        return html
 
 
 # ---------------------------------------------------------------------------
@@ -2200,10 +2214,12 @@ class EditorBridge(QObject):
     Signals:
         dirty_changed: Emitted when content modification state changes
         css_changed: Emitted when user selects custom CSS stylesheet
+        clipboard_analyzed: Emitted when JS detects clipboard content on paste
     """
 
     dirty_changed = pyqtSignal(bool)
     css_changed = pyqtSignal(str)   # emits absolute CSS file path when user selects a stylesheet
+    clipboard_analyzed = pyqtSignal(str, bool, list)  # content_type, has_html_links, detected_urls
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -2298,6 +2314,11 @@ class EditorBridge(QObject):
         """Receives JS-side errors forwarded via window.onerror."""
         log.warning("JS: %s", msg)
 
+    @pyqtSlot(str, bool, list)
+    def on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
+        """Receives clipboard analysis result from JavaScript paste handler."""
+        self.clipboard_analyzed.emit(content_type, has_html_links, detected_urls)
+
     # ------------------------------------------------------------------
     # Python-side accessors
     # ------------------------------------------------------------------
@@ -2348,6 +2369,7 @@ class EditorWindow(QMainWindow):
         # Profile loader and session management (new for 005-editor-profile-clipboard)
         self._config_loader = ConfigLoader(self._config_path)
         self._clipboard_processor = ClipboardProcessor()
+        self._paste_handler = EditorPasteHandler(self._clipboard_processor)
         self._editor_session = EditorSession()
         self._profile_selector: QComboBox | None = None
         self._load_editor_session()
@@ -2367,6 +2389,7 @@ class EditorWindow(QMainWindow):
         # Connect signals
         self._bridge.dirty_changed.connect(self._on_dirty_changed)
         self._bridge.css_changed.connect(self._on_css_changed)
+        self._bridge.clipboard_analyzed.connect(self._on_clipboard_analyzed)
 
         # Build menus and status bar
         self._build_menus()
@@ -2459,6 +2482,63 @@ class EditorWindow(QMainWindow):
         # Fall back to project default
         default_css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
         return default_css_dir
+
+    def _resolve_stylesheet_path(self, styles_value: str) -> Path | None:
+        """Resolve stylesheet path from config value, expanding user home and making absolute."""
+        if not styles_value:
+            return None
+        try:
+            path = Path(styles_value).expanduser().absolute()
+            return path if path.exists() else None
+        except Exception as exc:
+            log.warning("Failed to resolve stylesheet path %r: %s", styles_value, exc)
+            return None
+
+    def _clear_profile_stylesheet(self) -> None:
+        """Clear previously applied profile stylesheet."""
+        if hasattr(self, "_view") and self._view:
+            # Clear the user-css element by applying empty CSS (must happen BEFORE new stylesheet)
+            self._run_js("""
+            setTimeout(function() {
+              if (typeof applyCSS === 'function') {
+                applyCSS('');
+              }
+            }, 10);
+            """)
+        log.debug("Cleared profile stylesheet")
+
+    def _apply_profile_stylesheet(self, css_path: Path) -> None:
+        """Load and apply CSS stylesheet to editor canvas.
+
+        Clears any previously applied stylesheet and applies the new one.
+        Defers JS execution until page is ready.
+        """
+        try:
+            with open(css_path, encoding="utf-8") as f:
+                css_text = f.read()
+            self._css_path = str(css_path)
+            css_hash = hash(css_text) % 10000  # For debug logging
+            log.info("Loading CSS (hash=%d): %s", css_hash, css_path)
+
+            # Update status label if it exists (might not during initialization)
+            if hasattr(self, "_css_status_label"):
+                self._css_status_label.setText(f"CSS: {css_path.name}")
+            # Defer JS call until page is ready (setTimeout ensures applyCSS is defined)
+            if hasattr(self, "_view") and self._view:
+                # Defer until after clear completes (clear uses 10ms, so apply at 200ms to be safe)
+                script = f"""
+                setTimeout(function() {{
+                  if (typeof applyCSS === 'function') {{
+                    applyCSS({json.dumps(css_text)});
+                  }}
+                }}, 200);
+                """
+                self._run_js(script)
+                log.info("Queued stylesheet application (hash=%d): %s", css_hash, css_path)
+            else:
+                log.info("Deferred stylesheet application (UI not ready yet): %s", css_path)
+        except Exception as exc:
+            log.error("Failed to apply profile stylesheet %s: %s", css_path, exc)
 
     def _save_documents_path(self, path: str) -> None:
         """Save documents folder path to config for current profile (atomic write)."""
@@ -3123,16 +3203,20 @@ class EditorWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_profile_selected(self, profile_name: str) -> None:
-        """Handle profile selection from dropdown."""
+        """Handle profile selection from dropdown.
+
+        Updates default documents path and applies profile stylesheet if defined.
+        """
         self._current_profile = profile_name
         profiles = self._config_loader.get_profiles()
         log.info("Profile selected: %s", profile_name)
         log.info("Available profiles: %s", list(profiles.keys()))
         if profile_name in profiles:
             profile_info = profiles[profile_name]
+            log.info("Profile keys in config: %s", list(profile_info.keys())[:10])  # First 10 keys
             default_path = profile_info.get("default_documents_path")
             log.info("Profile '%s' default_documents_path: %r", profile_name, default_path)
-            # Use profile's path if set (not None and not empty); fallback to 'data'
+            # Use profile's path if set (not None and not empty); fallback to system default
             if default_path and default_path != "":
                 self._default_documents_path = default_path
                 self._editor_session.active_profile_default_path = default_path
@@ -3143,6 +3227,25 @@ class EditorWindow(QMainWindow):
                 self._default_documents_path = default_docs_path
                 self._editor_session.active_profile_default_path = default_docs_path
                 log.info("Profile has no default_documents_path; using system default: %s", default_docs_path)
+
+            # Apply profile stylesheet if defined (load directly from raw config, not transformed profile_info)
+            # Always clear previous stylesheet first
+            self._clear_profile_stylesheet()
+
+            if hasattr(self, "_config_data") and profile_name in self._config_data:
+                raw_profile = self._config_data[profile_name]
+                styles_path = raw_profile.get("styles") if isinstance(raw_profile, dict) else None
+                log.info("Profile stylesheet path: %s", styles_path)
+                if styles_path and isinstance(styles_path, str):
+                    css_path = self._resolve_stylesheet_path(styles_path)
+                    if css_path and css_path.exists():
+                        self._apply_profile_stylesheet(css_path)
+                        log.info("✓ Applied profile stylesheet: %s", css_path)
+                    else:
+                        log.warning("✗ Profile stylesheet not found: %s", styles_path)
+                else:
+                    log.info("Profile %s has no stylesheet defined", profile_name)
+
             self._editor_session.active_profile_name = profile_name
         self._save_editor_session()
 
@@ -3421,6 +3524,62 @@ class EditorWindow(QMainWindow):
 
     def _on_dirty_changed(self, _dirty: bool) -> None:  # noqa: ARG002
         self._update_title()
+
+    def _on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
+        """Handle clipboard analysis from paste event.
+
+        For html_rich: Quill natively preserves links.
+        For plain_text with URLs: Apply linkification to convert URLs to clickable links.
+        """
+        if content_type == "html_rich":
+            log.debug("Clipboard: HTML content with links=%s, urls=%s", has_html_links, len(detected_urls))
+        elif content_type == "plain_text" and detected_urls:
+            log.debug("Clipboard: Plain text with %d URLs detected: %s", len(detected_urls), detected_urls)
+            # Apply linkification to detected URLs in editor content
+            self._apply_url_linkification(detected_urls)
+        else:
+            log.debug("Clipboard: Plain text without URLs")
+
+    def _apply_url_linkification(self, urls: list[str]) -> None:
+        """Apply link formatting to detected plain-text URLs in editor.
+
+        Converts detected plain-text URLs to clickable hyperlinks.
+        Skips URLs that are already formatted as links.
+        """
+        if not urls:
+            return
+        # Create JavaScript to find and linkify plain-text URLs
+        url_json = json.dumps(urls)
+        script = f"""
+        (function() {{
+          const urls = {url_json};
+          const content = quill.getContents();
+          let offset = 0;
+
+          // Iterate through editor operations to find and format URLs
+          content.ops.forEach(function(op) {{
+            if (op.insert && typeof op.insert === 'string') {{
+              const text = op.insert;
+              const isLink = op.attributes && op.attributes.link;
+
+              // Only linkify plain text (not already formatted)
+              if (!isLink) {{
+                urls.forEach(function(url) {{
+                  let index = text.indexOf(url);
+                  while (index >= 0) {{
+                    quill.formatText(offset + index, url.length, 'link', url, 'silent');
+                    index = text.indexOf(url, index + url.length);
+                  }}
+                }});
+              }}
+              offset += text.length;
+            }} else if (op.insert) {{
+              offset += 1; // For embeds (images, etc.)
+            }}
+          }});
+        }})();
+        """
+        self._run_js(script)
 
     def _update_title(self) -> None:
         dirty_marker = " *" if self._bridge.is_dirty else ""
