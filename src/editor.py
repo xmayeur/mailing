@@ -712,26 +712,23 @@ class _SendDialog(QDialog):
 
         # T035: Update FilterBuilder schema when database changes
         # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
-        # Defer schema loading to avoid blocking dialog open (network calls to Google Sheets)
         if self._filter_builder:
-            def _update_schema() -> None:
-                t1 = time.time()
-                schema_fields = self._get_database_schema()
-                t2 = time.time()
-                log.info("TIMING: _get_database_schema took %.2fs", t2-t1)
-                log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
-                         profile, self.database_input.text(), schema_fields)
-                self._schema_info = DatabaseSchemaInfo(schema_fields)
-                self._filter_builder.schema_info = self._schema_info
-                log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
-                # Call refresh_schema on table_widget to update all row dropdowns
-                t3 = time.time()
-                self._filter_builder._table_widget.refresh_schema(self._schema_info)
-                t4 = time.time()
-                log.info("TIMING: refresh_schema took %.2fs", t4-t3)
-                log.info("DEBUG: refresh_schema called, row_widgets=%d",
-                         len(self._filter_builder._table_widget._row_widgets))
-            QTimer.singleShot(50, _update_schema)
+            t1 = time.time()
+            schema_fields = self._get_database_schema()
+            t2 = time.time()
+            log.info("TIMING: _get_database_schema took %.2fs", t2-t1)
+            log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
+                     profile, self.database_input.text(), schema_fields)
+            self._schema_info = DatabaseSchemaInfo(schema_fields)
+            self._filter_builder.schema_info = self._schema_info
+            log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
+            # Call refresh_schema on table_widget to update all row dropdowns
+            t3 = time.time()
+            self._filter_builder._table_widget.refresh_schema(self._schema_info)
+            t4 = time.time()
+            log.info("TIMING: refresh_schema took %.2fs", t4-t3)
+            log.info("DEBUG: refresh_schema called, row_widgets=%d",
+                     len(self._filter_builder._table_widget._row_widgets))
 
         self.subject_input.setText(Path(self._attachment_path).stem)
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
@@ -749,9 +746,7 @@ class _SendDialog(QDialog):
         self.do_not_send_check.setChecked(bool(profile_cfg.get("doNotSend", False)))
 
         self.load_current_filter(profile)
-        # Defer record loading to after dialog is shown (avoid blocking UI during open)
-        # Use single-shot timer to load records asynchronously
-        QTimer.singleShot(100, self.filter_and_display_records)
+        self.filter_and_display_records()
 
     def load_current_filter(self, profile: str) -> None:
         """Load filter from profile config and display in filter field (T036)."""
