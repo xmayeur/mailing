@@ -3089,7 +3089,8 @@ class EditorWindow(QMainWindow):
         if profile_name in profiles:
             profile_info = profiles[profile_name]
             default_path = profile_info.get("default_documents_path")
-            if default_path:
+            # Check for not None AND not empty string (empty string is falsy but exists in config)
+            if default_path is not None and default_path != "":
                 self._default_documents_path = default_path
                 self._editor_session.active_profile_default_path = default_path
             self._editor_session.active_profile_name = profile_name
