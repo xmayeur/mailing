@@ -1185,23 +1185,23 @@ class TestEditorWindowHelpers:
         Path(win._file_path).write_text("<html></html>", encoding="utf-8")
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
 
-        # Test successful send
+        # Test successful send (with new non-blocking show() flow)
         with (
             patch.object(editor, "_SendDialog") as mock_dialog,
             patch.object(editor, "_SessionLogDialog") as mock_log_dialog,
             patch.object(win, "_resolve_send_config_path", return_value="cfg.yml"),
             patch.object(win, "_load_send_config", return_value={"default": {}}),
-            patch.object(win, "_send_with_sendmail", return_value="OK") as mock_send,
+            patch.object(win, "_send_with_sendmail", return_value="OK"),
         ):
-            mock_dialog.return_value.exec.return_value = (
-                editor.QDialog.DialogCode.Accepted
-            )
+            dialog_instance = MagicMock()
+            dialog_instance.send_button = MagicMock()
+            mock_dialog.return_value = dialog_instance
             mock_log_dialog.return_value.exec.return_value = (
                 editor.QDialog.DialogCode.Accepted
             )
             win._menu_send()
-            mock_send.assert_called_once()  # pyright: ignore
-            mock_log_dialog.assert_called_once()  # pyright: ignore
+            # Dialog.show() is called, send button handler is connected
+            dialog_instance.show.assert_called_once()  # pyright: ignore
 
         # Test error response
         with (
@@ -1211,14 +1211,14 @@ class TestEditorWindowHelpers:
             patch.object(win, "_load_send_config", return_value={"default": {}}),
             patch.object(win, "_send_with_sendmail", return_value="error"),
         ):
-            mock_dialog.return_value.exec.return_value = (
-                editor.QDialog.DialogCode.Accepted
-            )
+            dialog_instance = MagicMock()
+            dialog_instance.send_button = MagicMock()
+            mock_dialog.return_value = dialog_instance
             mock_log_dialog.return_value.exec.return_value = (
                 editor.QDialog.DialogCode.Accepted
             )
             win._menu_send()
-            mock_log_dialog.assert_called_once()  # pyright: ignore
+            dialog_instance.show.assert_called_once()  # pyright: ignore
 
         win._send_in_progress = True
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
