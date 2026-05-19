@@ -55,6 +55,22 @@ When users paste plain-text URLs into the editor, they are automatically convert
 
 ---
 
+### User Story 4 - Apply Profile Stylesheet on Selection (Priority: P2)
+
+When users select a profile that has a stylesheet defined in config, the editor automatically loads and applies that stylesheet to the document, ensuring consistent visual styling based on profile selection.
+
+**Why this priority**: Workflow enhancement. Allows users to maintain profile-specific styling without manual intervention. Improves consistency when switching between profiles with different style requirements.
+
+**Independent Test**: Can be fully tested by (1) selecting a profile with defined stylesheet from dropdown, (2) verifying stylesheet is loaded and applied to editor document. Works independently of other features.
+
+**Acceptance Scenarios**:
+
+1. **Given** profile with stylesheet path defined in config, **When** user selects profile from dropdown, **Then** stylesheet is loaded and applied to editor document immediately
+2. **Given** profile without stylesheet defined, **When** user selects profile, **Then** system falls back to default/system stylesheet without error
+3. **Given** user switches between profiles with different stylesheets, **When** profile selection changes, **Then** new stylesheet replaces previous one smoothly
+
+---
+
 ### Edge Cases
 
 - What happens when pasting rich content with broken/invalid links?
@@ -62,6 +78,9 @@ When users paste plain-text URLs into the editor, they are automatically convert
 - What happens if user pastes URL that matches existing link text in document?
 - How does system behave if profile config is missing default_document_path value?
 - What happens when switching profiles while document with unsaved changes is open?
+- What happens if stylesheet path in profile config is invalid or file doesn't exist?
+- How does editor handle stylesheet switching if current document has inline CSS or user-applied styles?
+- Should stylesheet be applied to unsaved documents when profile changes, or only new documents?
 
 ## Requirements *(mandatory)*
 
@@ -75,6 +94,9 @@ When users paste plain-text URLs into the editor, they are automatically convert
 - **FR-006**: When user pastes plain-text URLs (http://, https://, ftp://), editor MUST automatically detect and convert them to clickable hyperlinks
 - **FR-007**: Profile selector MUST persist the last selected profile across editor sessions (restore on startup)
 - **FR-008**: System MUST handle paste operations with mixed plain text and hyperlinks without data loss
+- **FR-009**: When profile is selected and profile config defines a `styles` stylesheet path, editor MUST load and apply that stylesheet to the document
+- **FR-010**: If stylesheet path in profile is invalid or file does not exist, editor MUST fall back to default/system stylesheet without error or warning dialog
+- **FR-011**: When user switches profiles, the new profile's stylesheet MUST replace the previous stylesheet in the editor
 
 ### Key Entities
 
@@ -91,13 +113,18 @@ When users paste plain-text URLs into the editor, they are automatically convert
 - **SC-003**: Plain-text URLs are linkified automatically with zero manual action required
 - **SC-004**: Last selected profile persists across editor restart (verified by launching editor and checking active profile)
 - **SC-005**: Paste operations complete within 500ms even with large content containing multiple hyperlinks
+- **SC-006**: Profile stylesheet loads and applies to editor within 200ms of profile selection
+- **SC-007**: Stylesheet switching between profiles produces no visual artifacts or document corruption
 
 ## Assumptions
 
-- Config.yml profile structure remains unchanged (profile entries have name and optional default_document_path fields)
+- Config.yml profile structure includes optional `styles` field containing path to CSS stylesheet
 - Users have write access to config.yml for profile management
 - Quill.js editor (current rich-text engine) supports HTML link preservation via paste events
 - Hyperlink auto-detection should recognize standard URL schemes: http://, https://, ftp://
 - Profile selector UI will be simple dropdown - no complex filtering required in v1
 - Auto-linkification should only apply to plain text pastes, not already-formatted hyperlinks (avoid double-conversion)
 - Markdown link syntax `[text](url)` should not be auto-linkified again if already in markdown format
+- Stylesheet paths in profile config are absolute or user-expandable (support ~ for home directory)
+- Stylesheet should be applied via Quill's styling API or CSS injection into editor canvas
+- Profile without `styles` defined will use editor's default stylesheet (no fallback to previous profile's stylesheet)
