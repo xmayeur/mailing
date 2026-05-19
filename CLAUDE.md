@@ -14,51 +14,12 @@ Key flags: `-t` (test mode), `-x` (dry run), `-db` (CSV database), `-f/-to` (ind
 
 ## Key files
 
-| File                      | Role                                                                              |
-|---------------------------|-----------------------------------------------------------------------------------|
-| `src/sendMail.py`         | Main application — email logic, subscriber filtering, templating, HTML processing |
-| `src/editor.py`           | WYSIWYG HTML editor GUI (PyQt6 + Quill.js) — compose/edit newsletters             |
-| `src/visual_filter_builder.py` | Visual filter builder for subscriber filtering (table + YAML sync)            |
-| `src/googleDriveLib.py`   | Google Drive integration (download/upload/rename)                                 |
-| `config.yml`              | Email profiles — SMTP/IMAP settings, rate limits, filtering rules                 |
-
-## Visual Filter Builder
-
-PyQt6-based GUI for composing subscriber filters without YAML syntax.
-
-### Core Classes
-
-- **FilterRow**: Immutable dataclass representing single filter condition (field + operator + optional value)
-- **FilterTable**: Collection manager with CRUD operations (`add_row`, `delete_row`, `update_row`, `to_dict`, `from_dict`)
-- **DatabaseSchemaInfo**: Schema metadata for field type tracking and operator filtering by type
-- **FilterBuilder**: Main Qt widget combining visual table + YAML text editor with bidirectional sync
-- **FilterTableWidget**: Visual table container managing per-row editors
-- **FilterRowWidget**: Per-row editor with field dropdown (QComboBox), operator dropdown (QComboBox), dynamic value input (QLineEdit or QPlainTextEdit)
-
-### Public API
-
-```python
-# Create filter builder with schema
-schema = DatabaseSchemaInfo(["email", "status", "age"], {"age": "numeric"})
-builder = FilterBuilder(schema, initial_filter={"email": "is not empty"})
-
-# Connect signal to listen for filter changes
-builder.filter_changed.connect(on_filter_changed)
-
-# Get current filter as dict
-filter_dict = builder.get_filter_as_yaml()  # Returns {"field": "operator value"}
-
-# Load filter from dict
-builder.set_filter_from_yaml({"email": "is not empty", "status": "is active"})
-```
-
-### Integration with _SendDialog
-
-FilterBuilder replaces existing YAML filter_text_edit in _SendDialog. Provides:
-- Real-time field/operator dropdowns from database schema
-- Dynamic value input visibility (hidden for no-value ops, multiline for list ops)
-- Bidirectional sync between visual table and YAML representation
-- Seamless integration with existing FilterValidator
+| File                    | Role                                                                              |
+|-------------------------|-----------------------------------------------------------------------------------|
+| `src/sendMail.py`       | Main application — email logic, subscriber filtering, templating, HTML processing |
+| `src/editor.py`         | WYSIWYG HTML editor GUI (PyQt6 + Quill.js) — compose/edit newsletters             |
+| `src/googleDriveLib.py` | Google Drive integration (download/upload/rename)                                 |
+| `config.yml`            | Email profiles — SMTP/IMAP settings, rate limits, filtering rules                 |
 
 ## WYSIWYG Editor
 
@@ -70,7 +31,7 @@ python src/editor.py data/template.md     # open the newsletter template
 python src/editor.py data/20260420.md     # edit an existing newsletter
 ```
 
-The editor saves as `.html` (standalone document with embedded CSS).  
+The editor saves **both** `.md` and `.html` simultaneously.  
 Then pass the HTML to sendMail:
 
 ```bash
@@ -95,40 +56,6 @@ cp "$(find $(brew --prefix) -name qwebchannel.js | head -1)" editor_assets/qwebc
 ### New dependencies added for the editor
 
 `PyQt6>=6.7.0`, `PyQt6-WebEngine>=6.7.0`, `html2text>=2024.2.26`
-
-### Editor Core Classes (005-editor-profile-clipboard feature)
-
-**ConfigLoader**: Loads email profiles from config.yml and provides access to profile metadata
-- `load_profiles_from_config()` — parse YAML and create profile objects
-- `get_profiles()` — return filtered profile list with metadata
-- Expands user paths (~) and validates file existence
-
-**EditorSession**: Tracks active profile selection and document state for session persistence
-- `active_profile_name` — currently selected profile
-- `active_profile_default_path` — profile's documents directory
-- `save_to_file()` / `load_from_file()` — persist session to `~/.claude/editor-session.json`
-- Restored on editor startup to preserve user's last profile selection
-
-**ClipboardProcessor** & **ClipboardOperation**: Analyze pasted clipboard content
-- `analyze_paste(html_content, plain_text)` — detect content type and extract URLs
-- Returns: `content_type` (html|plain), `has_html_links` (bool), `detected_urls` (list[str])
-- URL detection via regex: `https?://` and `ftp://` schemes
-
-**EditorPasteHandler**: Process clipboard analysis results and apply URL linkification
-- Receives clipboard_analyzed signal from JavaScript (QWebChannel)
-- Calls JavaScript to linkify detected plain-text URLs
-
-**EditorBridge** (extended): QWebChannel bridge for JavaScript↔Python communication
-- `clipboard_analyzed` signal — emitted when clipboard content analyzed
-- `on_clipboard_analyzed(content_type, has_html_links, detected_urls)` — process paste events
-- `_apply_url_linkification(urls)` — format plain URLs as links in editor
-
-**Stylesheet Management** (US4: Apply Profile Stylesheet on Selection):
-- `_on_profile_selected(profile_name)` — load and apply profile's CSS stylesheet
-- `_resolve_stylesheet_path(styles_value)` — expand user paths, validate existence
-- `_apply_profile_stylesheet(css_path)` — inject CSS into Quill editor canvas
-- `_clear_profile_stylesheet()` — remove previous stylesheet before switching profiles
-- Stylesheet path read from profile's `styles:` config key in config.yml
 
 ### Building the editor binary
 
@@ -180,12 +107,3 @@ CI enforces:
 - This project uses `mypy --strict` and `ruff check .`.
 - Never use `type: ignore` without a human-approved justification.
 - All function signatures must be fully typed.
-
-## Active Technologies
-- Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, gspread, google-api-python-clien (004-visual-filter-builder)
-- N/A (filter definitions stored in YAML config) (004-visual-filter-builder)
-- Python 3.12+ + PyQt6 (≥6.7.0), PyQt6-WebEngine (≥6.7.0), Quill.js v2 (via HTML5), pyyaml, google-api-python-clien (005-editor-profile-clipboard)
-- YAML (config.yml), Markdown/HTML files (documents) (005-editor-profile-clipboard)
-
-## Recent Changes
-- 004-visual-filter-builder: Added Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, gspread, google-api-python-clien
