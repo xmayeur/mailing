@@ -3128,10 +3128,12 @@ class EditorWindow(QMainWindow):
     def _menu_open(self) -> None:
         if not self._ask_save_if_dirty():
             return
+        # Use profile's default_document_path; fallback to "data" if not set (BF001 fix)
+        default_dir = getattr(self, "_default_documents_path", None) or "data"
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Open File",
-            "data",
+            default_dir,
             "Supported files (*.md *.html *.htm);;Markdown (*.md);;HTML (*.html *.htm);;All Files (*)",
         )
         if path:
