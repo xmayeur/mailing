@@ -7,7 +7,9 @@
 
 **Format**: `[ID] [P?] [Story?] Description`
 - **[P]**: Parallelizable (different files, no dependencies)
-- **[Story]**: User story label (US1, US2, US3)
+- **[Story]**: User story label (US1, US2, US3, US4)
+
+**Note**: Updated to include US4 (Apply Profile Stylesheet on Selection) - Phase 6 inserted before Polish phase
 
 ---
 
@@ -123,20 +125,45 @@
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 - Apply Profile Stylesheet on Selection (Priority: P2)
+
+**Goal**: When users select a profile that has a stylesheet defined, the editor automatically loads and applies that stylesheet
+
+**Independent Test**:
+1. Create profile with stylesheet path in config.yml
+2. Select profile from dropdown in main window
+3. Verify stylesheet is loaded and applied to editor document
+4. Switch to different profile with different stylesheet
+5. Verify new stylesheet replaces previous one
+
+### Implementation for User Story 4
+
+- [ ] T041 [US4] Implement stylesheet loading in EditorWindow._on_profile_selected() to call _get_stylesheet_path() in src/editor.py
+- [ ] T042 [US4] Implement stylesheet application via Quill editor API (inject CSS into editor canvas) in src/editor.py
+- [ ] T043 [US4] Add fallback to default stylesheet if profile's stylesheet path is invalid in src/editor.py
+- [ ] T044 [US4] Implement stylesheet cleanup when switching profiles (remove previous stylesheet) in src/editor.py
+- [ ] T045 [US4] Test stylesheet loads from profile config path (manual GUI test)
+- [ ] T046 [US4] Test stylesheet switching between profiles (manual GUI test)
+- [ ] T047 [US4] Test graceful fallback when stylesheet file missing (manual GUI test)
+
+**Checkpoint**: User Story 4 complete - profile stylesheets load and apply correctly
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: Final validation, integration testing, and documentation
 
-- [ ] T041 [P] Run full pytest suite to verify no regressions in tests/
-- [ ] T042 [P] Run mypy type checking on src/editor.py to verify type safety
-- [ ] T043 [P] Run ruff linting on src/editor.py to verify code quality
-- [ ] T044 [P] Verify flake8 max-complexity and line-length constraints in src/editor.py
-- [ ] T045 Manual GUI testing on macOS, Windows, Linux if available (profile selector, paste operations, session persistence)
-- [ ] T046 Integration test: Full workflow - select profile → edit document → paste links → save → reopen → verify all functionality
-- [ ] T047 Update CLAUDE.md with new classes/methods added to editor.py (ConfigLoader, ClipboardProcessor, EditorPasteHandler)
-- [ ] T048 Verify no breaking changes to existing editor.py API or sendMail.py integration
-- [ ] T049 Test backward compatibility with existing config.yml files (profiles without default_document_path)
-- [ ] T050 Run quickstart.md validation checklist to verify all features working as documented
+- [ ] T048 [P] Run full pytest suite to verify no regressions in tests/
+- [ ] T049 [P] Run mypy type checking on src/editor.py to verify type safety
+- [ ] T050 [P] Run ruff linting on src/editor.py to verify code quality
+- [ ] T051 [P] Verify flake8 max-complexity and line-length constraints in src/editor.py
+- [ ] T052 Manual GUI testing on macOS, Windows, Linux if available (profile selector, paste operations, stylesheet loading, session persistence)
+- [ ] T053 Integration test: Full workflow - select profile → apply stylesheet → edit document → paste links → save → reopen → verify all functionality
+- [ ] T054 Update CLAUDE.md with new classes/methods added to editor.py (ConfigLoader, ClipboardProcessor, EditorPasteHandler, stylesheet helpers)
+- [ ] T055 Verify no breaking changes to existing editor.py API or sendMail.py integration
+- [ ] T056 Test backward compatibility with existing config.yml files (profiles without default_document_path or styles)
+- [ ] T057 Run quickstart.md validation checklist to verify all features working as documented
 
 **Checkpoint**: All quality gates passed - feature ready for merge
 
@@ -151,27 +178,31 @@
 - **Phase 3 (US1)**: Depends on Phase 2 - Can run independently once Phase 2 done
 - **Phase 4 (US2)**: Depends on Phase 2 - Can run in parallel with US1 or after
 - **Phase 5 (US3)**: Depends on Phase 2 - Can run in parallel with US1/US2 or after
-- **Phase 6 (Polish)**: Depends on all desired stories being complete
+- **Phase 6 (US4)**: Depends on Phase 3 (US1 profile selection must work first)
+- **Phase 7 (Polish)**: Depends on all desired stories being complete
 
 ### User Story Parallelization
 
-Once **Phase 2 is complete**, the three user stories can be implemented in parallel:
+Once **Phase 2 is complete**, US1/US2/US3 can be implemented in parallel. US4 requires US1 to complete first:
 
 ```
 Phase 1 (Setup) → Phase 2 (Foundational) → ⊘ Split here ⊘
                                             ├→ Phase 3 (US1: Profile Selection)
+                                            │   ↓
+                                            │   Phase 6 (US4: Stylesheet)
                                             ├→ Phase 4 (US2: Link Preservation)  
                                             └→ Phase 5 (US3: URL Auto-Linkify)
                                                ↓
-                                            Phase 6 (Polish)
+                                            Phase 7 (Polish)
 ```
 
-**Example: 3-developer parallel workflow**:
+**Example: 4-developer workflow**:
 - Developer A: Phase 1-2 (Setup + Foundational)
 - Developer B: Phase 3 (US1 - Profile Selection) starting when Phase 2 done
 - Developer C: Phase 4 (US2 - Link Preservation) starting when Phase 2 done
-- Developer A: Phase 5 (US3 - URL Auto-Linkify) after Phase 2 done
-- All together: Phase 6 (Polish & validation)
+- Developer D: Phase 5 (US3 - URL Auto-Linkify) starting when Phase 2 done
+- Developer A: Phase 6 (US4 - Stylesheet) after US1 (Phase 3) completes
+- All together: Phase 7 (Polish & validation)
 
 ---
 
@@ -203,12 +234,17 @@ After MVP, add remaining stories:
    - Verify US1 + US2 still work
    - Deploy/Demo all three stories
 
-3. **Phase 6**: Polish (1-2 hours)
+3. Add **Phase 6**: User Story 4 - Profile Stylesheet (1-2 hours)
+   - Validate US4 independently (depends on US1)
+   - Verify US1 + US2 + US3 still work
+   - Deploy/Demo all four stories
+
+4. **Phase 7**: Polish (1-2 hours)
    - Run full test suite
    - Type checking, linting, GUI testing
    - Documentation updates
 
-**Total time estimate**: 15-20 hours for all features + polish
+**Total time estimate**: 18-25 hours for all features + polish
 
 ### Single Developer Sequential Workflow
 
@@ -246,6 +282,23 @@ Each story independently testable before moving to next.
 - T022-T023 (Paste event detection) depend on T013 (QWebChannel)
 - T024-T026 (Clipboard processing) depend on T023
 - T027-T030 (Testing) depend on T026
+
+### Within Phase 5 (US3)
+
+- T031-T032 (URL detection) depend on Phase 2
+- T033-T036 (Linkification logic) depend on T032
+- T037 (Signal connection) depends on T035
+- T038-T040 (Testing) depend on T037
+
+**Sequential**: T031 → T032 → T033 → T034 → T035 → T036 → T037 → Test
+
+### Within Phase 6 (US4)
+
+- T041-T042 (Stylesheet loading/application) depend on Phase 3 (T014-T018 profile selector)
+- T043-T044 (Fallback & cleanup) depend on T042
+- T045-T047 (Testing) depend on T044
+
+**Sequential**: T041 → T042 → T043 → T044 → Test
 
 **Sequential**: T022 → T023 → T024 → T025 → T026 → T027 → Test
 
