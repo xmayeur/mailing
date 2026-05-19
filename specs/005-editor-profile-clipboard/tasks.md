@@ -21,7 +21,7 @@
 - [x] T002 Create ClipboardOperation dataclass in src/editor.py for clipboard data model
 - [x] T003 Add ClipboardProcessor class to src/editor.py for clipboard analysis
 - [x] T004 [P] Create .claude/editor-session.json template for session persistence
-- [ ] T005 [P] Setup QWebChannel signal/slot infrastructure in editor_assets/editor.html for clipboard events
+- [x] T005 [P] Setup QWebChannel signal/slot infrastructure in editor_assets/editor.html for clipboard events
 
 **Checkpoint**: Editor infrastructure ready for user story implementation
 
@@ -39,8 +39,8 @@
 - [x] T009 Add EditorSession class to src/editor.py for tracking active profile and document state
 - [x] T010 Implement EditorWidget.load_editor_session() in src/editor.py to restore session on startup
 - [x] T011 Implement EditorWidget.save_editor_session() in src/editor.py to persist session to JSON
-- [ ] T012 [P] Extend QWebChannel bridge in editor_assets/editor.html to expose qtBridge.clipboardAnalyzed signal
-- [ ] T013 [P] Add paste event handler hook in editor_assets/editor.html for Quill paste detection
+- [x] T012 [P] Extend QWebChannel bridge in editor_assets/editor.html to expose qtBridge.clipboardAnalyzed signal
+- [x] T013 [P] Add paste event handler hook in editor_assets/editor.html for Quill paste detection
 
 **Checkpoint**: Foundation complete - user story implementation can now proceed in parallel
 
