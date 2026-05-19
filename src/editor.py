@@ -2338,7 +2338,8 @@ class EditorWindow(QMainWindow):
         self._load_finished_connected = False
         self._send_in_progress = False
         self._is_template = False
-        self._config_path = str(Path(__file__).parent / "config.yml")
+        # Use same config path as Send mailing dialog (not hardcoded src/config.yml)
+        self._config_path = self._resolve_send_config_path()
         self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
         self._current_profile = profile or "default"
         self._default_documents_path = self._get_default_documents_path()
@@ -3056,9 +3057,9 @@ class EditorWindow(QMainWindow):
             profile_label = QLabel("Profile: ")
             self._profile_selector = QComboBox(self)
             self._profile_selector.addItems(list(self._config_loader.get_profiles().keys()))
+            self._profile_selector.currentTextChanged.connect(self._on_profile_selected)
             if hasattr(self, "_current_profile") and self._current_profile in self._config_loader.get_profiles():
                 self._profile_selector.setCurrentText(self._current_profile)
-            self._profile_selector.currentTextChanged.connect(self._on_profile_selected)
             toolbar.addWidget(profile_label)
             toolbar.addWidget(self._profile_selector)
             toolbar.addSeparator()
