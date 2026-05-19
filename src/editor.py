@@ -3283,12 +3283,14 @@ class EditorWindow(QMainWindow):
 
         config_path = self._resolve_send_config_path()
         config_data = self._load_send_config(config_path)
+        # Use currently selected profile in main window (not hardcoded "default")
+        initial_profile = getattr(self, "_current_profile", "default")
         dialog = _SendDialog(
             self,
             attachment_path=str(self._file_path),
             config_path=config_path,
             config_data=config_data,  # type: ignore[arg-type]
-            initial_profile="default",
+            initial_profile=initial_profile,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
