@@ -915,12 +915,20 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
     if param.donotsend:
         log.info("do not sent activated")
         return False
+    # Combine HTML file + user-selected attachments (T016: Integrate attachments)
+    # param.file is already a list (from editor.py line 1332)
+    all_attachments: list[str] = list(param.file) if param.file else []
+    if hasattr(param, "attachment") and param.attachment:
+        if isinstance(param.attachment, list):
+            all_attachments.extend(param.attachment)
+        else:
+            all_attachments.append(param.attachment)
     msg, recipients = build_email(
         param=param,
         subject=param.subject,
         message=msg_body,
         bcc=",".join(addressees),
-        attachments=param.file,
+        attachments=all_attachments if all_attachments else None,
     )
     try:
         if hasattr(param, "smtp_host"):
