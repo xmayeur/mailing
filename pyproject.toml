@@ -100,6 +100,7 @@ reportArgumentType = "information"
 reportOptionalMemberAccess = "warning"
 reportMissingTypeStubs = "none"  # lxml-stubs and types-setuptools installed; Pillow has no bundled stubs
 reportUnknownMemberType = false
+reportPossiblyUnboundVariable = false  # conditional imports in try/except blocks confuse pyright
 extraPaths = ["src", "scripts"]
 exclude = [
     "**/node_modules",

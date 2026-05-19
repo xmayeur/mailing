@@ -1521,7 +1521,10 @@ class _ConfigDialog(QDialog):
                 data = yaml.safe_load(f) or {}
             return self._normalize_config_data(data if isinstance(data, dict) else {})
         except Exception as exc:
-            QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
+            try:
+                QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
+            except Exception as e:
+                log.debug("Could not show warning dialog: %s", e)
             return {}
 
     def _browse_config(self) -> None:
@@ -2047,6 +2050,159 @@ class _ConfigDialog(QDialog):
 
 
 # ---------------------------------------------------------------------------
+# Profile, Clipboard, and Session Management
+# ---------------------------------------------------------------------------
+
+class ConfigLoader:
+    """Load email profiles from config.yml."""
+
+    def __init__(self, config_path: str) -> None:
+        self.config_path = config_path
+        self.profiles: dict[str, dict[str, Any]] = {}
+        self.load_profiles_from_config()
+
+    def load_profiles_from_config(self) -> None:
+        """Load profiles from config.yml and parse default_documents_path field."""
+        try:
+            if not os.path.exists(self.config_path):
+                log.warning("Config file not found: %s", self.config_path)
+                return
+            with open(self.config_path, encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            for profile_name, profile_config in config.items():
+                if isinstance(profile_config, dict):
+                    self.profiles[profile_name] = {
+                        "name": profile_name,
+                        "default_documents_path": profile_config.get("default_documents_path"),
+                        "config": profile_config,
+                    }
+        except Exception as exc:
+            log.warning("Failed to load profiles from config: %s", exc)
+
+    def get_profiles(self) -> dict[str, dict[str, Any]]:
+        """Return loaded profiles."""
+        return self.profiles
+
+
+@dataclass
+class ClipboardOperation:
+    """Represents clipboard paste operation with content analysis."""
+
+    content_type: str  # "html_rich", "plain_text", "markdown"
+    has_urls: bool
+    detected_urls: list[str]
+    has_existing_links: bool
+    raw_html: str | None
+    raw_text: str
+
+
+class ClipboardProcessor:
+    """Analyze clipboard content for content type and URL detection."""
+
+    URL_PATTERN = r"https?://[^\s<>\"{}|\\^`\[\]]+|ftp://[^\s<>\"{}|\\^`\[\]]+"
+
+    def analyze_paste(self, raw_text: str, raw_html: str | None = None) -> ClipboardOperation:
+        """Determine clipboard content type and detect URLs."""
+        has_existing_links = self._check_existing_links(raw_html) if raw_html else False
+        detected_urls: list[str] = []
+
+        if raw_html and "<a" in raw_html:
+            content_type = "html_rich"
+        elif raw_html:
+            content_type = "html_rich"
+        elif self._is_markdown_link(raw_text):
+            content_type = "markdown"
+        else:
+            content_type = "plain_text"
+            detected_urls = self.detect_urls_in_text(raw_text)
+
+        return ClipboardOperation(
+            content_type=content_type,
+            has_urls=len(detected_urls) > 0,
+            detected_urls=detected_urls,
+            has_existing_links=has_existing_links,
+            raw_html=raw_html,
+            raw_text=raw_text,
+        )
+
+    def detect_urls_in_text(self, text: str) -> list[str]:
+        """Find http(s)/ftp URLs in plain text."""
+        return re.findall(self.URL_PATTERN, text)
+
+    def _check_existing_links(self, html: str) -> bool:
+        """Check if HTML contains link markup."""
+        return bool(re.search(r"<a\s+[^>]*href\s*=", html))
+
+    def _is_markdown_link(self, text: str) -> bool:
+        """Check if text is already in markdown link format [text](url)."""
+        return bool(re.search(r"\[.+\]\(.+\)", text))
+
+    def detect_html_links(self, html: str) -> list[str]:
+        """Extract URLs from HTML link attributes."""
+        return re.findall(r'href\s*=\s*["\']([^"\']+)["\']', html)
+
+
+@dataclass
+class EditorSession:
+    """Track editor runtime state."""
+
+    active_profile_name: str | None = None
+    active_document_path: str | None = None
+    active_profile_default_path: str | None = None
+    unsaved_changes: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dict for JSON serialization."""
+        return {
+            "active_profile_name": self.active_profile_name,
+            "active_document_path": self.active_document_path,
+            "active_profile_default_path": self.active_profile_default_path,
+            "unsaved_changes": self.unsaved_changes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EditorSession:
+        """Create from dict loaded from JSON."""
+        return cls(
+            active_profile_name=data.get("active_profile_name"),
+            active_document_path=data.get("active_document_path"),
+            active_profile_default_path=data.get("active_profile_default_path"),
+            unsaved_changes=data.get("unsaved_changes", False),
+        )
+
+
+class EditorPasteHandler:
+    """Handle paste operations with link preservation and URL linkification."""
+
+    def __init__(self, clipboard_processor: ClipboardProcessor) -> None:
+        self.processor = clipboard_processor
+
+    def handle_paste(self, clipboard_op: ClipboardOperation) -> dict[str, Any]:
+        """Process paste operation and return instructions for Quill."""
+        if clipboard_op.content_type == "html_rich":
+            return {"action": "paste_html", "html": clipboard_op.raw_html}
+        elif clipboard_op.content_type == "plain_text" and clipboard_op.has_urls:
+            linkified_html = self.linkify_urls(clipboard_op.raw_text, clipboard_op.detected_urls)
+            return {
+                "action": "linkify_urls",
+                "text": clipboard_op.raw_text,
+                "urls": clipboard_op.detected_urls,
+                "html": linkified_html,
+            }
+        else:
+            return {"action": "paste_text", "text": clipboard_op.raw_text}
+
+    def linkify_urls(self, text: str, urls: list[str]) -> str:
+        """Convert plain-text URLs to HTML links, return linkified HTML."""
+        if not urls:
+            return text
+        html = text
+        for url in urls:
+            html = html.replace(url, f'<a href="{url}" target="_blank">{url}</a>')
+        return html
+
+
+# ---------------------------------------------------------------------------
 # JS ↔ Python bridge
 # ---------------------------------------------------------------------------
 class EditorBridge(QObject):
@@ -2058,10 +2214,12 @@ class EditorBridge(QObject):
     Signals:
         dirty_changed: Emitted when content modification state changes
         css_changed: Emitted when user selects custom CSS stylesheet
+        clipboard_analyzed: Emitted when JS detects clipboard content on paste
     """
 
     dirty_changed = pyqtSignal(bool)
     css_changed = pyqtSignal(str)   # emits absolute CSS file path when user selects a stylesheet
+    clipboard_analyzed = pyqtSignal(str, bool, list)  # content_type, has_html_links, detected_urls
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -2156,6 +2314,11 @@ class EditorBridge(QObject):
         """Receives JS-side errors forwarded via window.onerror."""
         log.warning("JS: %s", msg)
 
+    @pyqtSlot(str, bool, list)
+    def on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
+        """Receives clipboard analysis result from JavaScript paste handler."""
+        self.clipboard_analyzed.emit(content_type, has_html_links, detected_urls)
+
     # ------------------------------------------------------------------
     # Python-side accessors
     # ------------------------------------------------------------------
@@ -2196,11 +2359,20 @@ class EditorWindow(QMainWindow):
         self._load_finished_connected = False
         self._send_in_progress = False
         self._is_template = False
-        self._config_path = str(Path(__file__).parent / "config.yml")
+        # Use same config path as Send mailing dialog (not hardcoded src/config.yml)
+        self._config_path = self._resolve_send_config_path()
         self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
         self._current_profile = profile or "default"
         self._default_documents_path = self._get_default_documents_path()
         self._load_config()
+
+        # Profile loader and session management (new for 005-editor-profile-clipboard)
+        self._config_loader = ConfigLoader(self._config_path)
+        self._clipboard_processor = ClipboardProcessor()
+        self._paste_handler = EditorPasteHandler(self._clipboard_processor)
+        self._editor_session = EditorSession()
+        self._profile_selector: QComboBox | None = None
+        self._load_editor_session()
 
         # Web engine view
         self._view = QWebEngineView(self)
@@ -2217,6 +2389,7 @@ class EditorWindow(QMainWindow):
         # Connect signals
         self._bridge.dirty_changed.connect(self._on_dirty_changed)
         self._bridge.css_changed.connect(self._on_css_changed)
+        self._bridge.clipboard_analyzed.connect(self._on_clipboard_analyzed)
 
         # Build menus and status bar
         self._build_menus()
@@ -2269,6 +2442,103 @@ class EditorWindow(QMainWindow):
             return os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK)
         except Exception:
             return False
+
+    def _get_stylesheet_path(self) -> Path:
+        """Get stylesheet path: profile's styles → HOME/css/styles.css → project default."""
+        # Try to get from current profile config
+        if hasattr(self, "_current_profile") and hasattr(self, "_config_data"):
+            profile_cfg = self._config_data.get(self._current_profile, {})
+            profile_styles = profile_cfg.get("styles")
+            if profile_styles and isinstance(profile_styles, str):
+                styles_path = Path(profile_styles).expanduser().absolute()
+                if styles_path.exists():
+                    return styles_path
+
+        # Try HOME/css/styles.css
+        home_css = Path.home() / "css" / "styles.css"
+        if home_css.exists():
+            return home_css
+
+        # Fall back to project default
+        default_css = (_BASE / "Resources" / "css" / "styles.css") if _IS_FROZEN else (_BASE / "css" / "styles.css")
+        return default_css
+
+    def _get_css_directory(self) -> Path:
+        """Get CSS directory: profile's styles dir → HOME/css → project default."""
+        # Try to get directory from profile config
+        if hasattr(self, "_current_profile") and hasattr(self, "_config_data"):
+            profile_cfg = self._config_data.get(self._current_profile, {})
+            profile_styles = profile_cfg.get("styles")
+            if profile_styles and isinstance(profile_styles, str):
+                styles_dir = Path(profile_styles).expanduser().absolute().parent
+                if styles_dir.exists():
+                    return styles_dir
+
+        # Try HOME/css
+        home_css_dir = Path.home() / "css"
+        if home_css_dir.exists():
+            return home_css_dir
+
+        # Fall back to project default
+        default_css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
+        return default_css_dir
+
+    def _resolve_stylesheet_path(self, styles_value: str) -> Path | None:
+        """Resolve stylesheet path from config value, expanding user home and making absolute."""
+        if not styles_value:
+            return None
+        try:
+            path = Path(styles_value).expanduser().absolute()
+            return path if path.exists() else None
+        except Exception as exc:
+            log.warning("Failed to resolve stylesheet path %r: %s", styles_value, exc)
+            return None
+
+    def _clear_profile_stylesheet(self) -> None:
+        """Clear previously applied profile stylesheet."""
+        if hasattr(self, "_view") and self._view:
+            # Clear the user-css element by applying empty CSS (must happen BEFORE new stylesheet)
+            self._run_js("""
+            setTimeout(function() {
+              if (typeof applyCSS === 'function') {
+                applyCSS('');
+              }
+            }, 10);
+            """)
+        log.debug("Cleared profile stylesheet")
+
+    def _apply_profile_stylesheet(self, css_path: Path) -> None:
+        """Load and apply CSS stylesheet to editor canvas.
+
+        Clears any previously applied stylesheet and applies the new one.
+        Defers JS execution until page is ready.
+        """
+        try:
+            with open(css_path, encoding="utf-8") as f:
+                css_text = f.read()
+            self._css_path = str(css_path)
+            css_hash = hash(css_text) % 10000  # For debug logging
+            log.info("Loading CSS (hash=%d): %s", css_hash, css_path)
+
+            # Update status label if it exists (might not during initialization)
+            if hasattr(self, "_css_status_label"):
+                self._css_status_label.setText(f"CSS: {css_path.name}")
+            # Defer JS call until page is ready (setTimeout ensures applyCSS is defined)
+            if hasattr(self, "_view") and self._view:
+                # Defer until after clear completes (clear uses 10ms, so apply at 200ms to be safe)
+                script = f"""
+                setTimeout(function() {{
+                  if (typeof applyCSS === 'function') {{
+                    applyCSS({json.dumps(css_text)});
+                  }}
+                }}, 200);
+                """
+                self._run_js(script)
+                log.info("Queued stylesheet application (hash=%d): %s", css_hash, css_path)
+            else:
+                log.info("Deferred stylesheet application (UI not ready yet): %s", css_path)
+        except Exception as exc:
+            log.error("Failed to apply profile stylesheet %s: %s", css_path, exc)
 
     def _save_documents_path(self, path: str) -> None:
         """Save documents folder path to config for current profile (atomic write)."""
@@ -2653,9 +2923,8 @@ class EditorWindow(QMainWindow):
 
     def _write_html_file(self, path: str, body_html: str) -> None:
         """Write a complete HTML document file from body HTML."""
-        # Use user-selected CSS if set; otherwise fall back to project default
-        css_path = (_BASE / "Resources" / "css" / "styles.css") if _IS_FROZEN else (_BASE / "css" / "styles.css")
-        css_source = Path(self._css_path) if self._css_path else css_path
+        # Use user-selected CSS if set; otherwise use profile/home/project default
+        css_source = Path(self._css_path) if self._css_path else self._get_stylesheet_path()
         if css_source.exists():
             with open(css_source, encoding="utf-8") as f:
                 css_content = f.read()
@@ -2902,6 +3171,18 @@ class EditorWindow(QMainWindow):
         toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
 
+        # Profile selector dropdown (new for 005-editor-profile-clipboard)
+        if hasattr(self, "_config_loader"):
+            profile_label = QLabel("Profile: ")
+            self._profile_selector = QComboBox(self)
+            self._profile_selector.addItems(list(self._config_loader.get_profiles().keys()))
+            self._profile_selector.currentTextChanged.connect(self._on_profile_selected)
+            if hasattr(self, "_current_profile") and self._current_profile in self._config_loader.get_profiles():
+                self._profile_selector.setCurrentText(self._current_profile)
+            toolbar.addWidget(profile_label)
+            toolbar.addWidget(self._profile_selector)
+            toolbar.addSeparator()
+
         style = self.style()
         if style:
             save_action = toolbar.addAction(
@@ -2918,31 +3199,113 @@ class EditorWindow(QMainWindow):
             send_action.triggered.connect(self._menu_send)
 
     # ------------------------------------------------------------------
+    # Profile selection and session management (new for 005-editor-profile-clipboard)
+    # ------------------------------------------------------------------
+
+    def _on_profile_selected(self, profile_name: str) -> None:
+        """Handle profile selection from dropdown.
+
+        Updates default documents path and applies profile stylesheet if defined.
+        """
+        self._current_profile = profile_name
+        profiles = self._config_loader.get_profiles()
+        log.info("Profile selected: %s", profile_name)
+        log.info("Available profiles: %s", list(profiles.keys()))
+        if profile_name in profiles:
+            profile_info = profiles[profile_name]
+            log.info("Profile keys in config: %s", list(profile_info.keys())[:10])  # First 10 keys
+            default_path = profile_info.get("default_documents_path")
+            log.info("Profile '%s' default_documents_path: %r", profile_name, default_path)
+            # Use profile's path if set (not None and not empty); fallback to system default
+            if default_path and default_path != "":
+                self._default_documents_path = default_path
+                self._editor_session.active_profile_default_path = default_path
+                log.info("Updated editor default path to: %s", default_path)
+            else:
+                # Profile has no custom path set; use system default documents folder
+                default_docs_path = self._get_default_documents_path()
+                self._default_documents_path = default_docs_path
+                self._editor_session.active_profile_default_path = default_docs_path
+                log.info("Profile has no default_documents_path; using system default: %s", default_docs_path)
+
+            # Apply profile stylesheet if defined (load directly from raw config, not transformed profile_info)
+            # Always clear previous stylesheet first
+            self._clear_profile_stylesheet()
+
+            if hasattr(self, "_config_data") and profile_name in self._config_data:
+                raw_profile = self._config_data[profile_name]
+                styles_path = raw_profile.get("styles") if isinstance(raw_profile, dict) else None
+                log.info("Profile stylesheet path: %s", styles_path)
+                if styles_path and isinstance(styles_path, str):
+                    css_path = self._resolve_stylesheet_path(styles_path)
+                    if css_path and css_path.exists():
+                        self._apply_profile_stylesheet(css_path)
+                        log.info("✓ Applied profile stylesheet: %s", css_path)
+                    else:
+                        log.warning("✗ Profile stylesheet not found: %s", styles_path)
+                else:
+                    log.info("Profile %s has no stylesheet defined", profile_name)
+
+            self._editor_session.active_profile_name = profile_name
+        self._save_editor_session()
+
+    def _load_editor_session(self) -> None:
+        """Load active profile and document state from session file."""
+        session_file = Path.home() / ".claude" / "editor-session.json"
+        try:
+            if session_file.exists():
+                with open(session_file, encoding="utf-8") as f:
+                    session_data = json.load(f)
+                self._editor_session = EditorSession.from_dict(session_data)
+                if self._editor_session.active_profile_name:
+                    self._current_profile = self._editor_session.active_profile_name
+                if self._editor_session.active_profile_default_path:
+                    self._default_documents_path = self._editor_session.active_profile_default_path
+        except Exception as exc:
+            log.debug("Failed to load editor session: %s", exc)
+
+    def _save_editor_session(self) -> None:
+        """Save active profile and document state to session file."""
+        session_file = Path.home() / ".claude" / "editor-session.json"
+        try:
+            session_file.parent.mkdir(parents=True, exist_ok=True)
+            self._editor_session.active_profile_name = self._current_profile
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump(self._editor_session.to_dict(), f, indent=2)
+        except Exception as exc:
+            log.warning("Failed to save editor session: %s", exc)
+
+    # ------------------------------------------------------------------
     # Menu action handlers
     # ------------------------------------------------------------------
 
     def _menu_open(self) -> None:
         if not self._ask_save_if_dirty():
             return
+        # Use profile's default_documents_path; fallback to system default documents folder
+        default_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
+        log.info("_menu_open: using directory: %r (current profile: %s)", default_dir, getattr(self, "_current_profile", "unknown"))
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Open File",
-            "data",
+            default_dir,
             "Supported files (*.md *.html *.htm);;Markdown (*.md);;HTML (*.html *.htm);;All Files (*)",
         )
         if path:
             self.open_file(path)
 
     def _open_template(self) -> None:
-        """Open data/template.md if it exists."""
+        """Open data/template.md if it exists, or browse templates from default_documents_path."""
         if not self._ask_save_if_dirty():
             return
         template_path = _BASE / "data" / "template.md"
         if template_path.exists():
             self.open_file(str(template_path))
         else:
+            # Use profile's default_documents_path for template browsing; fallback to system default
+            template_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
             path, _ = QFileDialog.getOpenFileName(
-                self, "Open Template", "data", "Markdown (*.md);;HTML (*.html)"
+                self, "Open Template", template_dir, "Markdown (*.md);;HTML (*.html)"
             )
             if path:
                 self.open_file(path)
@@ -3064,12 +3427,14 @@ class EditorWindow(QMainWindow):
 
         config_path = self._resolve_send_config_path()
         config_data = self._load_send_config(config_path)
+        # Use currently selected profile in main window (not hardcoded "default")
+        initial_profile = getattr(self, "_current_profile", "default")
         dialog = _SendDialog(
             self,
             attachment_path=str(self._file_path),
             config_path=config_path,
             config_data=config_data,  # type: ignore[arg-type]
-            initial_profile="default",
+            initial_profile=initial_profile,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -3098,11 +3463,13 @@ class EditorWindow(QMainWindow):
         """Open the settings dialog to edit the sendMail YAML config file."""
         config_path = self._resolve_send_config_path()
         config_data = self._load_send_config(config_path)
+        # Use currently selected profile in main window (not hardcoded "default")
+        initial_profile = getattr(self, "_current_profile", "default")
         dialog = _ConfigDialog(
             self,
             config_path=config_path,
             config_data=config_data,
-            initial_profile="default",
+            initial_profile=initial_profile,
         )
         dialog.exec()
 
@@ -3115,8 +3482,7 @@ class EditorWindow(QMainWindow):
 
     def _menu_apply_css(self) -> None:
         """Open a CSS file picker and apply the stylesheet to the editor canvas."""
-        css_dir = (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
-        initial = str(Path(self._css_path).parent) if self._css_path else str(css_dir)
+        initial = str(Path(self._css_path).parent) if self._css_path else str(self._get_css_directory())
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Apply Stylesheet",
@@ -3158,6 +3524,62 @@ class EditorWindow(QMainWindow):
 
     def _on_dirty_changed(self, _dirty: bool) -> None:  # noqa: ARG002
         self._update_title()
+
+    def _on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
+        """Handle clipboard analysis from paste event.
+
+        For html_rich: Quill natively preserves links.
+        For plain_text with URLs: Apply linkification to convert URLs to clickable links.
+        """
+        if content_type == "html_rich":
+            log.debug("Clipboard: HTML content with links=%s, urls=%s", has_html_links, len(detected_urls))
+        elif content_type == "plain_text" and detected_urls:
+            log.debug("Clipboard: Plain text with %d URLs detected: %s", len(detected_urls), detected_urls)
+            # Apply linkification to detected URLs in editor content
+            self._apply_url_linkification(detected_urls)
+        else:
+            log.debug("Clipboard: Plain text without URLs")
+
+    def _apply_url_linkification(self, urls: list[str]) -> None:
+        """Apply link formatting to detected plain-text URLs in editor.
+
+        Converts detected plain-text URLs to clickable hyperlinks.
+        Skips URLs that are already formatted as links.
+        """
+        if not urls:
+            return
+        # Create JavaScript to find and linkify plain-text URLs
+        url_json = json.dumps(urls)
+        script = f"""
+        (function() {{
+          const urls = {url_json};
+          const content = quill.getContents();
+          let offset = 0;
+
+          // Iterate through editor operations to find and format URLs
+          content.ops.forEach(function(op) {{
+            if (op.insert && typeof op.insert === 'string') {{
+              const text = op.insert;
+              const isLink = op.attributes && op.attributes.link;
+
+              // Only linkify plain text (not already formatted)
+              if (!isLink) {{
+                urls.forEach(function(url) {{
+                  let index = text.indexOf(url);
+                  while (index >= 0) {{
+                    quill.formatText(offset + index, url.length, 'link', url, 'silent');
+                    index = text.indexOf(url, index + url.length);
+                  }}
+                }});
+              }}
+              offset += text.length;
+            }} else if (op.insert) {{
+              offset += 1; // For embeds (images, etc.)
+            }}
+          }});
+        }})();
+        """
+        self._run_js(script)
 
     def _update_title(self) -> None:
         dirty_marker = " *" if self._bridge.is_dirty else ""
