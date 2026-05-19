@@ -150,6 +150,8 @@ CI enforces:
 ## Active Technologies
 - Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, gspread, google-api-python-clien (004-visual-filter-builder)
 - N/A (filter definitions stored in YAML config) (004-visual-filter-builder)
+- Python 3.12+ + PyQt6 (≥6.7.0), PyQt6-WebEngine (≥6.7.0), Quill.js v2 (via HTML5), pyyaml, google-api-python-clien (005-editor-profile-clipboard)
+- YAML (config.yml), Markdown/HTML files (documents) (005-editor-profile-clipboard)
 
 ## Recent Changes
 - 004-visual-filter-builder: Added Python 3.12+ + PyQt6 (≥6.7.0), pyyaml, gspread, google-api-python-clien
