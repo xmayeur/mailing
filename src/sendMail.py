@@ -96,7 +96,7 @@ _OP_IS_BOUNCED = "is bounced"
 _OP_IS_NOT_BOUNCED = "is not bounced"
 
 
-def get_default_config_path():
+def get_default_config_path() -> str:
     """Get default configuration file path based on OS home directory.
 
     Returns:
@@ -342,7 +342,7 @@ def make_html_images_inline(in_filepath: str, out_filepath: str | None = None) -
     return str(soup)
 
 
-def prepare_html_for_cid(in_filepath):
+def prepare_html_for_cid(in_filepath: str) -> str:
     """
     Prepare HTML content for embedding inline images as Content-ID (CID) references.
 
@@ -380,7 +380,7 @@ def prepare_html_for_cid(in_filepath):
     return str(soup), image_paths
 
 
-def get_subscriber_reader(param):
+def get_subscriber_reader(param: Any) -> tuple[Any, Any]:
     """
     Returns a reader object and file handle for retrieving subscriber
     data based on the given parameter. The function retrieves the data
@@ -464,7 +464,7 @@ def get_smtp_connection(param: Any) -> SMTP | None:
         return None
 
 
-def get_gmail_service(param):
+def get_gmail_service(param: Any) -> Any:
     """
     Fetches and returns the Gmail service object by authenticating through OAuth2. If valid credentials
     are not found locally, the function retrieves them via authorized secrets or user authentication
