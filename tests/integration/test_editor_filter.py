@@ -12,10 +12,11 @@ from PyQt6.QtWidgets import QApplication
 
 from src.editor import _SendDialog
 
-# Skip all tests on Linux CI (Qt GUI tests require display server)
+# Skip all tests on Linux unless QT_GUI_TESTS=1 is explicitly set
+# (requires display server + GPU/EGL support; set QT_GUI_TESTS=1 to opt in)
 pytestmark = pytest.mark.skipif(
-    sys.platform.startswith("linux") and "GITHUB_ACTIONS" in os.environ,
-    reason="Qt GUI tests require display server, not available on Linux CI"
+    sys.platform.startswith("linux") and not os.environ.get("QT_GUI_TESTS"),
+    reason="Qt GUI tests require display server and GPU support; set QT_GUI_TESTS=1 to enable"
 )
 
 

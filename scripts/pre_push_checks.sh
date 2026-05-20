@@ -32,10 +32,17 @@ run_quiet "pytest unit (coverage)"  poetry run pytest tests/unit --cov-fail-unde
 # Integration tests (no coverage requirement - tested separately)
 echo "."
 echo "Running pytest integration (no coverage requirement)..."
-poetry run pytest tests/integration/ -v --tb=short || {
-    echo "❌ pytest integration failed"
-    exit 1
-}
+if [[ "$(uname)" == "Linux" ]] && command -v xvfb-run &>/dev/null; then
+    xvfb-run -a poetry run pytest tests/integration/ -v --tb=short || {
+        echo "❌ pytest integration failed"
+        exit 1
+    }
+else
+    poetry run pytest tests/integration/ -v --tb=short || {
+        echo "❌ pytest integration failed"
+        exit 1
+    }
+fi
 # run_quiet "pytest legacy"           poetry run pytest tests/legacy_unit/ tests/legacy_integration/ tests/legacy_examples/
 
 echo "✅ Pre-push checks completed."

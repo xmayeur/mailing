@@ -236,10 +236,10 @@ class _LinkDialog(QDialog):
         self.text_input.returnPressed.connect(self.accept)
 
     def get_url(self) -> str:
-        return self.url_input.text().strip()
+        return str(self.url_input.text()).strip()
 
     def get_text(self) -> str:
-        return self.text_input.text().strip()
+        return str(self.text_input.text()).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ class _AnchorDialog(QDialog):
         self.name_input.returnPressed.connect(self.accept)
 
     def get_name(self) -> str:
-        return self.name_input.text().strip().replace(" ", "-")
+        return str(self.name_input.text()).strip().replace(" ", "-")
 
 
 # ---------------------------------------------------------------------------
@@ -347,10 +347,10 @@ class _TableDialog(QDialog):
         layout.addRow(buttons)
 
     def get_rows(self) -> int:
-        return self.rows_spin.value()
+        return int(self.rows_spin.value())
 
     def get_cols(self) -> int:
-        return self.cols_spin.value()
+        return int(self.cols_spin.value())
 
 
 # ---------------------------------------------------------------------------
@@ -1525,9 +1525,9 @@ class _ConfigDialog(QDialog):
         if value in (None, ""):
             return ""
         if isinstance(value, dict):
-            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
+            return str(yaml.safe_dump(value, sort_keys=False, allow_unicode=True)).strip()
         try:
-            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
+            return str(yaml.safe_dump(value, sort_keys=False, allow_unicode=True)).strip()
         except Exception:
             return str(value)
 
@@ -1674,7 +1674,7 @@ class _ConfigDialog(QDialog):
         name, ok = QInputDialog.getText(self, title, "Profile name:", text=default)
         if not ok:
             return None
-        name = name.strip()
+        name = str(name).strip()
         if not name:
             return None
         return name
