@@ -145,12 +145,12 @@ pyright src/ && echo "pyright passed"
 
 **Independent Test**: `ruff check src/ tests/` returns zero violations and exit code 0.
 
-- [ ] T047 [US3] Review ruff violation report and categorize by type (line length, unused imports, naming, etc.)
-- [ ] T048 [US3] Auto-fix auto-fixable ruff violations in src/ via `ruff check --fix src/` (handles imports, formatting, etc.)
-- [ ] T049 [US3] Manually fix non-auto-fixable ruff violations in src/ (naming conventions, complexity, bandit security issues)
-- [ ] T050 [US3] Review and fix ruff violations in tests/ (apply per-file-ignores from pyproject.toml)
-- [ ] T051 [US3] Verify zero ruff violations with `ruff check . --exclude venv,env,build,dist,release` (all source + test code)
-- [ ] T052 [US3] Update CI to run ruff check as part of test suite in .github/workflows/tests.yml
+- [x] T047 [US3] Review ruff violation report and categorize by type (line length, unused imports, naming, etc.)
+- [x] T048 [US3] Auto-fix auto-fixable ruff violations in src/ via `ruff check --fix src/` (handles imports, formatting, etc.)
+- [x] T049 [US3] Manually fix non-auto-fixable ruff violations in src/ (naming conventions, complexity, bandit security issues)
+- [x] T050 [US3] Review and fix ruff violations in tests/ (apply per-file-ignores from pyproject.toml)
+- [x] T051 [US3] Verify zero ruff violations with `ruff check . --exclude venv,env,build,dist,release` (all source + test code)
+- [x] T052 [US3] Update CI to run ruff check as part of test suite in .github/workflows/tests.yml
 
 **Phase 5 Completion Test**:
 ```bash

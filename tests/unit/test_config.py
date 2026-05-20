@@ -3,12 +3,10 @@
 Tests YAML loading, validation, profile handling, and defaults.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 import sys
-import tempfile
+from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 

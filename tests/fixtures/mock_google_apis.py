@@ -14,6 +14,7 @@ Usage:
 """
 
 from unittest.mock import MagicMock
+
 import pytest
 
 
@@ -146,18 +147,18 @@ def mock_google_api_build(monkeypatch):
             service = build('drive', 'v3', credentials=creds)
             # service is now a mock
     """
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
 
     drive_service = MagicMock()
     sheets_service = MagicMock()
     gmail_service = MagicMock()
 
-    def _build(serviceName, version, **kwargs):
-        if serviceName == "drive":
+    def _build(service_name, version, **kwargs):
+        if service_name == "drive":
             return drive_service
-        elif serviceName == "sheets":
+        elif service_name == "sheets":
             return sheets_service
-        elif serviceName == "gmail":
+        elif service_name == "gmail":
             return gmail_service
         return MagicMock()
 

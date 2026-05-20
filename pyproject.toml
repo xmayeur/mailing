@@ -199,7 +199,7 @@ max-complexity = 15
 check-typed-exception = true
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "N999", "N817", "ARG"]  # S101: assertions OK in tests; N999: test files mirror camelCase reader/writer names; N817: ET is the canonical ElementTree alias; ARG: unused params are normal in BDD steps, mocks, and sentinel lambdas
+"tests/**" = ["S101", "N999", "N813", "N817", "ARG"]  # S101: assertions OK in tests; N999: test files mirror camelCase reader/writer names; N813: camelCase module imports (sendMail → sm); N817: ET is the canonical ElementTree alias; ARG: unused params are normal in BDD steps, mocks, and sentinel lambdas
 
 [tool.ruff.format]
 quote-style = "double"

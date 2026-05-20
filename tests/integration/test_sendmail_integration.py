@@ -3,13 +3,13 @@
 Tests end-to-end email operations combining multiple modules.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
+import csv
 import sys
 from pathlib import Path
 from typing import Any
-import csv
-import tempfile
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
@@ -84,7 +84,7 @@ class TestSendMailErrorScenarios:
         # Would attempt retry logic here
         with pytest.raises(OSError):
             from smtplib import SMTP
-            conn = SMTP(param.smtp_host, param.smtp_port)
+            SMTP(param.smtp_host, param.smtp_port)
 
     def test_template_with_missing_required_field(self) -> None:
         """Handle template with missing required field in data."""
