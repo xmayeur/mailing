@@ -76,10 +76,26 @@ jobs:
       with:
         python-version: '3.9'
 
-    - name: Install linting tools
+    - name: Install linting and type checking tools
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pylint black
+        pip install mypy pyright ruff vulture flake8 pylint black
+
+    - name: Type checking with mypy
+      run: mypy --strict src/
+      continue-on-error: false
+
+    - name: Type checking with pyright
+      run: pyright src/
+      continue-on-error: false
+
+    - name: Lint with ruff
+      run: ruff check src/ tests/
+      continue-on-error: false
+
+    - name: Dead code detection with vulture
+      run: vulture src/ --exclude venv,tests,build,dist,release
+      continue-on-error: true
 
     - name: Lint with flake8
       run: |
