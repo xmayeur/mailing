@@ -228,6 +228,7 @@ source = ["src"]
 omit = [
     "tests/*",
     "src/setup.py",
+    "src/visual_filter_builder.py",  # GUI widget mocked in unit tests, integration tests needed
 ]
 
 [tool.coverage.report]
