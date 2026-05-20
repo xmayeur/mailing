@@ -170,13 +170,13 @@ ruff check src/ tests/ --exclude venv,env,build,dist,release
 
 **Independent Test**: `vulture src/ --exclude venv,tests,build,dist,release` generates report of unused code with file/line info.
 
-- [ ] T053 [US4] Run vulture and generate dead code report: `vulture src/ --exclude venv,tests,build,dist,release > deadcode.txt`
-- [ ] T054 [US4] Review dead code report and categorize findings (unused functions, unused variables, unused imports)
-- [ ] T055 [US4] For each reported unused function/variable: Decide (1) delete if truly dead, (2) add # noqa if intentional API
-- [ ] T056 [US4] Delete confirmed dead code or add noqa comments with justification in src/ files
-- [ ] T057 [US4] Re-run vulture to verify report reflects decisions (some items may remain as intentional/public APIs)
-- [ ] T058 [US4] Document dead code findings and decisions in specs/007-improve-test-coverage/deadcode-audit.md (for future reference)
-- [ ] T059 [US4] Add vulture check to CI in .github/workflows/tests.yml for ongoing dead code detection
+- [x] T053 [US4] Run vulture and generate dead code report: `vulture src/ --exclude venv,tests,build,dist,release > deadcode.txt`
+- [x] T054 [US4] Review dead code report and categorize findings (unused functions, unused variables, unused imports)
+- [x] T055 [US4] For each reported unused function/variable: Decide (1) delete if truly dead, (2) add # noqa if intentional API
+- [x] T056 [US4] Delete confirmed dead code or add noqa comments with justification in src/ files
+- [x] T057 [US4] Re-run vulture to verify report reflects decisions (some items may remain as intentional/public APIs)
+- [x] T058 [US4] Document dead code findings and decisions in specs/007-improve-test-coverage/deadcode-audit.md (for future reference)
+- [x] T059 [US4] Add vulture check to CI in .github/workflows/tests.yml for ongoing dead code detection
 
 **Phase 6 Completion Test**:
 ```bash
