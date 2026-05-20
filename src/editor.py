@@ -209,7 +209,7 @@ def _svg_icon(svg: str) -> QIcon:
 # ---------------------------------------------------------------------------
 # Link insertion dialog
 # ---------------------------------------------------------------------------
-class _LinkDialog(QDialog):  # pragma: no cover  # type: ignore
+class _LinkDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     """Small dialog asking for a URL and optional display text."""
 
     def __init__(self, parent: QWidget | None = None, selected_text: str = "") -> None:
@@ -255,7 +255,7 @@ class _LinkDialog(QDialog):  # pragma: no cover  # type: ignore
 # ---------------------------------------------------------------------------
 # Session log viewer dialog
 # ---------------------------------------------------------------------------
-class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore
+class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     """Dialog displaying the session log from a send operation."""
 
     def __init__(self, parent: QWidget | None = None, log_entries: list[str] | None = None) -> None:
@@ -292,7 +292,7 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore
 # ---------------------------------------------------------------------------
 # Anchor insertion dialog
 # ---------------------------------------------------------------------------
-class _AnchorDialog(QDialog):  # pragma: no cover  # type: ignore
+class _AnchorDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     """Small dialog asking for a named anchor / bookmark identifier."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -327,7 +327,7 @@ class _AnchorDialog(QDialog):  # pragma: no cover  # type: ignore
 # ---------------------------------------------------------------------------
 # Table insertion dialog
 # ---------------------------------------------------------------------------
-class _TableDialog(QDialog):  # pragma: no cover  # type: ignore
+class _TableDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     """Dialog asking for table dimensions (rows × columns)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -366,7 +366,7 @@ class _TableDialog(QDialog):  # pragma: no cover  # type: ignore
 # ---------------------------------------------------------------------------
 # Send dialog
 # ---------------------------------------------------------------------------
-class _SendDialog(QDialog):  # pragma: no cover  # type: ignore
+class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     """Dialog for selecting sendMail options before sending the edited file."""
 
     def __init__(
@@ -1369,7 +1369,7 @@ class _LineFieldSpec:
 # ---------------------------------------------------------------------------
 # Settings / config editor
 # ---------------------------------------------------------------------------
-class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore
+class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     """Dialog for editing sendMail YAML configuration by profile.
 
     Provides tabbed interface for editing:
@@ -2442,7 +2442,7 @@ class EditorBridge(QObject):
 # ---------------------------------------------------------------------------
 # Main editor window
 # ---------------------------------------------------------------------------
-class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore
+class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
     """Main WYSIWYG newsletter editor window.
 
     Desktop application for composing and editing HTML newsletters.
@@ -2864,7 +2864,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore
                 continue
             span = soup.new_tag(
                 "span",
-                **{"class": "editor-anchor", "data-anchor-id": anchor_id,  # type: ignore
+                **{"class": "editor-anchor", "data-anchor-id": anchor_id,  # type: ignore[arg-type]
                    "title": f"Anchor: {anchor_id}"},
             )
             span.string = "⚓"  # ⚓
