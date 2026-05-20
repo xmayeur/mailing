@@ -1915,10 +1915,9 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _dump_yaml_block(self, value: object) -> str:
         if value in (None, ""):
             return ""
-        if isinstance(value, dict):
-            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()  # type: ignore[no-any-return]
         try:
-            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()  # type: ignore[no-any-return]
+            result: str = yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
+            return result
         except Exception:
             return str(value)
 

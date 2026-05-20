@@ -685,7 +685,8 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         try:
             import yaml
 
-            return yaml.dump(filter_dict, default_flow_style=False, sort_keys=False)  # type: ignore[no-any-return]
+            result = yaml.dump(filter_dict, default_flow_style=False, sort_keys=False)
+            return result if isinstance(result, str) else ""
         except ImportError:
             return ""
 
