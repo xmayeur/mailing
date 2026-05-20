@@ -96,12 +96,12 @@ _OP_IS_BOUNCED = "is bounced"
 _OP_IS_NOT_BOUNCED = "is not bounced"
 
 
-def get_default_config_path() -> str:
+def get_default_config_path() -> str | int:
     """Get default configuration file path based on OS home directory.
 
     Returns:
-        str: Path to sendMail.yml in user's .config directory,
-             e.g., ~/.config/sendMail.yml
+        str | int: Path to sendMail.yml in user's .config directory
+        or -1 if file was created with defaults
     """
     home = getenv("USERPROFILE") if os.name == "nt" else getenv("HOME")
     home = home or ""
@@ -342,9 +342,8 @@ def make_html_images_inline(in_filepath: str, out_filepath: str | None = None) -
     return str(soup)
 
 
-def prepare_html_for_cid(in_filepath: str) -> str:
-    """
-    Prepare HTML content for embedding inline images as Content-ID (CID) references.
+def prepare_html_for_cid(in_filepath: str) -> tuple[str, list[tuple[str, str]]]:
+    """Prepare HTML content for embedding inline images as Content-ID (CID) references.
 
     This function processes an HTML file, reads its content, identifies the <img>
     tags, and replaces their `src` attributes with Content-ID (CID) references,
@@ -352,12 +351,11 @@ def prepare_html_for_cid(in_filepath: str) -> str:
     paths and excludes external or base64-encoded images. A mapping of the local
     image paths and the generated CIDs is returned.
 
-    :param in_filepath: The file path to the HTML file to be processed.
-    :type in_filepath: str
-    :return: A tuple containing the modified HTML content as a string and a list
-        of tuples, where each tuple includes the local image file path and its
-        associated CID.
-    :rtype: tuple[str, list[tuple[str, str]]]
+    Args:
+        in_filepath: File path to HTML file to process
+
+    Returns:
+        Tuple of modified HTML content and list of (path, CID) tuples for embedded images
     """
     basepath = os.path.split(in_filepath.rstrip(os.path.sep))[0]
     with open(in_filepath, encoding="utf-8") as file:
@@ -573,7 +571,7 @@ def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: in
         return None
 
 
-def prepare_html_and_get_images(in_filepath, max_width=800):
+def prepare_html_and_get_images(in_filepath: str, max_width: int = 800) -> tuple[str, list[Any], str]:
     """
     Processes an HTML file to embed inline images and resize them for optimized usage.
 
@@ -682,7 +680,7 @@ def process_attachments(args, config, folder="input"):
     return files, service, google_drive_files
 
 
-def md2html(file_path, styles=None, embed_styles=False):
+def md2html(file_path: str, styles: str | None = None, embed_styles: bool = False) -> str | None:
     """
     Converts a Markdown file to an HTML file with optional styling.
 
@@ -805,11 +803,14 @@ def _set_email_headers(
     return to, bcc
 
 
-def _process_html_attachment(att, param, all_inline_images, temp_dirs):
+def _process_html_attachment(att: str, param: Any, all_inline_images: list[Any], temp_dirs: list[str]) -> str:
     """Convert Markdown to HTML if needed, then extract inline images. Returns the HTML body."""
     is_md = att.endswith("md")
     if is_md:
-        att = md2html(att, styles=param.styles if hasattr(param, "styles") else None, embed_styles=True)
+        result = md2html(att, styles=param.styles if hasattr(param, "styles") else None, embed_styles=True)
+        if result is None:
+            return ""
+        att = result
     html_content, found_images, t_dir = prepare_html_and_get_images(att)
     all_inline_images.extend(found_images)
     temp_dirs.append(t_dir)
@@ -1351,7 +1352,7 @@ def _post_send_cleanup(service, google_drive_files):
         os.remove(f)
 
 
-def process_profile(args):
+def process_profile(args: Any) -> str:
     """
     Processes the user profile to configure and send a mailing task with attachments. The function
     integrates configurations, manages secrets, processes attachments, and dynamically generates
