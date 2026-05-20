@@ -4,13 +4,14 @@ Tests email MIME message creation, SMTP/Gmail sending, attachment handling,
 and batch operations with mocked SMTP/Gmail connections.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 import sys
-from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
@@ -141,7 +142,7 @@ class TestHtmlProcessing:
         img_file.write_bytes(b"\x89PNG\r\n\x1a\n")  # PNG header
 
         html_file = tmp_path / "test.html"
-        html_file.write_text(f"<html><body><img src='test.png'/></body></html>")
+        html_file.write_text("<html><body><img src='test.png'/></body></html>")
 
         result = sm.prepare_html_and_get_images(str(html_file))
         assert result is not None

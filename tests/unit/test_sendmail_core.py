@@ -4,10 +4,11 @@ Tests recipient filtering, template substitution, email building, and sending lo
 Mocks Google APIs and SMTP connections to avoid external dependencies.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, Mock
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
