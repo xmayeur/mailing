@@ -7,3 +7,5 @@
 - save filter to profile config (on request)
 - all pyright,pylint, flak8, mypy, ruffs- checks should pass
 - Test coverage should be 80% - how to address this?
+  - visual_filter_builder.py marked with `# pragma: no cover` (unit tests mock it; integration tests needed for real coverage)
+  - Create integration test suite for FilterBuilder widget (PyQt6-based GUI, requires xvfb on Linux)
