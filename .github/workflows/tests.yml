@@ -43,9 +43,9 @@ jobs:
     - name: Run unit tests with pytest
       run: |
         if [ "$RUNNER_OS" = "Linux" ]; then
-          xvfb-run -a pytest tests/unit --cov=src --cov-fail-under=60 --cov-report=xml --cov-report=term-missing
+          xvfb-run -a pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml --cov-report=term-missing
         else
-          pytest tests/unit --cov=src --cov-fail-under=60 --cov-report=xml --cov-report=term-missing
+          pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml --cov-report=term-missing
         fi
       shell: bash
 

@@ -396,5 +396,295 @@ class TestCoverageGap:
                 mock_sleep.assert_called_with(10)
 
 
+class TestCoverageGap2:
+    """Additional tests to push coverage above 80%."""
+
+    def test_get_google_sheets_schema_exception(self):
+        """Cover lines 226-236: exception in get_google_sheets_schema."""
+        with patch("sendMail.open_google_db_members_sheet", side_effect=Exception("API error")):
+            result = sendMail.get_google_sheets_schema("sa", "sheet_id")
+        assert result == []
+
+    def test_get_google_sheets_schema_empty_data(self):
+        """Cover line 233: empty data returns []."""
+        with patch("sendMail.open_google_db_members_sheet") as mock_open, \
+             patch("sendMail.read_all_sheet", return_value=[]):
+            mock_open.return_value = MagicMock()
+            result = sendMail.get_google_sheets_schema("sa", "sheet_id")
+        assert result == []
+
+    def test_process_attachments_google_drive_path(self):
+        """Cover lines 671-680: process_attachments downloads from Google Drive."""
+        args = Mock()
+        args.file = None
+        config = {"SA": "sa_key", "mailing_folder": "folder_id"}
+
+        mock_service = MagicMock()
+        mock_files = [{"id": "f1", "name": "news.html"}]
+
+        with patch("sendMail.gd.connect_google_driver", return_value=mock_service), \
+             patch("sendMail.gd.get_files", return_value={"files": mock_files}), \
+             patch("sendMail.gd.download_file"), \
+             patch("sendMail.glob", return_value=[]), \
+             patch("sendMail.os.remove"):
+            files, service, gd_files = sendMail.process_attachments(args, config)
+
+        assert service is mock_service
+        assert gd_files == mock_files
+
+    def test_attach_body_with_inline_images(self, tmp_path):
+        """Cover lines 843-845: _attach_body attaches inline images."""
+        img_file = tmp_path / "test.png"
+        img_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
+
+        from email.mime.multipart import MIMEMultipart
+        msg = MIMEMultipart("mixed")
+        msg_related = MIMEMultipart("related")
+
+        all_inline_images = [{"path": str(img_file), "cid": "img001"}]
+        sendMail._attach_body(msg, msg_related, "<html><body>test</body></html>", all_inline_images)
+
+        # related part should have been attached to msg
+        assert msg.get_payload()
+
+    def test_attach_body_inline_image_error(self):
+        """Cover line 847: OSError when opening inline image."""
+        from email.mime.multipart import MIMEMultipart
+        msg = MIMEMultipart("mixed")
+        msg_related = MIMEMultipart("related")
+
+        all_inline_images = [{"path": "/nonexistent/img.png", "cid": "img001"}]
+        with patch("sendMail.log") as mock_log:
+            sendMail._attach_body(msg, msg_related, "<html><body>test</body></html>", all_inline_images)
+        mock_log.error.assert_called_once()
+
+    def test_build_and_send_temp_dir_cleanup_verbose(self, tmp_path):
+        """Cover lines 933-938: temp dir cleanup with verbose logging."""
+        import shutil
+        temp_dir = str(tmp_path / "tmpdir")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        param = Mock()
+        param.donotsend = False
+        param.verbose = True
+        param.subject = "Test"
+        param.message = "Hello"
+        param.file = []
+        param.smtp_host = "smtp.test.com"
+
+        mock_msg = Mock()
+        mock_msg._temp_dirs = [temp_dir]
+        mock_recipients = ["to@test.com"]
+
+        with patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)), \
+             patch("sendMail.send_mail", return_value=True), \
+             patch("sendMail.log") as mock_log, \
+             patch("sendMail.shutil.rmtree") as mock_rmtree:
+            sendMail._build_and_send(param, ["to@test.com"], ["to@test.com"], ["email"])
+
+        mock_rmtree.assert_called_once_with(temp_dir)
+        mock_log.info.assert_any_call(f"Dossier temporaire supprimé : {temp_dir}")
+
+    def test_build_and_send_temp_dir_oserror(self, tmp_path):
+        """Cover line 937-938: OSError during temp dir cleanup."""
+        param = Mock()
+        param.donotsend = False
+        param.verbose = False
+        param.subject = "Test"
+        param.message = "Hello"
+        param.file = []
+        param.smtp_host = "smtp.test.com"
+
+        mock_msg = Mock()
+        mock_msg._temp_dirs = ["/nonexistent/dir"]
+        mock_recipients = ["to@test.com"]
+
+        with patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)), \
+             patch("sendMail.send_mail", return_value=True), \
+             patch("sendMail.shutil.rmtree", side_effect=OSError("no such dir")), \
+             patch("sendMail.log") as mock_log:
+            sendMail._build_and_send(param, ["to@test.com"], ["to@test.com"], ["email"])
+
+        mock_log.error.assert_called()
+
+    def test_generate_mailing_empty_header(self):
+        """Cover line 993: return 'Header Error' when reader yields nothing."""
+        param = Mock()
+        param.max_addr_per_mail = 1
+        param.pause = 0
+        param.max_mails_per_hour = 100
+        param.from_index = None
+
+        with patch("sendMail.get_subscriber_reader", return_value=(iter([]), None)):
+            result = sendMail.generate_mailing(param)
+        assert result == "Header Error"
+
+    def test_generate_mailing_closes_file_object(self):
+        """Cover line 1029: file_object.close() in finally block."""
+        param = Mock()
+        param.max_addr_per_mail = 1
+        param.pause = 0
+        param.max_mails_per_hour = 100
+        param.from_index = None
+        param.to_index = None
+        param.filter = {}
+        param.test = False
+        param.selected = False
+        param.verbose = False
+        param.donotsend = False
+        param.subject = "Sub"
+        param.message = "Hi ${email}"
+        param.file = []
+        param.profile = "test"
+
+        mock_file = MagicMock()
+        rows = [["email"], ["a@b.com"]]
+
+        mock_msg = Mock()
+        mock_msg._temp_dirs = []
+        mock_recipients = ["a@b.com"]
+
+        with patch("sendMail.get_subscriber_reader", return_value=(iter(rows), mock_file)), \
+             patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)), \
+             patch("sendMail.send_mail", return_value=True):
+            result = sendMail.generate_mailing(param)
+
+        mock_file.close.assert_called_once()
+
+    def test_parse_filter_expr_empty_raises(self):
+        """Cover line 1068: ValueError for empty filter value."""
+        with pytest.raises(ValueError, match="empty or invalid"):
+            sendMail._parse_filter_expr("", "field")
+
+    def test_parse_filter_expr_non_string_raises(self):
+        """Cover line 1068: ValueError for non-string filter value."""
+        with pytest.raises(ValueError, match="empty or invalid"):
+            sendMail._parse_filter_expr(None, "field")
+
+    def test_eval_regex_empty_test_value_negate_true(self):
+        """Cover line 1116: empty test_value + negate=True returns True."""
+        result = sendMail._eval_regex(None, "anything", negate=True)
+        assert result is True
+
+    def test_eval_regex_empty_test_value_negate_false(self):
+        """Cover line 1116: empty test_value + negate=False returns False."""
+        result = sendMail._eval_regex("", "anything", negate=False)
+        assert result is False
+
+    def test_do_string_eval_default_true(self):
+        """Cover line 1155: _do_string_eval returns True for unknown op."""
+        # 'unknown_op' is not in any of the checked strings, so falls through to default True
+        result = sendMail._do_string_eval("hello", "world", "unknown_op")
+        assert result is True
+
+    def test_post_send_cleanup(self, tmp_path):
+        """Cover lines 1337, 1339: _post_send_cleanup renames files and removes input."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        input_file = input_dir / "test.html"
+        input_file.write_text("content")
+
+        mock_service = MagicMock()
+        google_drive_files = [{"id": "f1", "name": "news.html"}]
+
+        with patch("sendMail.gd.rename_file") as mock_rename, \
+             patch("sendMail.glob", return_value=[str(input_file)]), \
+             patch("sendMail.os.remove") as mock_remove:
+            sendMail._post_send_cleanup(mock_service, google_drive_files)
+
+        mock_rename.assert_called_once_with(mock_service, "f1", "published_news.html")
+        mock_remove.assert_called_once_with(str(input_file))
+
+    def test_process_profile_session_filter_applied(self):
+        """Cover line 1376: session_filter from args overrides param.filter."""
+        from unittest.mock import call
+
+        args = Mock()
+        args.session_filter = {"status": "is active"}
+        args.profile = "test"
+        args.conf = {"test": {"sender": "me@test.com", "sendername": "Me",
+                               "subject": "Sub", "message": "Body",
+                               "database": "data.csv"}}
+        args.subject = "Sub"
+        args.test = False
+        args.verbose = False
+        args.doNotSend = False
+        args.database = "data.csv"
+        args.file = []
+        args.from_index = None
+        args.to_index = None
+        args.wait = None
+        args.max_mails_per_hour = 100
+        args.max_addr_per_mail = 10
+        args.pause = 0
+        args.config = None
+        args.md2html = False
+        args.body = None
+
+        filter_applied = {}
+
+        def capture_filter(param):
+            filter_applied["filter"] = param.filter
+            return "OK"
+
+        with patch("sendMail._load_config_with_secrets", return_value={
+            "sender": "me@test.com", "sendername": "Me", "subject": "Sub",
+            "message": "Body", "database": "data.csv", "filter": {"email": "is not empty"},
+            "test": False,
+        }), \
+        patch("sendMail.check_mandatory_param", return_value=True), \
+        patch("sendMail.process_attachments", return_value=(["file.html"], None, [])), \
+        patch("sendMail._prepare_message_body", side_effect=lambda p, c, f: p), \
+        patch("sendMail.generate_mailing", side_effect=capture_filter), \
+        patch("sendMail._post_send_cleanup"):
+            sendMail.process_profile(args)
+
+        assert filter_applied.get("filter") == {"status": "is active"}
+
+    def test_process_profile_generate_mailing_error(self):
+        """Cover line 1384: return 'Error' when generate_mailing != 'OK'."""
+        args = Mock()
+        args.session_filter = None
+        args.profile = "test"
+
+        with patch("sendMail._load_config_with_secrets", return_value={
+            "sender": "me@test.com", "sendername": "Me", "subject": "Sub",
+            "message": "Body", "database": "data.csv", "test": False,
+        }), \
+        patch("sendMail.check_mandatory_param", return_value=True), \
+        patch("sendMail.process_attachments", return_value=(["file.html"], None, [])), \
+        patch("sendMail._prepare_message_body", side_effect=lambda p, c, f: p), \
+        patch("sendMail.generate_mailing", return_value="Error"):
+            result = sendMail.process_profile(args)
+        assert result == "Error"
+
+    def test_check_data_source_with_database(self):
+        """Cover line 1404: _check_data_source returns True when database attr present."""
+        param = Mock(spec=["database"])
+        param.database = "data.csv"
+        assert sendMail._check_data_source(param) is True
+
+    def test_check_smtp_imap_params_all_present(self):
+        """Cover lines 1409-1415: _check_smtp_imap_params with all params set."""
+        param = Mock()
+        param.smtp_port = 587
+        param.imap_host = "imap.test.com"
+        param.imap_port = 993
+        param.username = "user"
+        param.password = "pass"
+        param.sent_folder = "Sent"
+        result = sendMail._check_smtp_imap_params(param)
+        assert result is True
+
+    def test_check_smtp_imap_params_missing_param(self):
+        """Cover loop body: _check_smtp_imap_params with missing param."""
+        param = Mock(spec=["smtp_port"])  # Only smtp_port, rest missing
+        param.smtp_port = 587
+        with patch("sendMail.log") as mock_log:
+            result = sendMail._check_smtp_imap_params(param)
+        assert result is False
+        mock_log.error.assert_called()
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
