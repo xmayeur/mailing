@@ -486,7 +486,7 @@ def _display_to_canonical_operator(display_op: str) -> str:
     return display_op.lower()
 
 
-class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
+class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
     """Main visual filter editor widget with bidirectional YAML sync.
 
     Combines visual table editor with YAML text editor in tabs.
@@ -708,7 +708,7 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc
             return {}
 
 
-class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
+class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
     """Visual table editor for filter rows.
 
     Displays filter conditions with one FilterRowWidget per row.
@@ -857,7 +857,7 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[
             self.row_changed.emit()
 
 
-class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore[misc]
+class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
     """Editor widget for a single filter row.
 
     Contains field, operator, value inputs (all QLineEdit initially) and delete button.

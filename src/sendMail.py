@@ -788,7 +788,7 @@ def _set_email_headers(
     msg["List-Unsubscribe"] = f"<{unsubscribe_mail}>"
     msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     if param.max_addr_per_mail == 1:
-        to = bcc  # type: ignore[assignment]
+        to = bcc  # type: ignore
         bcc = None
         msg["To"] = to
     else:
@@ -881,7 +881,7 @@ def build_email(
         Tuple of (MIME message object, list of recipient addresses)
     """
     msg = MIMEMultipart("mixed")
-    to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)  # type: ignore[assignment]
+    to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)  # type: ignore
 
     msg_related = MIMEMultipart("related")
     all_inline_images: list[dict[str, str]] = []
@@ -901,7 +901,7 @@ def build_email(
     _attach_body(msg, msg_related, message, all_inline_images)
 
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
-    msg._temp_dirs = temp_dirs  # type: ignore[attr-defined]
+    msg._temp_dirs = temp_dirs  # type: ignore
 
     return msg, recipients
 
@@ -1026,7 +1026,7 @@ def generate_mailing(param: Any) -> str:
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
-            _build_and_send(param, addressees, row, header)  # type: ignore[arg-type]
+            _build_and_send(param, addressees, row, header)  # type: ignore
             mail_batch_count += 1
 
         log.info(

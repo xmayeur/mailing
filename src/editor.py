@@ -36,7 +36,7 @@ ConfigProfile: TypeAlias = dict[str, ConfigData]  # noqa: UP040
 _IS_FROZEN = getattr(sys, "frozen", False)
 
 if _IS_FROZEN:
-    _MEIPASS = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    _MEIPASS = Path(sys._MEIPASS)  # type: ignore
     # For macOS BUNDLE, sys._MEIPASS is Contents/Frameworks/
     # Correct to Contents/ for asset/module resolution
     if _MEIPASS.name == "Frameworks" and _MEIPASS.parent.name == "Contents":
@@ -209,7 +209,7 @@ def _svg_icon(svg: str) -> QIcon:
 # ---------------------------------------------------------------------------
 # Link insertion dialog
 # ---------------------------------------------------------------------------
-class _LinkDialog(QDialog):  # pragma: no cover
+class _LinkDialog(QDialog):  # pragma: no cover  # type: ignore
     """Small dialog asking for a URL and optional display text."""
 
     def __init__(self, parent: QWidget | None = None, selected_text: str = "") -> None:
@@ -255,7 +255,7 @@ class _LinkDialog(QDialog):  # pragma: no cover
 # ---------------------------------------------------------------------------
 # Session log viewer dialog
 # ---------------------------------------------------------------------------
-class _SessionLogDialog(QDialog):  # pragma: no cover
+class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore
     """Dialog displaying the session log from a send operation."""
 
     def __init__(self, parent: QWidget | None = None, log_entries: list[str] | None = None) -> None:
@@ -292,7 +292,7 @@ class _SessionLogDialog(QDialog):  # pragma: no cover
 # ---------------------------------------------------------------------------
 # Anchor insertion dialog
 # ---------------------------------------------------------------------------
-class _AnchorDialog(QDialog):  # pragma: no cover
+class _AnchorDialog(QDialog):  # pragma: no cover  # type: ignore
     """Small dialog asking for a named anchor / bookmark identifier."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -327,7 +327,7 @@ class _AnchorDialog(QDialog):  # pragma: no cover
 # ---------------------------------------------------------------------------
 # Table insertion dialog
 # ---------------------------------------------------------------------------
-class _TableDialog(QDialog):  # pragma: no cover
+class _TableDialog(QDialog):  # pragma: no cover  # type: ignore
     """Dialog asking for table dimensions (rows × columns)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -366,7 +366,7 @@ class _TableDialog(QDialog):  # pragma: no cover
 # ---------------------------------------------------------------------------
 # Send dialog
 # ---------------------------------------------------------------------------
-class _SendDialog(QDialog):  # pragma: no cover
+class _SendDialog(QDialog):  # pragma: no cover  # type: ignore
     """Dialog for selecting sendMail options before sending the edited file."""
 
     def __init__(
@@ -535,7 +535,7 @@ class _SendDialog(QDialog):  # pragma: no cover
             filter_layout.addWidget(self.filter_text_edit)
             filter_layout.addWidget(self.filter_status_label)
             form.addRow("Filter (YAML)", filter_widget)
-            self._filter_builder = None  # type: ignore[assignment]
+            self._filter_builder = None  # type: ignore
 
         # Validation setup (T016, T017)
         self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
@@ -1369,7 +1369,7 @@ class _LineFieldSpec:
 # ---------------------------------------------------------------------------
 # Settings / config editor
 # ---------------------------------------------------------------------------
-class _ConfigDialog(QDialog):  # pragma: no cover
+class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore
     """Dialog for editing sendMail YAML configuration by profile.
 
     Provides tabbed interface for editing:
@@ -2020,8 +2020,8 @@ class _ConfigDialog(QDialog):  # pragma: no cover
         defaults = self._default_profile_data()
 
         for key, widget in self._widgets.items():
-            value = self._get_config_value_for_widget(key, widget, cfg, defaults)  # type: ignore[arg-type]
-            self._load_widget_by_type(widget, key, value, cfg, defaults)  # type: ignore[arg-type]
+            value = self._get_config_value_for_widget(key, widget, cfg, defaults)  # type: ignore
+            self._load_widget_by_type(widget, key, value, cfg, defaults)  # type: ignore
 
         current_index = self.tabs.currentIndex()
         if current_index >= 0:
@@ -2052,7 +2052,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover
     def _persist_current_profile(self) -> None:
         if not self._current_profile:
             return
-        self._config_data[self._current_profile] = self._collect_profile_data()  # type: ignore[assignment]
+        self._config_data[self._current_profile] = self._collect_profile_data()  # type: ignore
 
     def _on_profile_changed(self, profile: str) -> None:
         if not profile:
@@ -2091,7 +2091,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover
         if name in self._config_data:
             QMessageBox.warning(self, "Profile Exists", f"Profile '{name}' already exists.")
             return
-        self._config_data[name] = self._collect_profile_data()  # type: ignore[assignment]
+        self._config_data[name] = self._collect_profile_data()  # type: ignore
         self._reload_profiles(name)
 
     def _delete_profile(self) -> None:
@@ -2339,7 +2339,7 @@ class EditorBridge(QObject):
             self._dirty = True
             self.dirty_changed.emit(True)
 
-    @pyqtSlot(result=str)  # type: ignore[arg-type]
+    @pyqtSlot(result=str)  # type: ignore
     def request_image_insert(self) -> str:
         """
         Opens a file dialog and returns a base64 data URI for the chosen image.
@@ -2374,7 +2374,7 @@ class EditorBridge(QObject):
             log.error("Image insert failed: %s", exc)
             return ""
 
-    @pyqtSlot(str, result=str)  # type: ignore[arg-type]
+    @pyqtSlot(str, result=str)  # type: ignore
     def request_link_insert(self, selected_text: str) -> str:
         """
         Opens a link dialog pre-filled with *selected_text*.
@@ -2394,7 +2394,7 @@ class EditorBridge(QObject):
             return ""
         return json.dumps({"url": url, "text": dialog.get_text()})
 
-    @pyqtSlot(result=str)  # type: ignore[arg-type]
+    @pyqtSlot(result=str)  # type: ignore
     def request_table_insert(self) -> str:
         """
         Opens a dialog asking for table dimensions.
@@ -2442,7 +2442,7 @@ class EditorBridge(QObject):
 # ---------------------------------------------------------------------------
 # Main editor window
 # ---------------------------------------------------------------------------
-class EditorWindow(QMainWindow):  # pragma: no cover
+class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore
     """Main WYSIWYG newsletter editor window.
 
     Desktop application for composing and editing HTML newsletters.
@@ -3587,7 +3587,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover
             self,
             attachment_path=str(self._file_path),
             config_path=config_path,
-            config_data=config_data,  # type: ignore[arg-type]
+            config_data=config_data,  # type: ignore
             initial_profile=initial_profile,
         )
         # Use show() instead of exec() so send can happen while dialog is visible (T023: test mode confirmation)
