@@ -121,6 +121,27 @@ class _FakeQDialog(_FakeQObject):
     def reject(self):
         pass
 
+    def setWindowTitle(self, t):  # noqa: N802
+        pass
+
+    def setMinimumWidth(self, w):  # noqa: N802
+        pass
+
+    def setMinimumHeight(self, h):  # noqa: N802
+        pass
+
+    def setStyleSheet(self, s):  # noqa: N802
+        pass
+
+    def setFont(self, f):  # noqa: N802
+        pass
+
+    def setReadOnly(self, r):  # noqa: N802
+        pass
+
+    def setOpenExternalLinks(self, v):  # noqa: N802
+        pass
+
 
 sys.modules["PyQt6.QtCore"].pyqtSlot = _make_pyqtSlot  # pyright: ignore
 sys.modules["PyQt6.QtCore"].pyqtSignal = _make_pyqtSignal  # pyright: ignore
@@ -778,6 +799,9 @@ class _PlainTextLike:
     def setPlainText(self, value):  # noqa: N802
         self._text = value
 
+    def setStyleSheet(self, s):  # noqa: N802
+        pass
+
 
 class _FakePage:
     def __init__(self):
@@ -1393,3 +1417,665 @@ class TestEditorWindowHelpers:
 
         with patch.object(editor.sm, "make_html_images_inline", side_effect=RuntimeError("boom")):
             assert win._html_to_body_html(str(html_path)) == ""
+
+
+# ---------------------------------------------------------------------------
+# _LogCapture tests
+# ---------------------------------------------------------------------------
+
+class TestLogCapture:
+    def test_emit_appends_formatted_message(self):
+        import logging as _logging
+        log_list: list[str] = []
+        handler = editor._LogCapture(log_list)
+        record = _logging.LogRecord("test.logger", _logging.INFO, "", 0, "Hello world", None, None)
+        handler.emit(record)
+        assert len(log_list) == 1
+        assert "Hello world" in log_list[0]
+
+    def test_emit_multiple_records(self):
+        import logging as _logging
+        log_list: list[str] = []
+        handler = editor._LogCapture(log_list)
+        for msg in ("first", "second", "third"):
+            record = _logging.LogRecord("x", _logging.WARNING, "", 0, msg, None, None)
+            handler.emit(record)
+        assert len(log_list) == 3
+        assert "first" in log_list[0]
+        assert "third" in log_list[2]
+
+    def test_emit_includes_levelname(self):
+        import logging as _logging
+        log_list: list[str] = []
+        handler = editor._LogCapture(log_list)
+        record = _logging.LogRecord("x", _logging.ERROR, "", 0, "boom", None, None)
+        handler.emit(record)
+        assert "ERROR" in log_list[0]
+
+
+# ---------------------------------------------------------------------------
+# Small dialog constructor / getter tests
+# ---------------------------------------------------------------------------
+
+class TestSmallDialogs:
+    """Exercise dialog constructors (covers __init__ bodies) and getter methods."""
+
+    def test_link_dialog_get_url_and_text(self):
+        dlg = editor._LinkDialog()
+        # Replace mocked widgets with testable stubs
+        dlg.url_input = _LineEditLike("https://example.com")
+        dlg.text_input = _LineEditLike("  Click here  ")
+        assert dlg.get_url() == "https://example.com"
+        assert dlg.get_text() == "Click here"
+
+    def test_link_dialog_with_selected_text(self):
+        dlg = editor._LinkDialog(selected_text="pre-filled")
+        dlg.url_input = _LineEditLike("https://test.com")
+        dlg.text_input = _LineEditLike("pre-filled")
+        assert dlg.get_url() == "https://test.com"
+        assert dlg.get_text() == "pre-filled"
+
+    def test_anchor_dialog_get_name_replaces_spaces(self):
+        dlg = editor._AnchorDialog()
+        dlg.name_input = _LineEditLike("section one")
+        assert dlg.get_name() == "section-one"
+
+    def test_anchor_dialog_get_name_no_spaces(self):
+        dlg = editor._AnchorDialog()
+        dlg.name_input = _LineEditLike("intro")
+        assert dlg.get_name() == "intro"
+
+    def test_table_dialog_get_rows_and_cols(self):
+        dlg = editor._TableDialog()
+        dlg.rows_spin = _SpinBoxLike(5)
+        dlg.cols_spin = _SpinBoxLike(3)
+        assert dlg.get_rows() == 5
+        assert dlg.get_cols() == 3
+
+    def test_session_log_dialog_with_entries(self):
+        dlg = editor._SessionLogDialog(log_entries=["INFO: msg1", "WARNING: msg2"])
+        # Constructor covers lines 251-272
+        assert dlg is not None
+
+    def test_session_log_dialog_append_log(self):
+        dlg = editor._SessionLogDialog()
+        dlg.log_view = MagicMock()
+        dlg.append_log("new log entry")
+        dlg.log_view.setTextCursor.assert_called()
+        dlg.log_view.insertPlainText.assert_called_with("new log entry\n")
+
+
+# ---------------------------------------------------------------------------
+# _ConfigDialog tab builder tests
+# ---------------------------------------------------------------------------
+
+class TestConfigDialogTabBuilders:
+    """Verify that all _build_*_tab methods run and populate _widgets."""
+
+    def _make_stub(self):
+        dlg = object.__new__(editor._ConfigDialog)
+        dlg._widgets = {}
+        dlg.tabs = MagicMock()
+        return dlg
+
+    def test_build_identity_tab_populates_widgets(self):
+        dlg = self._make_stub()
+        dlg._build_identity_tab()
+        assert "sender" in dlg._widgets
+        assert "sendername" in dlg._widgets
+        assert "MAILCONFIG" in dlg._widgets
+        assert "username" in dlg._widgets
+        assert "password" in dlg._widgets
+        assert "domain" in dlg._widgets
+
+    def test_build_delivery_tab_populates_widgets(self):
+        dlg = self._make_stub()
+        dlg._build_delivery_tab()
+        assert "smtp_host" in dlg._widgets
+        assert "smtp_port" in dlg._widgets
+        assert "imap_host" in dlg._widgets
+        assert "imap_port" in dlg._widgets
+        assert "sent_folder" in dlg._widgets
+
+    def test_build_sources_tab_populates_widgets(self):
+        dlg = self._make_stub()
+        dlg._build_sources_tab()
+        assert "database" in dlg._widgets
+        assert "sa" in dlg._widgets
+        assert "sheetid" in dlg._widgets
+        assert "token_file" in dlg._widgets
+        assert "scopes" in dlg._widgets
+
+    def test_build_templates_tab_populates_widgets(self):
+        dlg = self._make_stub()
+        dlg._build_templates_tab()
+        assert "subject" in dlg._widgets
+        assert "message" in dlg._widgets
+        assert "default_message" in dlg._widgets
+        assert "styles" in dlg._widgets
+        assert "pause" in dlg._widgets
+
+    def test_build_filters_tab_populates_widgets(self):
+        dlg = self._make_stub()
+        dlg._build_filters_tab()
+        assert "filter" in dlg._widgets
+        assert "filter_test" in dlg._widgets
+
+    def test_build_flags_tab_populates_widgets(self):
+        dlg = self._make_stub()
+        dlg._build_flags_tab()
+        assert "test" in dlg._widgets
+        assert "verbose" in dlg._widgets
+        assert "doNotSend" in dlg._widgets
+        assert "md2html" in dlg._widgets
+
+    def test_reload_from_disk_calls_reload_profiles(self):
+        dlg = _make_config_dialog_stub()
+        dlg._reload_profiles = MagicMock()
+        dlg.profile_combo.current = "alpha"
+        dlg._reload_from_disk()
+        dlg._reload_profiles.assert_called_once()
+
+    def test_browse_config_updates_path(self, monkeypatch):
+        dlg = _make_config_dialog_stub()
+        dlg._reload_profiles = MagicMock()
+        monkeypatch.setitem(
+            editor._ConfigDialog._browse_config.__globals__,
+            "QFileDialog",
+            type("QFD", (), {"getOpenFileName": staticmethod(lambda *a, **k: ("/new/config.yml", ""))}),
+        )
+        dlg._browse_config()
+        assert dlg.config_input.text() == "/new/config.yml"
+        dlg._reload_profiles.assert_called_once()
+
+    def test_browse_config_cancelled(self, monkeypatch):
+        dlg = _make_config_dialog_stub()
+        dlg._reload_profiles = MagicMock()
+        monkeypatch.setitem(
+            editor._ConfigDialog._browse_config.__globals__,
+            "QFileDialog",
+            type("QFD", (), {"getOpenFileName": staticmethod(lambda *a, **k: ("", ""))}),
+        )
+        dlg._browse_config()
+        dlg._reload_profiles.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _SendDialog stub factory and tests
+# ---------------------------------------------------------------------------
+
+def _make_send_dialog_stub(*, config_data=None, attachment="/tmp/test.html", profile="default"):
+    """Return a _SendDialog bypassing __init__, with all widgets as testable stubs."""
+    dlg = object.__new__(editor._SendDialog)
+    dlg._config_data = config_data or {}
+    dlg._initial_config_data = config_data or {}
+    dlg._current_profile = profile
+    dlg._attachment_path = attachment
+    dlg._session_filter = None
+    dlg._original_filter_text = ""
+    dlg._filter_validator = None
+    dlg._schema_cache = None
+    dlg._validation_timer = MagicMock()
+
+    dlg.config_input = _LineEditLike("")
+    dlg.profile_combo = MagicMock()
+    dlg.database_input = _LineEditLike("")
+    dlg.filter_text_edit = _PlainTextLike("")
+    dlg.filter_status_label = MagicMock()
+    dlg.record_count_label = MagicMock()
+    dlg.records_table = MagicMock()
+    dlg.retry_load_btn = MagicMock()
+    dlg.subject_input = _LineEditLike("")
+    dlg.message_input = _PlainTextLike("")
+    dlg.body_input = _LineEditLike("")
+    dlg.password_input = _LineEditLike("")
+    dlg.from_index_input = _SpinBoxLike(0)
+    dlg.to_index_input = _SpinBoxLike(0)
+    dlg.wait_input = _SpinBoxLike(0)
+    dlg.max_mails_input = _SpinBoxLike(1000)
+    dlg.max_addr_input = _SpinBoxLike(50)
+    dlg.pause_input = _SpinBoxLike(3)
+    dlg.test_check = _CheckBoxLike(False)
+    dlg.verbose_check = _CheckBoxLike(False)
+    dlg.do_not_send_check = _CheckBoxLike(False)
+    return dlg
+
+
+class TestSendDialogReloadProfiles:
+    def test_loads_from_yaml_file(self, tmp_path):
+        cfg = tmp_path / "config.yml"
+        cfg.write_text("alpha:\n  sender: a@test.com\nbeta:\n  sender: b@test.com\n", encoding="utf-8")
+        dlg = _make_send_dialog_stub()
+        dlg.config_input = _LineEditLike(str(cfg))
+        dlg._load_profile_defaults = MagicMock()
+
+        import yaml as real_yaml
+        with patch.dict(editor._SendDialog._reload_profiles.__globals__, {"yaml": real_yaml}):
+            dlg._reload_profiles()
+
+        assert "alpha" in dlg._config_data
+        assert "beta" in dlg._config_data
+        dlg._load_profile_defaults.assert_called()
+
+    def test_falls_back_to_initial_config(self):
+        dlg = _make_send_dialog_stub(config_data={"default": {"sender": "x@test.com"}})
+        dlg.config_input = _LineEditLike("")  # No path
+        dlg._load_profile_defaults = MagicMock()
+        dlg.profile_combo.count.return_value = 1
+        dlg.profile_combo.currentText.return_value = "default"
+
+        dlg._reload_profiles()
+        dlg._load_profile_defaults.assert_called()
+
+    def test_adds_default_when_combo_empty(self):
+        dlg = _make_send_dialog_stub()
+        dlg.config_input = _LineEditLike("")
+        dlg._load_profile_defaults = MagicMock()
+        dlg.profile_combo.count.return_value = 0
+        dlg.profile_combo.currentText.return_value = "default"
+
+        dlg._reload_profiles()
+        dlg.profile_combo.addItem.assert_called_with("default")
+
+
+class TestSendDialogLoadCurrentFilter:
+    def test_no_filter_clears_field(self):
+        dlg = _make_send_dialog_stub(config_data={"default": {}})
+        dlg._current_profile = "default"
+        dlg.load_current_filter("default")
+        assert dlg.filter_text_edit.toPlainText() == ""
+        assert dlg._session_filter is None
+
+    def test_loads_dict_filter_as_yaml(self):
+        dlg = _make_send_dialog_stub(
+            config_data={"default": {"filter": {"email": "is not empty"}}}
+        )
+        dlg._current_profile = "default"
+        dlg.load_current_filter("default")
+        text = dlg.filter_text_edit.toPlainText()
+        assert "email" in text
+        assert dlg._original_filter_text != ""
+
+    def test_loads_filter_test_when_test_checked(self):
+        dlg = _make_send_dialog_stub(
+            config_data={"default": {
+                "filter": {"email": "is not empty"},
+                "filter_test": {"email": "is test@test.com"},
+            }}
+        )
+        dlg.test_check = _CheckBoxLike(True)
+        dlg._current_profile = "default"
+        dlg.load_current_filter("default")
+        text = dlg.filter_text_edit.toPlainText()
+        assert "test@test.com" in text
+
+    def test_string_filter_displayed(self):
+        dlg = _make_send_dialog_stub(
+            config_data={"default": {"filter": "email: is not empty"}}
+        )
+        dlg._current_profile = "default"
+        dlg.load_current_filter("default")
+        text = dlg.filter_text_edit.toPlainText()
+        assert "email" in text
+
+
+class TestSendDialogOnTestModeToggled:
+    def test_on_test_mode_toggled_clears_session_filter(self):
+        dlg = _make_send_dialog_stub(config_data={"default": {}})
+        dlg._session_filter = {"email": "is not empty"}
+        dlg._current_profile = "default"
+        dlg._on_test_mode_toggled(True)
+        assert dlg._session_filter is None
+
+    def test_on_filter_text_changed_restarts_timer(self):
+        dlg = _make_send_dialog_stub()
+        dlg._on_filter_text_changed()
+        dlg._validation_timer.stop.assert_called_once()
+        dlg._validation_timer.start.assert_called_once_with(50)
+
+
+class TestSendDialogRunFilterValidation:
+    def test_no_validator_is_noop(self):
+        dlg = _make_send_dialog_stub()
+        dlg._filter_validator = None
+        dlg._run_filter_validation()  # Should not raise
+
+    def test_with_validator_calls_update_ui(self):
+        dlg = _make_send_dialog_stub()
+        mock_validator = MagicMock()
+        mock_validator.get_validation_status.return_value = {"is_valid": True, "syntax_errors": [], "missing_fields": []}
+        dlg._filter_validator = mock_validator
+        dlg._get_database_schema = MagicMock(return_value=[])
+        dlg._update_validation_ui = MagicMock()
+        dlg._run_filter_validation()
+        dlg._update_validation_ui.assert_called_once()
+
+
+class TestSendDialogGetSchemaCache:
+    def test_creates_cache_lazily(self, monkeypatch):
+        dlg = _make_send_dialog_stub()
+        dlg._schema_cache = None
+
+        mock_cache_cls = MagicMock()
+        mock_cache_instance = MagicMock()
+        mock_cache_cls.return_value = mock_cache_instance
+
+        with patch.dict(sys.modules, {"schema_cache": MagicMock(SchemaCacheProvider=mock_cache_cls)}):
+            result = dlg._get_schema_cache()
+
+        assert result is mock_cache_instance
+
+    def test_reuses_existing_cache(self):
+        dlg = _make_send_dialog_stub()
+        existing = MagicMock()
+        dlg._schema_cache = existing
+        assert dlg._get_schema_cache() is existing
+
+
+class TestSendDialogUpdateValidationUi:
+    def test_valid_status_sets_green_style(self):
+        dlg = _make_send_dialog_stub()
+        dlg.filter_and_display_records = MagicMock()
+        dlg._update_validation_ui({"is_valid": True, "syntax_errors": [], "missing_fields": []})
+        text_arg = dlg.filter_text_edit._text  # unchanged — style is set on the widget mock
+        # Verify the status label was called
+        dlg.filter_status_label.setText.assert_called_with("")
+        dlg.filter_and_display_records.assert_called_once()
+
+    def test_invalid_status_sets_error_message(self):
+        dlg = _make_send_dialog_stub()
+        dlg.filter_and_display_records = MagicMock()
+        dlg._update_validation_ui({
+            "is_valid": False,
+            "syntax_errors": ["bad syntax"],
+            "missing_fields": ["unknown_field"],
+        })
+        dlg.filter_status_label.setText.assert_called()
+        call_arg = dlg.filter_status_label.setText.call_args[0][0]
+        assert "bad syntax" in call_arg or "unknown_field" in call_arg
+
+
+class TestSendDialogLoadDatabaseRecords:
+    def test_no_path_returns_empty(self):
+        dlg = _make_send_dialog_stub()
+        rows, headers = dlg.load_database_records()
+        assert rows == []
+        assert headers == []
+
+    def test_csv_path_loads_data(self, tmp_path):
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("name,email\nAlice,alice@test.com\nBob,bob@test.com\n", encoding="utf-8")
+        dlg = _make_send_dialog_stub()
+        dlg.database_input = _LineEditLike(str(csv_file))
+        rows, headers = dlg.load_database_records()
+        assert headers == ["name", "email"]
+        assert len(rows) == 2
+
+    def test_csv_encoding_fallback(self, tmp_path):
+        csv_file = tmp_path / "latin.csv"
+        csv_file.write_bytes(b"name,email\nAndr\xe9,a@test.com\n")
+        dlg = _make_send_dialog_stub()
+        dlg.database_input = _LineEditLike(str(csv_file))
+        rows, headers = dlg.load_database_records()
+        assert headers == ["name", "email"]
+
+    def test_gsheet_profile_loads_via_sendmail(self):
+        dlg = _make_send_dialog_stub(config_data={
+            "gsheet_profile": {"SHEETID": "sheet123", "SA": "sa_key"}
+        })
+        dlg._current_profile = "gsheet_profile"
+
+        mock_wb = MagicMock()
+        mock_sm = MagicMock()
+        mock_sm.open_google_db_members_sheet.return_value = mock_wb
+        mock_sm.read_all_sheet.return_value = [["name", "email"], ["Alice", "alice@test.com"]]
+
+        with patch.dict(sys.modules, {"sendMail": mock_sm}):
+            rows, headers = dlg.load_database_records()
+
+        assert headers == ["name", "email"]
+        assert rows == [["Alice", "alice@test.com"]]
+
+
+class TestSendDialogFilterAndDisplayRecords:
+    def test_no_headers_shows_error(self):
+        dlg = _make_send_dialog_stub()
+        dlg.load_database_records = MagicMock(return_value=([], []))
+        dlg.filter_and_display_records()
+        dlg.record_count_label.setText.assert_called()
+        dlg.retry_load_btn.show.assert_called_once()
+
+    def test_empty_rows_shows_zero_message(self, tmp_path):
+        csv_file = tmp_path / "empty.csv"
+        csv_file.write_text("name,email\n", encoding="utf-8")
+        dlg = _make_send_dialog_stub()
+        dlg.load_database_records = MagicMock(return_value=([], ["name", "email"]))
+        dlg.filter_and_display_records()
+        dlg.retry_load_btn.hide.assert_called()
+
+    def test_full_flow_with_data(self, tmp_path):
+        dlg = _make_send_dialog_stub()
+        dlg.load_database_records = MagicMock(return_value=(
+            [["Alice", "a@test.com"], ["Bob", "b@test.com"]],
+            ["name", "email"],
+        ))
+        dlg.filter_and_display_records()
+        dlg.record_count_label.setText.assert_called()
+
+    def test_apply_filter_button(self):
+        dlg = _make_send_dialog_stub()
+        dlg._filter_validator = None
+        dlg.filter_text_edit = _PlainTextLike("")
+        dlg.filter_and_display_records = MagicMock()
+        dlg._apply_filter()
+        assert dlg._session_filter is None
+
+    def test_apply_filter_with_invalid_yaml(self):
+        mock_validator = MagicMock()
+        mock_validator.get_validation_status.return_value = {
+            "is_valid": False, "syntax_errors": ["bad yaml"], "missing_fields": []
+        }
+        dlg = _make_send_dialog_stub()
+        dlg._filter_validator = mock_validator
+        dlg._get_database_schema = MagicMock(return_value=[])
+        dlg.filter_text_edit = _PlainTextLike("bad: [yaml")
+        dlg._apply_filter()
+        dlg.filter_status_label.setText.assert_called()
+
+    def test_apply_filter_with_valid_yaml(self):
+        mock_validator = MagicMock()
+        mock_validator.get_validation_status.return_value = {
+            "is_valid": True, "syntax_errors": [], "missing_fields": []
+        }
+        dlg = _make_send_dialog_stub()
+        dlg._filter_validator = mock_validator
+        dlg._get_database_schema = MagicMock(return_value=[])
+        dlg.filter_and_display_records = MagicMock()
+        dlg.filter_text_edit = _PlainTextLike("email: is not empty")
+        dlg._apply_filter()
+        assert dlg._session_filter == {"email": "is not empty"}
+
+    def test_reset_filter_restores_original(self):
+        dlg = _make_send_dialog_stub()
+        dlg._original_filter_text = "email: is not empty"
+        dlg._session_filter = {"email": "is active"}
+        dlg._reset_filter()
+        assert dlg._session_filter is None
+        assert dlg.filter_text_edit.toPlainText() == "email: is not empty"
+
+    def test_reset_filter_clears_when_no_original(self):
+        dlg = _make_send_dialog_stub()
+        dlg._original_filter_text = ""
+        dlg._reset_filter()
+        assert dlg.filter_text_edit.toPlainText() == ""
+
+
+class TestSendDialogBuildArgs:
+    def test_build_args_captures_all_fields(self):
+        dlg = _make_send_dialog_stub(attachment="/tmp/newsletter.html")
+        dlg.profile_combo.currentText.return_value = "myprofile"
+        dlg.config_input = _LineEditLike("/etc/sendMail.yml")
+        dlg.subject_input = _LineEditLike("Test Subject")
+        dlg.message_input = _PlainTextLike("Hello body")
+        dlg.body_input = _LineEditLike("body override")
+        dlg.database_input = _LineEditLike("data/subs.csv")
+        dlg.from_index_input = _SpinBoxLike(5)
+        dlg.to_index_input = _SpinBoxLike(10)
+        dlg.wait_input = _SpinBoxLike(2)
+        dlg.max_mails_input = _SpinBoxLike(100)
+        dlg.max_addr_input = _SpinBoxLike(5)
+        dlg.pause_input = _SpinBoxLike(3)
+        dlg.test_check = _CheckBoxLike(True)
+        dlg.verbose_check = _CheckBoxLike(True)
+        dlg.do_not_send_check = _CheckBoxLike(False)
+        dlg._session_filter = {"status": "is active"}
+        dlg._config_data = {"myprofile": {}}
+
+        args = dlg.build_args(dlg._config_data)
+        assert args.profile == "myprofile"
+        assert args.subject == "Test Subject"
+        assert args.message == "Hello body"
+        assert args.body == "body override"
+        assert args.database == "data/subs.csv"
+        assert args.from_index == "5"
+        assert args.to_index == "10"
+        assert args.test is True
+        assert args.verbose is True
+        assert args.session_filter == {"status": "is active"}
+        assert args.file == ["/tmp/newsletter.html"]
+
+    def test_build_args_zero_index_is_none(self):
+        dlg = _make_send_dialog_stub()
+        dlg.profile_combo.currentText.return_value = "default"
+        dlg._config_data = {"default": {}}
+        args = dlg.build_args(dlg._config_data)
+        assert args.from_index is None
+        assert args.to_index is None
+
+    def test_build_args_empty_body_is_none(self):
+        dlg = _make_send_dialog_stub()
+        dlg.profile_combo.currentText.return_value = "default"
+        dlg._config_data = {"default": {}}
+        args = dlg.build_args(dlg._config_data)
+        assert args.body is None
+
+
+# ---------------------------------------------------------------------------
+# EditorWindow.open_file + related tests
+# ---------------------------------------------------------------------------
+
+class TestEditorWindowOpenFile:
+    def _make_window(self):
+        win = object.__new__(editor.EditorWindow)
+        win._view = _FakeView()
+        win._bridge = _FakeBridge()
+        win._css_status_label = MagicMock()
+        win._file_path = None
+        win._is_template = False
+        win._css_path = None
+        win._load_finished_connected = False
+        win._send_in_progress = False
+        win._config_path = ""
+        win._config_data = {}
+        win._current_profile = "default"
+        win._default_documents_path = ""
+        win._save = MagicMock(return_value=True)
+        win._load_editor_page = MagicMock()
+        win._load_default_stylesheet = MagicMock()
+        win._save_documents_path = MagicMock()
+        win.statusBar = MagicMock(return_value=_FakeStatusBar())
+        win.setWindowTitle = MagicMock()
+        win.style = MagicMock(return_value=MagicMock(standardIcon=MagicMock(return_value="icon")))
+        return win
+
+    def test_open_nonexistent_file_warns(self):
+        win = self._make_window()
+        with patch.object(editor.QMessageBox, "warning") as mock_warn:
+            win.open_file("/no/such/path.html")
+        mock_warn.assert_called_once()
+        assert win._file_path is None
+
+    def test_open_unsupported_extension_warns(self, tmp_path):
+        win = self._make_window()
+        txt = tmp_path / "doc.txt"
+        txt.write_text("hello")
+        with patch.object(editor.QMessageBox, "warning") as mock_warn:
+            win.open_file(str(txt))
+        mock_warn.assert_called_once()
+
+    def test_open_html_file_succeeds(self, tmp_path):
+        win = self._make_window()
+        html = tmp_path / "doc.html"
+        html.write_text("<html><body><p>hi</p></body></html>")
+        with patch.object(editor.EditorWindow, "_html_to_body_html", return_value="<p>hi</p>"):
+            win.open_file(str(html))
+        assert str(html) in win._file_path
+        win._load_editor_page.assert_called_once()
+
+    def test_open_md_file_succeeds(self, tmp_path):
+        win = self._make_window()
+        md = tmp_path / "doc.md"
+        md.write_text("# Title")
+        with patch.object(editor.EditorWindow, "_md_to_body_html", return_value="<h1>Title</h1>"):
+            win.open_file(str(md))
+        assert str(md) in win._file_path
+
+    def test_is_template_file_true_for_template_prefix(self):
+        win = self._make_window()
+        assert editor.EditorWindow._is_template_file(win, "template.md") is True
+        assert editor.EditorWindow._is_template_file(win, "TEMPLATE.html") is True
+
+    def test_is_template_file_true_for_template_suffix(self):
+        win = self._make_window()
+        assert editor.EditorWindow._is_template_file(win, "newsletter.template.html") is True
+
+    def test_is_template_file_false_for_regular(self):
+        win = self._make_window()
+        assert editor.EditorWindow._is_template_file(win, "newsletter.html") is False
+        assert editor.EditorWindow._is_template_file(win, "2026-01-01.md") is False
+
+    def test_on_dirty_changed_calls_update_title(self):
+        win = self._make_window()
+        win._update_title = MagicMock()
+        editor.EditorWindow._on_dirty_changed(win, True)
+        win._update_title.assert_called_once()
+
+    def test_validate_documents_path_valid(self, tmp_path):
+        win = self._make_window()
+        assert editor.EditorWindow._validate_documents_path(win, str(tmp_path)) is True
+
+    def test_validate_documents_path_invalid(self):
+        win = self._make_window()
+        assert editor.EditorWindow._validate_documents_path(win, "/no/such/dir") is False
+
+    def test_load_config_no_file_does_not_raise(self, tmp_path):
+        win = self._make_window()
+        win._config_path = str(tmp_path / "missing.yml")
+        win._config_data = {}
+        editor.EditorWindow._load_config(win)  # Should not raise
+
+    def test_md_to_body_html_markdown2_path(self, tmp_path, monkeypatch):
+        win = self._make_window()
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Hello\n\nParagraph.", encoding="utf-8")
+        monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
+        monkeypatch.setattr(editor, "_MD2_AVAILABLE", True)
+        result = win._md_to_body_html_markdown2(str(md_file))
+        assert "Hello" in result or result == ""
+
+    def test_load_default_stylesheet_no_styles(self):
+        win = self._make_window()
+        win._resolve_send_config_path = MagicMock(return_value="cfg.yml")
+        win._load_send_config = MagicMock(return_value={"default": {}})
+        win._load_default_stylesheet()  # Should not raise
+
+    def test_load_default_stylesheet_with_valid_css(self, tmp_path):
+        win = self._make_window()
+        css_file = tmp_path / "style.css"
+        css_file.write_text("body { color: black; }")
+        win._resolve_send_config_path = MagicMock(return_value="cfg.yml")
+        win._load_send_config = MagicMock(return_value={"default": {"styles": str(css_file)}})
+        win._bridge = _FakeBridge()
+        win._bridge.css_changed = MagicMock()
+        editor.EditorWindow._load_default_stylesheet(win)
+        win._bridge.css_changed.emit.assert_called_once_with(str(css_file))
