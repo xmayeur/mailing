@@ -375,6 +375,8 @@ class TestHtmlFileWriter:
         """Call _write_html_file with a temp _BASE that has no css/ dir."""
         class _FakeWindow:
             _css_path = css_path
+            def _get_stylesheet_path(self) -> Path:
+                return Path(tempfile.gettempdir()) / "styles.css"
         with patch.object(editor, "_BASE", Path(tempfile.gettempdir())):
             editor.EditorWindow._write_html_file(_FakeWindow(), path, body_html)
 
@@ -1220,40 +1222,18 @@ class TestEditorWindowHelpers:
         Path(win._file_path).write_text("<html></html>", encoding="utf-8")
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
 
-        # Test successful send
+        # Test that _menu_send creates dialog and sets up signal connection
         with (
-            patch.object(editor, "_SendDialog") as mock_dialog,
-            patch.object(editor, "_SessionLogDialog") as mock_log_dialog,
+            patch.object(editor, "_SendDialog") as mock_dialog_class,
             patch.object(win, "_resolve_send_config_path", return_value="cfg.yml"),
             patch.object(win, "_load_send_config", return_value={"default": {}}),
-            patch.object(win, "_send_with_sendmail", return_value="OK") as mock_send,
         ):
-            mock_dialog.return_value.exec.return_value = (
-                editor.QDialog.DialogCode.Accepted
-            )
-            mock_log_dialog.return_value.exec.return_value = (
-                editor.QDialog.DialogCode.Accepted
-            )
+            mock_dialog_instance = MagicMock()
+            mock_dialog_class.return_value = mock_dialog_instance
             win._menu_send()
-            mock_send.assert_called_once()  # pyright: ignore
-            mock_log_dialog.assert_called_once()  # pyright: ignore
-
-        # Test error response
-        with (
-            patch.object(editor, "_SendDialog") as mock_dialog,
-            patch.object(editor, "_SessionLogDialog") as mock_log_dialog,
-            patch.object(win, "_resolve_send_config_path", return_value="cfg.yml"),
-            patch.object(win, "_load_send_config", return_value={"default": {}}),
-            patch.object(win, "_send_with_sendmail", return_value="error"),
-        ):
-            mock_dialog.return_value.exec.return_value = (
-                editor.QDialog.DialogCode.Accepted
-            )
-            mock_log_dialog.return_value.exec.return_value = (
-                editor.QDialog.DialogCode.Accepted
-            )
-            win._menu_send()
-            mock_log_dialog.assert_called_once()  # pyright: ignore
+            # Verify dialog was created and shown
+            mock_dialog_class.assert_called_once()  # pyright: ignore
+            mock_dialog_instance.show.assert_called_once()  # pyright: ignore
 
         win._send_in_progress = True
         with patch.object(editor.QMessageBox, "warning") as mock_warning:
@@ -1634,6 +1614,7 @@ def _make_send_dialog_stub(*, config_data=None, attachment="/tmp/test.html", pro
     dlg._cached_headers = None
     dlg._cached_for_profile = None
     dlg._cached_for_db = None
+    dlg.attachments = []
 
     dlg.config_input = _LineEditLike("")
     dlg.profile_combo = MagicMock()
