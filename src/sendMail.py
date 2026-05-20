@@ -484,7 +484,7 @@ def get_gmail_service(param: Any) -> Any:
     :rtype: googleapiclient.discovery.Resource
     """
     if os.path.exists(param.token_file):
-        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)  # type: ignore
+        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)  # type: ignore[no-untyped-call]
     else:
         creds = None
     # else:
@@ -567,7 +567,7 @@ def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: in
             if im.width > max_width:
                 ratio = max_width / float(im.width)
                 new_height = int(float(im.height) * float(ratio))
-                im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)  # type: ignore
+                im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)  # type: ignore[assignment]
             opt_img_path = os.path.join(temp_dir, f"{cid}.jpg")
             im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
         return opt_img_path
