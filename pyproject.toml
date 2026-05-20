@@ -83,6 +83,9 @@ docs = [
     # Required for SC-008 WCAG 2.1 Level AA accessibility verification
 ]
 
+[tool.poetry]
+package-mode = false
+
 [tool.setuptools.package-dir]
 "" = "src"
 pyArchimate = "src/"
