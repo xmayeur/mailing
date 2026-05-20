@@ -1916,9 +1916,9 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         if value in (None, ""):
             return ""
         if isinstance(value, dict):
-            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
+            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()  # type: ignore[no-any-return]
         try:
-            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
+            return yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()  # type: ignore[no-any-return]
         except Exception:
             return str(value)
 
