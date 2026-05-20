@@ -128,13 +128,20 @@
 
 ## Known Issues
 
-### Test Isolation Issue (Non-Critical)
+### Test Isolation Issue (Partially Resolved)
 When running the full test suite (`pytest tests/`):
-- 226 core tests pass consistently
-- ~30 editor tests fail in batch mode due to test fixture isolation issues
-- All editor tests pass when run individually
-- Impact: Batch coverage reporting is affected, but individual functionality is correct
-- Resolution: Would require refactoring editor test fixtures for proper cleanup
+- **Status**: Significantly improved from 30 failures → 22 failures
+- **Current State**: 
+  - 477/499 tests passing in full suite
+  - 127/127 editor tests pass when run individually
+  - 22 tests fail in batch mode (SmallDialogs, ConfigDialog, GoogleDrive auth tests)
+- **Root Cause**: Shared module-level state in editor.py persists between test classes
+- **Impact**: Batch coverage reporting affected; individual test files work correctly
+- **Fixed Issues**:
+  - ✓ _FakeWindow missing _get_stylesheet_path method
+  - ✓ _SendDialog stub missing attachments attribute  
+  - ✓ test_send_menu_and_dirty_flow incompatible with current implementation
+- **Remaining**: Would require investigating editor.py module state management and proper fixture cleanup between test classes
 
 ## Next Steps
 
