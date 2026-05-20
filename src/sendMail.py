@@ -27,7 +27,6 @@ Key functions:
 from __future__ import annotations
 
 import argparse
-from argparse import ArgumentParser
 import base64
 import csv
 import email.mime.application
@@ -480,7 +479,7 @@ def get_gmail_service(param: Any) -> Any:
     :rtype: googleapiclient.discovery.Resource
     """
     if os.path.exists(param.token_file):
-        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
+        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)  # type: ignore[no-untyped-call]
     else:
         creds = None
     # else:
@@ -563,7 +562,7 @@ def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: in
             if im.width > max_width:
                 ratio = max_width / float(im.width)
                 new_height = int(float(im.height) * float(ratio))
-                im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)
+                im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)  # type: ignore[assignment]
             opt_img_path = os.path.join(temp_dir, f"{cid}.jpg")
             im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
         return opt_img_path
@@ -1215,7 +1214,7 @@ def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> b
     return not result
 
 
-def send_gmail(service: Any, message: Any = None) -> bool:
+def send_gmail(service: Any, message: Any = None) -> Any:
     """
     Sends an email message using the Gmail API.
 
@@ -1229,13 +1228,13 @@ def send_gmail(service: Any, message: Any = None) -> bool:
     :return: The sent message resource if successful, None otherwise.
     :rtype: dict or None
     """
-    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()  # pyright: ignore
+    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
     body = {"raw": encoded_message}
     try:
         return service.users().messages().send(userId="me", body=body).execute()
     except errors.HttpError as error:
-        log.error(f"Error sending message: {error} to {message['To']}")  # pyright: ignore
+        log.error(f"Error sending message: {error} to {message['To']}")
         return None
 
 
@@ -1280,7 +1279,7 @@ def send_mail(param: Any = None, message: Any = None, recipients: Any = None) ->
     return success
 
 
-def get_newsletter_name(files: list[str], args: Any) -> str | None:
+def get_newsletter_name(files: list[str], args: Any) -> Any:
     """
     Parses given files and updates newsletter-related attributes in the provided arguments.
 
@@ -1333,7 +1332,7 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
     return config
 
 
-def _prepare_message_body(param: Any, config: dict[str, Any], files: list[str]) -> str:
+def _prepare_message_body(param: Any, config: dict[str, Any], files: list[str]) -> Any:
     """Populate param.message from the default template when not already set."""
     body_txt = param.body if param.body else ""
     param.newsletter_name = ""
@@ -1550,7 +1549,7 @@ def setup_argparse() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
+def main() -> int:
     """
     Changes the current working directory to the directory of the executing file, parses
     command-line arguments, and loads configuration settings from a YAML file. Based on
