@@ -33,6 +33,17 @@ for _mod in _qt_mocks:
     if _mod not in sys.modules:
         sys.modules[_mod] = MagicMock()
 
+# Mock visual_filter_builder (imported conditionally by editor.py)
+_filter_builder_mock = MagicMock()
+_filter_builder_mock.FilterBuilder = MagicMock(return_value=MagicMock())
+_filter_builder_mock.DatabaseSchemaInfo = MagicMock(return_value=MagicMock())
+sys.modules["visual_filter_builder"] = _filter_builder_mock
+
+# Mock filter_validator (imported conditionally by editor.py)
+_validator_mock = MagicMock()
+_validator_mock.FilterValidator = MagicMock(return_value=MagicMock())
+sys.modules["filter_validator"] = _validator_mock
+
 
 # pyqtSlot: use inspect.isfunction to distinguish @pyqtSlot(str) from @pyqtSlot
 def _make_pyqtSlot(*args, **kwargs):  # noqa: N802, ARG001
@@ -1616,6 +1627,13 @@ def _make_send_dialog_stub(*, config_data=None, attachment="/tmp/test.html", pro
     dlg._filter_validator = None
     dlg._schema_cache = None
     dlg._validation_timer = MagicMock()
+    dlg._filter_builder = None  # None so text edit path is used
+    dlg._schema_info = None
+    dlg._test_sent = False
+    dlg._cached_records = None
+    dlg._cached_headers = None
+    dlg._cached_for_profile = None
+    dlg._cached_for_db = None
 
     dlg.config_input = _LineEditLike("")
     dlg.profile_combo = MagicMock()
