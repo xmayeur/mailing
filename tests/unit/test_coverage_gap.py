@@ -460,7 +460,6 @@ class TestCoverageGap2:
 
     def test_build_and_send_temp_dir_cleanup_verbose(self, tmp_path):
         """Cover lines 933-938: temp dir cleanup with verbose logging."""
-        import shutil
         temp_dir = str(tmp_path / "tmpdir")
         os.makedirs(temp_dir, exist_ok=True)
 
@@ -547,7 +546,7 @@ class TestCoverageGap2:
         with patch("sendMail.get_subscriber_reader", return_value=(iter(rows), mock_file)), \
              patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)), \
              patch("sendMail.send_mail", return_value=True):
-            result = sendMail.generate_mailing(param)
+            sendMail.generate_mailing(param)
 
         mock_file.close.assert_called_once()
 
@@ -597,7 +596,6 @@ class TestCoverageGap2:
 
     def test_process_profile_session_filter_applied(self):
         """Cover line 1376: session_filter from args overrides param.filter."""
-        from unittest.mock import call
 
         args = Mock()
         args.session_filter = {"status": "is active"}
