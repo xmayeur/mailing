@@ -1777,7 +1777,6 @@ class TestSendDialogUpdateValidationUi:
         dlg = _make_send_dialog_stub()
         dlg.filter_and_display_records = MagicMock()
         dlg._update_validation_ui({"is_valid": True, "syntax_errors": [], "missing_fields": []})
-        text_arg = dlg.filter_text_edit._text  # unchanged — style is set on the widget mock
         # Verify the status label was called
         dlg.filter_status_label.setText.assert_called_with("")
         dlg.filter_and_display_records.assert_called_once()
