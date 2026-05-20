@@ -27,6 +27,7 @@ Key functions:
 from __future__ import annotations
 
 import argparse
+from argparse import ArgumentParser
 import base64
 import csv
 import email.mime.application
@@ -562,7 +563,7 @@ def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: in
             if im.width > max_width:
                 ratio = max_width / float(im.width)
                 new_height = int(float(im.height) * float(ratio))
-                im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)  # type: ignore[assignment]
+                im = im.resize((max_width, new_height), Image.Resampling.LANCZOS)
             opt_img_path = os.path.join(temp_dir, f"{cid}.jpg")
             im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
         return opt_img_path
@@ -640,7 +641,7 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
         return template
 
 
-def process_attachments(args, config, folder="input"):
+def process_attachments(args: Any, config: dict[str, Any], folder: str = "input") -> tuple[list[str], Any, list[Any]]:
     """
     Processes attachments by either verifying file paths provided in the arguments or downloading files
     from a Google Drive folder and cleaning up the local folder. Returns processed file paths, the Google
@@ -819,7 +820,7 @@ def _process_html_attachment(att: str, param: Any, all_inline_images: list[Any],
     return html_content
 
 
-def _process_binary_attachment(att, msg):
+def _process_binary_attachment(att: str, msg: MIMEMultipart) -> None:
     """Attach a PDF or TXT file directly to *msg*."""
     with open(att, "rb") as f:
         content = f.read()
@@ -831,7 +832,7 @@ def _process_binary_attachment(att, msg):
         msg.attach(MIMEText(content.decode()))
 
 
-def _attach_body(msg, msg_related, message, all_inline_images):
+def _attach_body(msg: MIMEMultipart, msg_related: MIMEMultipart, message: str, all_inline_images: list[Any]) -> None:
     """Attach the message body and any inline images to *msg*."""
     if not message:
         return
@@ -957,7 +958,7 @@ def _skip_to_index(reader: Any, from_index: int) -> int:
     return idx
 
 
-def _flush_batch(param, addressees, row, header, pause, recipient_count, max_mail_per_hour):
+def _flush_batch(param: Any, addressees: list[Any], row: list[Any], header: list[str], pause: int, recipient_count: int, max_mail_per_hour: int) -> None:
     """Dispatch the current addressee batch and enforce rate limiting."""
     _build_and_send(param, addressees, row, header)
     sleep(pause)
@@ -966,7 +967,7 @@ def _flush_batch(param, addressees, row, header, pause, recipient_count, max_mai
         sleep(3600)
 
 
-def generate_mailing(param):
+def generate_mailing(param: Any) -> str:
     """
     Generates and sends emails to a list of subscribers based on provided parameters and subscriber information.
 
@@ -1279,7 +1280,7 @@ def send_mail(param: Any = None, message: Any = None, recipients: Any = None) ->
     return success
 
 
-def get_newsletter_name(files, args):
+def get_newsletter_name(files: list[str], args: Any) -> str | None:
     """
     Parses given files and updates newsletter-related attributes in the provided arguments.
 
@@ -1332,7 +1333,7 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
     return config
 
 
-def _prepare_message_body(param, config, files):
+def _prepare_message_body(param: Any, config: dict[str, Any], files: list[str]) -> str:
     """Populate param.message from the default template when not already set."""
     body_txt = param.body if param.body else ""
     param.newsletter_name = ""
@@ -1344,7 +1345,7 @@ def _prepare_message_body(param, config, files):
     return param
 
 
-def _post_send_cleanup(service, google_drive_files):
+def _post_send_cleanup(service: Any, google_drive_files: list[Any]) -> None:
     """Mark processed Google Drive files as published and clear the local input folder."""
     for f in google_drive_files:
         gd.rename_file(service, f["id"], f"published_{f['name']}")
@@ -1467,7 +1468,7 @@ def check_mandatory_param(param: Any) -> bool:
     return ret
 
 
-def setup_argparse():
+def setup_argparse() -> ArgumentParser:
     """
     Sets up and parses command-line arguments for a mailing utility.
 
@@ -1549,7 +1550,7 @@ def setup_argparse():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     """
     Changes the current working directory to the directory of the executing file, parses
     command-line arguments, and loads configuration settings from a YAML file. Based on
