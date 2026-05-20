@@ -2864,7 +2864,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore
                 continue
             span = soup.new_tag(
                 "span",
-                **{"class": "editor-anchor", "data-anchor-id": anchor_id,  # type: ignore[arg-type]
+                **{"class": "editor-anchor", "data-anchor-id": anchor_id,  # type: ignore
                    "title": f"Anchor: {anchor_id}"},
             )
             span.string = "⚓"  # ⚓
