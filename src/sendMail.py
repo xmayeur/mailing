@@ -915,12 +915,20 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
     if param.donotsend:
         log.info("do not sent activated")
         return False
+    # Combine HTML file + user-selected attachments (T016: Integrate attachments)
+    # param.file is already a list (from editor.py line 1332)
+    all_attachments: list[str] = list(param.file) if param.file else []
+    if hasattr(param, "attachment") and param.attachment:
+        if isinstance(param.attachment, list):
+            all_attachments.extend(param.attachment)
+        else:
+            all_attachments.append(param.attachment)
     msg, recipients = build_email(
         param=param,
         subject=param.subject,
         message=msg_body,
         bcc=",".join(addressees),
-        attachments=param.file,
+        attachments=all_attachments if all_attachments else None,
     )
     try:
         if hasattr(param, "smtp_host"):
@@ -1030,32 +1038,36 @@ def generate_mailing(param):
 
 
 _FILTER_OPS = [
-    "is",
+    # Longer operators first to avoid substring matches
+    # E.g., "is equal to" before "is", "is not equal to" before "is not"
+    "does not contain",
+    "does not match",
+    "does not",
+    "is not empty",
+    _OP_IS_NOT_EQUAL_TO,  # "is not equal to"
     "is not",
+    "greater or equal to",
+    "less or equal to",
+    _OP_IS_EQUAL_TO,  # "is equal to"
+    "greater than",
+    "less than",
+    "is empty",
+    _OP_IS_NOT_EMPTY,  # "is not empty"
+    "starts with",
+    "ends with",
+    "matches",
+    "one of",
+    "none of",
+    "not in",
+    "is",
+    "in",
     "gt",
     "lt",
     "ge",
     "le",
-    "in",
-    "not in",
-    "is empty",
-    _OP_IS_NOT_EMPTY,
-    "greater than",
-    "less than",
-    "greater or equal to",
-    "less or equal to",
-    "one of",
-    "none of",
-    _OP_IS_EQUAL_TO,
-    _OP_IS_NOT_EQUAL_TO,
     "eq",
     "ne",
     "contains",
-    "does not contain",
-    "starts with",
-    "ends with",
-    "matches",
-    "does not match",
 ]
 
 
