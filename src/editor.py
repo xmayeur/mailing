@@ -199,7 +199,7 @@ def _svg_icon(svg: str) -> QIcon:
 # ---------------------------------------------------------------------------
 # Link insertion dialog
 # ---------------------------------------------------------------------------
-class _LinkDialog(QDialog):  # type: ignore[misc]
+class _LinkDialog(QDialog):
     """Small dialog asking for a URL and optional display text."""
 
     def __init__(self, parent: QWidget | None = None, selected_text: str = "") -> None:
@@ -245,7 +245,7 @@ class _LinkDialog(QDialog):  # type: ignore[misc]
 # ---------------------------------------------------------------------------
 # Session log viewer dialog
 # ---------------------------------------------------------------------------
-class _SessionLogDialog(QDialog):  # type: ignore[misc]
+class _SessionLogDialog(QDialog):
     """Dialog displaying the session log from a send operation."""
 
     def __init__(self, parent: QWidget | None = None, log_entries: list[str] | None = None) -> None:
@@ -282,7 +282,7 @@ class _SessionLogDialog(QDialog):  # type: ignore[misc]
 # ---------------------------------------------------------------------------
 # Anchor insertion dialog
 # ---------------------------------------------------------------------------
-class _AnchorDialog(QDialog):  # type: ignore[misc]
+class _AnchorDialog(QDialog):
     """Small dialog asking for a named anchor / bookmark identifier."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -317,7 +317,7 @@ class _AnchorDialog(QDialog):  # type: ignore[misc]
 # ---------------------------------------------------------------------------
 # Table insertion dialog
 # ---------------------------------------------------------------------------
-class _TableDialog(QDialog):  # type: ignore[misc]
+class _TableDialog(QDialog):
     """Dialog asking for table dimensions (rows × columns)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -356,7 +356,7 @@ class _TableDialog(QDialog):  # type: ignore[misc]
 # ---------------------------------------------------------------------------
 # Send dialog
 # ---------------------------------------------------------------------------
-class _SendDialog(QDialog):  # type: ignore[misc]
+class _SendDialog(QDialog):
     """Dialog for selecting sendMail options before sending the edited file."""
 
     def __init__(
@@ -981,7 +981,7 @@ class _LineFieldSpec:
 # ---------------------------------------------------------------------------
 # Settings / config editor
 # ---------------------------------------------------------------------------
-class _ConfigDialog(QDialog):  # type: ignore[misc]
+class _ConfigDialog(QDialog):
     """Dialog for editing sendMail YAML configuration by profile.
 
     Provides tabbed interface for editing:
@@ -1762,7 +1762,7 @@ class _ConfigDialog(QDialog):  # type: ignore[misc]
 # ---------------------------------------------------------------------------
 # JS ↔ Python bridge
 # ---------------------------------------------------------------------------
-class EditorBridge(QObject):  # type: ignore[misc]
+class EditorBridge(QObject):
     """QWebChannel bridge for communication with Quill.js editor.
 
     Registered with QWebChannel as "bridge". Provides slots callable from
@@ -1785,7 +1785,7 @@ class EditorBridge(QObject):  # type: ignore[misc]
     # Slots called from JavaScript
     # ------------------------------------------------------------------
 
-    @pyqtSlot(str)  # type: ignore[untyped-decorator]
+    @pyqtSlot(str)
     def on_content_changed(self, html: str) -> None:
         """Receives the editor's current HTML after every edit (debounced 500ms)."""
         self._current_html = html
@@ -1793,7 +1793,7 @@ class EditorBridge(QObject):  # type: ignore[misc]
             self._dirty = True
             self.dirty_changed.emit(True)
 
-    @pyqtSlot(result=str)  # type: ignore[untyped-decorator]
+    @pyqtSlot(result=str)  # type: ignore[arg-type]
     def request_image_insert(self) -> str:
         """
         Opens a file dialog and returns a base64 data URI for the chosen image.
@@ -1828,7 +1828,7 @@ class EditorBridge(QObject):  # type: ignore[misc]
             log.error("Image insert failed: %s", exc)
             return ""
 
-    @pyqtSlot(str, result=str)  # type: ignore[untyped-decorator]
+    @pyqtSlot(str, result=str)  # type: ignore[arg-type]
     def request_link_insert(self, selected_text: str) -> str:
         """
         Opens a link dialog pre-filled with *selected_text*.
@@ -1848,7 +1848,7 @@ class EditorBridge(QObject):  # type: ignore[misc]
             return ""
         return json.dumps({"url": url, "text": dialog.get_text()})
 
-    @pyqtSlot(result=str)  # type: ignore[untyped-decorator]
+    @pyqtSlot(result=str)  # type: ignore[arg-type]
     def request_table_insert(self) -> str:
         """
         Opens a dialog asking for table dimensions.
@@ -1864,7 +1864,7 @@ class EditorBridge(QObject):  # type: ignore[misc]
             return ""
         return json.dumps({"rows": dialog.get_rows(), "cols": dialog.get_cols()})
 
-    @pyqtSlot(str)  # type: ignore[untyped-decorator]
+    @pyqtSlot(str)
     def log_js_error(self, msg: str) -> None:
         """Receives JS-side errors forwarded via window.onerror."""
         log.warning("JS: %s", msg)
@@ -1891,7 +1891,7 @@ class EditorBridge(QObject):  # type: ignore[misc]
 # ---------------------------------------------------------------------------
 # Main editor window
 # ---------------------------------------------------------------------------
-class EditorWindow(QMainWindow):  # type: ignore[misc]
+class EditorWindow(QMainWindow):
     """Main WYSIWYG newsletter editor window.
 
     Desktop application for composing and editing HTML newsletters.
@@ -2206,7 +2206,7 @@ class EditorWindow(QMainWindow):  # type: ignore[misc]
                 continue
             span = soup.new_tag(
                 "span",
-                **{"class": "editor-anchor", "data-anchor-id": anchor_id,
+                **{"class": "editor-anchor", "data-anchor-id": anchor_id,  # type: ignore[arg-type]
                    "title": f"Anchor: {anchor_id}"},
             )
             span.string = "⚓"  # ⚓
