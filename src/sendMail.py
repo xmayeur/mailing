@@ -282,6 +282,11 @@ def guess_type(filepath: str) -> str | None:
     except (ImportError, ModuleNotFoundError):
         import mimetypes
 
+        # Initialize Office file MIME types (not registered on all platforms)
+        mimetypes.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx")
+        mimetypes.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
+        mimetypes.add_type("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx")
+
         return mimetypes.guess_type(filepath)[0]
 
 
