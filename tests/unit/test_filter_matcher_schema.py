@@ -8,8 +8,6 @@ import os
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # Mock heavy dependencies before any source import
 # ---------------------------------------------------------------------------
@@ -40,7 +38,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from filter_matcher import FilterMatcher  # noqa: E402
 from schema_provider import DatabaseSchemaProvider  # noqa: E402
-
 
 # ===========================================================================
 # FilterMatcher tests

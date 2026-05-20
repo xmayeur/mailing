@@ -83,6 +83,9 @@ docs = [
     # Required for SC-008 WCAG 2.1 Level AA accessibility verification
 ]
 
+[tool.poetry]
+package-mode = false
+
 [tool.setuptools.package-dir]
 "" = "src"
 pyArchimate = "src/"
@@ -128,6 +131,33 @@ disable_error_code = ["import-untyped"]
 #]
 exclude = [
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "bs4",
+    "getSecrets",
+    "google.auth",
+    "google.auth.transport",
+    "google.auth.transport.requests",
+    "google.oauth2",
+    "google.oauth2.credentials",
+    "google_auth_oauthlib",
+    "google_auth_oauthlib.flow",
+    "googleapiclient",
+    "googleapiclient.discovery",
+    "googleapiclient.errors",
+    "googleapiclient.http",
+    "gspread",
+    "markdown2",
+    "oauth2client",
+    "oauth2client.service_account",
+    "PIL",
+    "PIL.*",
+    "python_calamine",
+    "PyQt6",
+    "PyQt6.*",
+]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 120
