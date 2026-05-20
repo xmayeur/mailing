@@ -1215,7 +1215,7 @@ def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> b
     return not result
 
 
-def send_gmail(service, message=None):
+def send_gmail(service: Any, message: Any = None) -> bool:
     """
     Sends an email message using the Gmail API.
 
@@ -1468,7 +1468,7 @@ def check_mandatory_param(param: Any) -> bool:
     return ret
 
 
-def setup_argparse() -> ArgumentParser:
+def setup_argparse() -> argparse.Namespace:
     """
     Sets up and parses command-line arguments for a mailing utility.
 
