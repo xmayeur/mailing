@@ -782,6 +782,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.load_current_filter(profile)
         self.filter_and_display_records()
 
+        # Reload stylesheet when profile changes
+        self._load_default_stylesheet()
+
     def load_current_filter(self, profile: str) -> None:
         """Load filter from profile config and display in filter field (T036)."""
         profile_cfg = self._config_data.get(profile, {})
@@ -3466,17 +3469,19 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return {}
 
     def _load_default_stylesheet(self) -> None:
-        """Load the default profile's stylesheet if available."""
+        """Load the current profile's stylesheet if available."""
         try:
             config_path = self._resolve_send_config_path()
             config_data = self._load_send_config(config_path)
-            styles_path = config_data.get("default", {}).get("styles")
+            # Use current profile, fallback to "default" if not set
+            profile_name = self._current_profile or "default"
+            styles_path = config_data.get(profile_name, {}).get("styles")
             if styles_path and isinstance(styles_path, str):
                 abs_path = os.path.abspath(styles_path)
                 if os.path.exists(abs_path):
                     self._bridge.css_changed.emit(abs_path)
         except Exception as exc:
-            log.debug("Could not load default stylesheet: %s", exc)
+            log.debug("Could not load profile stylesheet: %s", exc)
 
     def _send_with_sendmail(self, dialog: _SendDialog) -> str:
         """Run sendMail with the options selected in the dialog."""
