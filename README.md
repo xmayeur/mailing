@@ -475,8 +475,8 @@ pip install pytest pytest-cov pytest-mock
 # Run all tests
 pytest
 
-# Run tests with coverage report
-pytest --cov=. --cov-report=html
+# Run tests with coverage report (source code only, excludes tests/docs/build)
+pytest tests/ --cov=src --cov-report=term-missing --cov-report=html
 
 # Run specific test file
 pytest tests/test_sendMail.py -v
