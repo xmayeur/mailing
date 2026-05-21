@@ -177,9 +177,7 @@ class TestInvalidateAll:
 class TestLoaderExceptions:
     """Exceptions from loader propagate to caller"""
 
-    def test_loader_exception_propagates(
-        self, cache: SchemaCacheProvider
-    ) -> None:
+    def test_loader_exception_propagates(self, cache: SchemaCacheProvider) -> None:
         """If loader raises, exception propagates. Cache not updated."""
 
         def failing_loader() -> list[str]:

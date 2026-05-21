@@ -134,7 +134,10 @@ class TestFileToBase64:
         assert isinstance(b64, str)
         assert len(b64) > 0
         # Should be valid base64 (only alphanumeric + / + = + whitespace)
-        assert all(c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n" for c in b64)
+        assert all(
+            c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n"
+            for c in b64
+        )
 
     def test_file_not_found(self):
         """Handle missing file gracefully."""
@@ -171,13 +174,16 @@ class TestGetSubscriberReader:
         assert reader is None
         assert handle is None
 
-    @patch('sendMail.open_google_db_members_sheet')
-    @patch('sendMail.read_all_sheet')
+    @patch("sendMail.open_google_db_members_sheet")
+    @patch("sendMail.read_all_sheet")
     def test_google_sheets_reader(self, mock_read_sheet, mock_open_sheet):
         """Create reader for Google Sheets."""
         mock_sheet = MagicMock()
         mock_open_sheet.return_value = mock_sheet
-        mock_read_sheet.return_value = [["name", "email"], ["Alice", "alice@example.com"]]
+        mock_read_sheet.return_value = [
+            ["name", "email"],
+            ["Alice", "alice@example.com"],
+        ]
 
         param = MagicMock()
         param.database = None
@@ -192,7 +198,7 @@ class TestGetSubscriberReader:
 class TestGetSmtpConnection:
     """Test SMTP connection establishment."""
 
-    @patch('sendMail.SMTP')
+    @patch("sendMail.SMTP")
     def test_successful_connection(self, mock_smtp_class):
         """Create successful SMTP connection."""
         mock_conn = MagicMock()
@@ -208,13 +214,15 @@ class TestGetSmtpConnection:
         assert conn is not None
         mock_smtp_class.assert_called_once()
 
-    @patch('sendMail.SMTP')
+    @patch("sendMail.SMTP")
     def test_auth_failure(self, mock_smtp_class):
         """Exit on authentication failure."""
         from smtplib import SMTPAuthenticationError
 
         mock_conn = MagicMock()
-        mock_conn.login.side_effect = SMTPAuthenticationError(530, "Authentication required")
+        mock_conn.login.side_effect = SMTPAuthenticationError(
+            530, "Authentication required"
+        )
         mock_smtp_class.return_value = mock_conn
 
         param = MagicMock()
@@ -226,7 +234,7 @@ class TestGetSmtpConnection:
         with pytest.raises(SystemExit):
             sm.get_smtp_connection(param)
 
-    @patch('sendMail.SMTP')
+    @patch("sendMail.SMTP")
     def test_connection_error(self, mock_smtp_class):
         """Return None on connection error."""
         mock_smtp_class.side_effect = OSError("Connection refused")

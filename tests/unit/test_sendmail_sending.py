@@ -84,8 +84,14 @@ class TestMimeTypeDetection:
         """Detect common file MIME types."""
         assert sm.guess_type("file.pdf") == "application/pdf"
         assert sm.guess_type("image.jpg") == "image/jpeg"
-        assert sm.guess_type("sheet.xlsx") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        assert sm.guess_type("doc.docx") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        assert (
+            sm.guess_type("sheet.xlsx")
+            == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        assert (
+            sm.guess_type("doc.docx")
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
     def test_unknown_extension(self) -> None:
         """Return None for unknown extensions."""
@@ -113,7 +119,9 @@ class TestMessageFormatting:
 
     def test_format_with_multiple_fields(self) -> None:
         """Format body with multiple template fields."""
-        template = "Dear ${title} ${lastname},\n\nYour email is ${email}.\n\nBest regards"
+        template = (
+            "Dear ${title} ${lastname},\n\nYour email is ${email}.\n\nBest regards"
+        )
         row = ["Dr", "Smith", "smith@example.com"]
         header = ["title", "lastname", "email"]
 
@@ -180,7 +188,7 @@ class TestMarkdownConversion:
         assert result is not None
 
 
-@patch('sendMail.get_gmail_service')
+@patch("sendMail.get_gmail_service")
 class TestGmailSending:
     """Test Gmail API sending."""
 
@@ -217,7 +225,7 @@ class TestGmailSending:
 class TestSmtpSending:
     """Test SMTP email sending."""
 
-    @patch('sendMail.SMTP')
+    @patch("sendMail.SMTP")
     def test_send_via_smtp_success(self, mock_smtp_class: Any) -> None:
         """Send email via SMTP."""
         mock_conn = MagicMock()
@@ -240,7 +248,7 @@ class TestSmtpSending:
         # SMTP sending is done through send method, not exposed as separate function
         assert mock_conn is not None
 
-    @patch('sendMail.SMTP')
+    @patch("sendMail.SMTP")
     def test_send_via_smtp_connection_error(self, mock_smtp_class: Any) -> None:
         """Handle SMTP connection failures."""
         mock_smtp_class.side_effect = OSError("Connection refused")
@@ -251,7 +259,7 @@ class TestSmtpSending:
         param.smtp_port = 25
 
         # Should not crash on connection error
-        with patch('sendMail.get_smtp_connection', return_value=None):
+        with patch("sendMail.get_smtp_connection", return_value=None):
             pass  # Function should handle None connection
 
 
@@ -262,7 +270,9 @@ class TestBatchOperations:
         """Send batch emails to multiple recipients."""
         # Create CSV with recipients
         csv_file = tmp_path / "recipients.csv"
-        csv_file.write_text("name,email\nAlice,alice@example.com\nBob,bob@example.com\n")
+        csv_file.write_text(
+            "name,email\nAlice,alice@example.com\nBob,bob@example.com\n"
+        )
 
         # Test batch operation would iterate through recipients
         # Each one formatted and sent
@@ -334,6 +344,7 @@ class TestErrorHandling:
 
         # Simulate error and cleanup
         import shutil
+
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
 
@@ -352,7 +363,9 @@ class TestBatchEmailOperations:
             (["Charlie", "12347"], ["name", "order_id"]),
         ]
 
-        results = [sm.format_message(template, row, header) for row, header in recipients]
+        results = [
+            sm.format_message(template, row, header) for row, header in recipients
+        ]
         assert len(results) == 3
         assert "Alice" in results[0]
         assert "12345" in results[0]
@@ -423,7 +436,9 @@ class TestRateLimiting:
         """Calculate delay between batch sends."""
         batch_count = 10  # noqa: F841
         max_batches_per_second = 2
-        expected_delay = 1.0 / max_batches_per_second if max_batches_per_second > 0 else 0
+        expected_delay = (
+            1.0 / max_batches_per_second if max_batches_per_second > 0 else 0
+        )
 
         assert expected_delay == 0.5
 

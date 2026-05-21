@@ -17,13 +17,15 @@ class TestConfigLoading:
     def test_load_valid_yaml_config(self, tmp_path: Any) -> None:
         """Load valid YAML configuration file."""
         config_file = tmp_path / "config.yml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 profiles:
   default:
     smtp_host: localhost
     smtp_port: 25
     from_address: test@example.com
-""")
+"""
+        )
         # Would test actual config loading here
         assert config_file.exists()
 
@@ -35,11 +37,13 @@ profiles:
     def test_load_invalid_yaml_syntax(self, tmp_path: Any) -> None:
         """Handle invalid YAML syntax."""
         config_file = tmp_path / "bad_config.yml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 invalid: yaml: content:
   - bad
   - indentation
-""")
+"""
+        )
         # YAML is valid, but structure might be unexpected
         assert config_file.exists()
 
@@ -94,7 +98,10 @@ class TestProfileHandling:
 
     def test_select_default_profile(self) -> None:
         """Select default profile when none specified."""
-        profiles = {"default": {"smtp_host": "localhost"}, "other": {"smtp_host": "mail.example.com"}}
+        profiles = {
+            "default": {"smtp_host": "localhost"},
+            "other": {"smtp_host": "mail.example.com"},
+        }
         selected = profiles.get("default")
         assert selected is not None
 
@@ -147,7 +154,7 @@ class TestConfigEnvironmentVariables:
 
     def test_env_var_smtp_host(self) -> None:
         """SMTP host from environment variable."""
-        with patch.dict('os.environ', {'SENDMAIL_SMTP_HOST': 'env.example.com'}):
+        with patch.dict("os.environ", {"SENDMAIL_SMTP_HOST": "env.example.com"}):
             # Would test actual env var reading here
             pass
 

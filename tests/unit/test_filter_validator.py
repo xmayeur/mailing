@@ -35,11 +35,16 @@ class TestMalformedYAMLErrorReporting:
         )
         assert not status["is_valid"]
         assert len(status["syntax_errors"]) > 0
-        assert "YAML" in status["syntax_errors"][0] or "syntax" in status["syntax_errors"][0].lower()
+        assert (
+            "YAML" in status["syntax_errors"][0]
+            or "syntax" in status["syntax_errors"][0].lower()
+        )
 
     def test_valid_yaml_shows_no_syntax_error(self, validator: FilterValidator) -> None:
         """Valid YAML shows no syntax errors."""
-        status = validator.get_validation_status("email: test@example.com", ["email", "name"])
+        status = validator.get_validation_status(
+            "email: test@example.com", ["email", "name"]
+        )
         # May have missing field errors but not syntax errors
         assert len(status["syntax_errors"]) == 0
 
@@ -54,7 +59,9 @@ class TestUnicodeHandling:
         assert result is not None
         assert result.get("name") == "José"
 
-    def test_special_characters_in_field_names(self, validator: FilterValidator) -> None:
+    def test_special_characters_in_field_names(
+        self, validator: FilterValidator
+    ) -> None:
         """Field names with special characters should be handled."""
         filter_text = "name_with_underscore: value\nemail-with-dash: test@example.com"
         status = validator.get_validation_status(

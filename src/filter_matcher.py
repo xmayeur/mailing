@@ -21,6 +21,7 @@ class FilterMatcher:
         self._filter_fn: Any = None
         try:
             import sendMail as sm  # noqa: N813
+
             self._filter_fn = sm.filter
             self._available = True
         except (ImportError, AttributeError) as e:
@@ -66,7 +67,10 @@ class FilterMatcher:
             return True
 
     def filter_rows(
-        self, rows_data: list[list[Any]], filter_dict: dict[str, str], headers: list[str]
+        self,
+        rows_data: list[list[Any]],
+        filter_dict: dict[str, str],
+        headers: list[str],
     ) -> list[list[Any]]:
         """Apply filter to multiple rows.
 
@@ -84,7 +88,10 @@ class FilterMatcher:
         return [row for row in rows_data if self.match_row(row, filter_dict, headers)]
 
     def filter_rows_with_count(
-        self, rows_data: list[list[Any]], filter_dict: dict[str, str], headers: list[str]
+        self,
+        rows_data: list[list[Any]],
+        filter_dict: dict[str, str],
+        headers: list[str],
     ) -> tuple[list[list[Any]], int]:
         """Apply filter and return both results and original count.
 

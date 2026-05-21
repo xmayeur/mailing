@@ -18,9 +18,11 @@ from src.editor import _SendDialog
 pytestmark = [
     pytest.mark.skipif(
         sys.platform.startswith("linux") and not os.environ.get("QT_GUI_TESTS"),
-        reason="Qt GUI tests require display server and GPU support; set QT_GUI_TESTS=1 to enable"
+        reason="Qt GUI tests require display server and GPU support; set QT_GUI_TESTS=1 to enable",
     ),
-    pytest.mark.xfail(reason="Filter text not loading in time; filter loading may be async")
+    pytest.mark.xfail(
+        reason="Filter text not loading in time; filter loading may be async"
+    ),
 ]
 
 
@@ -190,9 +192,7 @@ default:
         self, qapp: Any, temp_attachment: Any
     ) -> None:
         """Test filter validation with valid YAML syntax."""
-        config_data = {
-            "test": {"sender": "test@example.com"}
-        }
+        config_data = {"test": {"sender": "test@example.com"}}
 
         dialog = _SendDialog(
             attachment_path=temp_attachment,
@@ -215,9 +215,7 @@ default:
         self, qapp: Any, temp_attachment: Any
     ) -> None:
         """Test filter validation with invalid YAML syntax."""
-        config_data = {
-            "test": {"sender": "test@example.com"}
-        }
+        config_data = {"test": {"sender": "test@example.com"}}
 
         dialog = _SendDialog(
             attachment_path=temp_attachment,
@@ -280,9 +278,7 @@ test:
         self, qapp: Any, temp_attachment: Any
     ) -> None:
         """Test that filter text change starts debounce timer."""
-        config_data = {
-            "test": {"sender": "test@example.com"}
-        }
+        config_data = {"test": {"sender": "test@example.com"}}
 
         dialog = _SendDialog(
             attachment_path=temp_attachment,
@@ -305,9 +301,7 @@ test:
         self, qapp: Any, temp_attachment: Any
     ) -> None:
         """Test filter field styling for valid filter."""
-        config_data = {
-            "test": {"sender": "test@example.com"}
-        }
+        config_data = {"test": {"sender": "test@example.com"}}
 
         dialog = _SendDialog(
             attachment_path=temp_attachment,
@@ -327,9 +321,7 @@ test:
         self, qapp: Any, temp_attachment: Any
     ) -> None:
         """Test filter field styling for invalid filter."""
-        config_data = {
-            "test": {"sender": "test@example.com"}
-        }
+        config_data = {"test": {"sender": "test@example.com"}}
 
         dialog = _SendDialog(
             attachment_path=temp_attachment,
@@ -345,9 +337,7 @@ test:
         stylesheet = dialog.filter_text_edit.styleSheet()
         assert "#f44336" in stylesheet or "border" in stylesheet
 
-    def test_load_database_records_csv(
-        self, qapp: Any, temp_attachment: Any
-    ) -> None:
+    def test_load_database_records_csv(self, qapp: Any, temp_attachment: Any) -> None:
         """Test loading records from CSV file (T026)."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write("name,email,age\n")
@@ -372,9 +362,7 @@ test:
         finally:
             Path(csv_path).unlink()
 
-    def test_filter_and_display_records(
-        self, qapp: Any, temp_attachment: Any
-    ) -> None:
+    def test_filter_and_display_records(self, qapp: Any, temp_attachment: Any) -> None:
         """Test filtering and displaying records (T027, T028)."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write("name,status\n")
@@ -543,7 +531,9 @@ test:
         finally:
             Path(csv_path).unlink()
 
-    def test_apply_filter_updates_display(self, qapp: Any, temp_attachment: Any) -> None:
+    def test_apply_filter_updates_display(
+        self, qapp: Any, temp_attachment: Any
+    ) -> None:
         """Test applying filter updates record preview display (T034-FIX-2)."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write("name,status,email\n")
@@ -575,7 +565,9 @@ test:
 
             # Record count should update to 2 (Alice and Charlie)
             filtered_count = dialog.records_table.rowCount()
-            assert filtered_count == 2, f"Expected 2 filtered records, got {filtered_count}"
+            assert (
+                filtered_count == 2
+            ), f"Expected 2 filtered records, got {filtered_count}"
             assert dialog._session_filter == {"status": "is active"}
         finally:
             Path(csv_path).unlink()
@@ -654,7 +646,9 @@ test:
         finally:
             Path(csv_path).unlink()
 
-    def test_google_sheets_profile_validation(self, qapp: Any, temp_attachment: str) -> None:
+    def test_google_sheets_profile_validation(
+        self, qapp: Any, temp_attachment: str
+    ) -> None:
         """Verify Google Sheets profiles attempt schema loading via sendMail.
 
         In test environment without valid credentials, schema load will fail
@@ -690,11 +684,13 @@ test:
 
             # With proper schema, validation should pass
             label_text = dialog.filter_status_label.text()
-            assert label_text == "", (
-                f"Expected validation to pass with schema, got: {label_text}"
-            )
+            assert (
+                label_text == ""
+            ), f"Expected validation to pass with schema, got: {label_text}"
 
-    def test_profile_load_timing_no_missing_fields(self, qapp: Any, temp_attachment: str) -> None:
+    def test_profile_load_timing_no_missing_fields(
+        self, qapp: Any, temp_attachment: str
+    ) -> None:
         """Verify database schema loaded before validation when profile changes.
 
         Regression test for: filter validation reported "all fields not found"
@@ -745,31 +741,31 @@ test:
             dialog._run_filter_validation()
             # Check status label doesn't contain "not found"
             label_text = dialog.filter_status_label.text()
-            assert "not found" not in label_text.lower(), (
-                f"cambristi: filter reported missing fields: {label_text}"
-            )
+            assert (
+                "not found" not in label_text.lower()
+            ), f"cambristi: filter reported missing fields: {label_text}"
 
             # Switch to artscroises profile - validate filter
             dialog._load_profile_defaults("artscroises")
             dialog._validation_timer.stop()
             dialog._run_filter_validation()
             label_text = dialog.filter_status_label.text()
-            assert "not found" not in label_text.lower(), (
-                f"artscroises: filter reported missing fields: {label_text}"
-            )
+            assert (
+                "not found" not in label_text.lower()
+            ), f"artscroises: filter reported missing fields: {label_text}"
         finally:
             Path(camb_path).unlink()
             Path(arts_path).unlink()
 
-    def test_filter_validation_string_operations(self, qapp: Any, temp_attachment: str) -> None:
+    def test_filter_validation_string_operations(
+        self, qapp: Any, temp_attachment: str
+    ) -> None:
         """Test that string operations are recognized as valid by filter validator."""
         csv_content = "email,name,domain\n"
         csv_content += "john@example.com,John Smith,example.com\n"
         csv_content += "jane@gmail.com,Jane Doe,gmail.com\n"
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write(csv_content)
             csv_path = f.name
 
@@ -829,16 +825,16 @@ test:
         finally:
             Path(csv_path).unlink()
 
-    def test_filter_preview_string_operations(self, qapp: Any, temp_attachment: str) -> None:
+    def test_filter_preview_string_operations(
+        self, qapp: Any, temp_attachment: str
+    ) -> None:
         """Test that record preview correctly filters with string operations."""
         csv_content = "email,name,domain\n"
         csv_content += "john@example.com,John Smith,example.com\n"
         csv_content += "jane@gmail.com,Jane Doe,gmail.com\n"
         csv_content += "bob@example.org,Bob Jones,example.org\n"
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write(csv_content)
             csv_path = f.name
 
@@ -896,9 +892,7 @@ test:
         csv_content += "john@example.com,John Smith,example.com\n"
         csv_content += "jane@gmail.com,Jane Doe,gmail.com\n"
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write(csv_content)
             csv_path = f.name
 
@@ -925,7 +919,9 @@ test:
             dialog._validation_timer.stop()
             dialog.filter_and_display_records()
             # Should show 0 records
-            assert "0 records" in dialog.record_count_label.text() or \
-                   dialog.records_table.rowCount() == 0
+            assert (
+                "0 records" in dialog.record_count_label.text()
+                or dialog.records_table.rowCount() == 0
+            )
         finally:
             Path(csv_path).unlink()

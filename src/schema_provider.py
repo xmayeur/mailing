@@ -153,7 +153,9 @@ class DatabaseSchemaProvider:
             log.warning("Excel database file not found: %s", database_path)
             return []
 
-        if gsheet_service and ("docs.google" in database_path or len(database_path) > 20):
+        if gsheet_service and (
+            "docs.google" in database_path or len(database_path) > 20
+        ):
             return DatabaseSchemaProvider.from_google_sheets(
                 gsheet_service, database_path, sheet_name
             )

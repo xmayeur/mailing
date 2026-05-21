@@ -205,15 +205,14 @@ def mock_google_api_errors():
 
     return {
         "not_found": HttpError(
-            resp=MagicMock(status=404),
-            content=b'{"error": {"message": "Not found"}}'
+            resp=MagicMock(status=404), content=b'{"error": {"message": "Not found"}}'
         ),
         "forbidden": HttpError(
             resp=MagicMock(status=403),
-            content=b'{"error": {"message": "Access denied"}}'
+            content=b'{"error": {"message": "Access denied"}}',
         ),
         "rate_limit": HttpError(
             resp=MagicMock(status=429),
-            content=b'{"error": {"message": "Rate limit exceeded"}}'
+            content=b'{"error": {"message": "Rate limit exceeded"}}',
         ),
     }

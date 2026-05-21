@@ -192,7 +192,9 @@ def open_google_db_members_sheet(sa: str, sheet_id: str) -> Any:
         "https://www.googleapis.com/auth/drive",
     ]
 
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), scope)  # pyright: ignore
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        get_secret(sa), scope
+    )  # pyright: ignore
     gc = gspread.authorize(creds)  # pyright: ignore
 
     spreadsheet_id = get_secret(sheet_id)["ID"]
@@ -257,7 +259,9 @@ class Dict2Class:
             object.__setattr__(self, key.lower(), my_dict[key])
 
     def __getattr__(self, name: str) -> Any:
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{name}'"
+        )
 
     def __setattr__(self, name: str, value: Any) -> None:
         object.__setattr__(self, name, value)
@@ -284,9 +288,17 @@ def guess_type(filepath: str) -> str | None:
         import mimetypes
 
         # Initialize Office file MIME types (not registered on all platforms)
-        mimetypes.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx")
-        mimetypes.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
-        mimetypes.add_type("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx")
+        mimetypes.add_type(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"
+        )
+        mimetypes.add_type(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".docx",
+        )
+        mimetypes.add_type(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".pptx",
+        )
 
         return mimetypes.guess_type(filepath)[0]
 
@@ -560,7 +572,9 @@ def _decode_base64_image(src: str, temp_dir: str) -> str | None:
         return None
 
 
-def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: int) -> str | None:
+def _resize_and_save_image(
+    img_path: str, cid: str, temp_dir: str, max_width: int
+) -> str | None:
     """Resize *img_path* to *max_width* and save as a JPEG in *temp_dir*.
 
     :return: Path of the optimised file, or None on error.
@@ -579,7 +593,9 @@ def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: in
         return None
 
 
-def prepare_html_and_get_images(in_filepath: str, max_width: int = 800) -> tuple[str, list[Any], str]:
+def prepare_html_and_get_images(
+    in_filepath: str, max_width: int = 800
+) -> tuple[str, list[Any], str]:
     """
     Processes an HTML file to embed inline images and resize them for optimized usage.
 
@@ -639,6 +655,7 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
         Formatted message with values substituted, or original template on error
     """
     try:
+
         def _replace(m: re.Match[str]) -> str:
             key = m.group(1)
             return str(row[header.index(key)])
@@ -648,7 +665,9 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
         return template
 
 
-def process_attachments(args: Any, config: dict[str, Any], folder: str = "input") -> tuple[list[str], Any, list[Any]]:
+def process_attachments(
+    args: Any, config: dict[str, Any], folder: str = "input"
+) -> tuple[list[str], Any, list[Any]]:
     """
     Processes attachments by either verifying file paths provided in the arguments or downloading files
     from a Google Drive folder and cleaning up the local folder. Returns processed file paths, the Google
@@ -688,7 +707,9 @@ def process_attachments(args: Any, config: dict[str, Any], folder: str = "input"
     return files, service, google_drive_files
 
 
-def md2html(file_path: str, styles: str | None = None, embed_styles: bool = False) -> str | None:
+def md2html(
+    file_path: str, styles: str | None = None, embed_styles: bool = False
+) -> str | None:
     """
     Converts a Markdown file to an HTML file with optional styling.
 
@@ -807,15 +828,23 @@ def _set_email_headers(
         msg["Bcc"] = bcc
     msg["Date"] = email.utils.formatdate(localtime=True)
     if hasattr(param, "domain"):
-        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain=param.domain)
+        msg["Message-ID"] = email.utils.make_msgid(
+            idstring=str(uuid4()), domain=param.domain
+        )
     return to, bcc
 
 
-def _process_html_attachment(att: str, param: Any, all_inline_images: list[Any], temp_dirs: list[str]) -> str:
+def _process_html_attachment(
+    att: str, param: Any, all_inline_images: list[Any], temp_dirs: list[str]
+) -> str:
     """Convert Markdown to HTML if needed, then extract inline images. Returns the HTML body."""
     is_md = att.endswith("md")
     if is_md:
-        result = md2html(att, styles=param.styles if hasattr(param, "styles") else None, embed_styles=True)
+        result = md2html(
+            att,
+            styles=param.styles if hasattr(param, "styles") else None,
+            embed_styles=True,
+        )
         if result is None:
             return ""
         att = result
@@ -833,13 +862,20 @@ def _process_binary_attachment(att: str, msg: MIMEMultipart) -> None:
         content = f.read()
     if att.endswith("pdf"):
         part = MIMEApplication(content, _subtype="pdf")
-        part.add_header("Content-Disposition", "attachment", filename=os.path.basename(att))
+        part.add_header(
+            "Content-Disposition", "attachment", filename=os.path.basename(att)
+        )
         msg.attach(part)
     elif att.endswith("txt"):
         msg.attach(MIMEText(content.decode()))
 
 
-def _attach_body(msg: MIMEMultipart, msg_related: MIMEMultipart, message: str, all_inline_images: list[Any]) -> None:
+def _attach_body(
+    msg: MIMEMultipart,
+    msg_related: MIMEMultipart,
+    message: str,
+    all_inline_images: list[Any],
+) -> None:
     """Attach the message body and any inline images to *msg*."""
     if not message:
         return
@@ -850,7 +886,11 @@ def _attach_body(msg: MIMEMultipart, msg_related: MIMEMultipart, message: str, a
                 with open(img_info["path"], "rb") as f:
                     img_part = MIMEImage(f.read())
                 img_part.add_header("Content-ID", f"<{img_info['cid']}>")
-                img_part.add_header("Content-Disposition", "inline", filename=os.path.basename(img_info["path"]))
+                img_part.add_header(
+                    "Content-Disposition",
+                    "inline",
+                    filename=os.path.basename(img_info["path"]),
+                )
                 msg_related.attach(img_part)
             except (OSError, TypeError) as e:
                 log.error(f"Error attaching inline image {img_info['path']}: {e}")
@@ -860,14 +900,14 @@ def _attach_body(msg: MIMEMultipart, msg_related: MIMEMultipart, message: str, a
 
 
 def build_email(
-        param: Any,
-        subject: str = "",
-        to: str = "",
-        cc: str = "",
-        bcc: str | None = None,
-        message: str = "",
-        images: str | list[str] | None = None,
-        attachments: str | list[str] | None = None
+    param: Any,
+    subject: str = "",
+    to: str = "",
+    cc: str = "",
+    bcc: str | None = None,
+    message: str = "",
+    images: str | list[str] | None = None,
+    attachments: str | list[str] | None = None,
 ) -> tuple[MIMEMultipart, list[str]]:
     """Build MIME email message with attachments and inline images.
 
@@ -914,7 +954,9 @@ def build_email(
     return msg, recipients
 
 
-def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: list[str]) -> bool:
+def _build_and_send(
+    param: Any, addressees: list[Any], row: list[Any], header: list[str]
+) -> bool:
     """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs.
 
     :return: True if the message was sent, False if sending was skipped or failed.
@@ -965,7 +1007,15 @@ def _skip_to_index(reader: Any, from_index: int) -> int:
     return idx
 
 
-def _flush_batch(param: Any, addressees: list[Any], row: list[Any], header: list[str], pause: int, recipient_count: int, max_mail_per_hour: int) -> None:
+def _flush_batch(
+    param: Any,
+    addressees: list[Any],
+    row: list[Any],
+    header: list[str],
+    pause: int,
+    recipient_count: int,
+    max_mail_per_hour: int,
+) -> None:
     """Dispatch the current addressee batch and enforce rate limiting."""
     _build_and_send(param, addressees, row, header)
     sleep(pause)
@@ -1028,8 +1078,18 @@ def generate_mailing(param: Any) -> str:
             addressees.append(row[indices["email"]])
             recipient_count += 1
             if len(addressees) >= max_add:
-                log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
-                _flush_batch(param, addressees, row, header, pause, recipient_count, max_mail_per_hour)
+                log.info(
+                    f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})"
+                )
+                _flush_batch(
+                    param,
+                    addressees,
+                    row,
+                    header,
+                    pause,
+                    recipient_count,
+                    max_mail_per_hour,
+                )
                 addressees, mail_batch_count = [], mail_batch_count + 1
 
         if addressees:
@@ -1159,7 +1219,7 @@ def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
         return bool(field_value != test_value)
     if op in (_OP_IS_NOT_EMPTY, "is not empty"):
         return field_value != "" and field_value is not None
-    if op in ("is empty", ):
+    if op in ("is empty",):
         return field_value == "" or field_value is None
     if op in ("contains", _OP_CONTAINS):
         return bool(test_value in field_value) if test_value else False
@@ -1184,7 +1244,9 @@ def _evaluate_condition(field_value: str, op: str, test_value: Any, _k: str) -> 
         return _eval_string(field_value, test_value, op)
 
 
-def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> bool:  # noqa: A001,A002
+def filter(
+    filter: dict[str, str], row: list[Any], indices: dict[str, int]
+) -> bool:  # noqa: A001,A002
     """Filter row: return True if should be EXCLUDED, False if INCLUDED.
 
     Applies filter conditions to subscriber row. All filter conditions must
@@ -1207,7 +1269,9 @@ def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> b
 
     result = True
     for k, v in filter.items():
-        field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
+        field_value = (
+            row[indices[k]] if k in indices and indices[k] < len(row) else None
+        )
         if field_value is None:
             return True
         try:
@@ -1271,7 +1335,9 @@ def send_mail(param: Any = None, message: Any = None, recipients: Any = None) ->
         conn = get_smtp_connection(param)
         if conn:
             try:
-                conn.sendmail(message["From"], recipients, message.as_string())  # pyright: ignore
+                conn.sendmail(
+                    message["From"], recipients, message.as_string()
+                )  # pyright: ignore
                 conn.quit()
                 success = True
                 if param.verbose:  # pyright: ignore
@@ -1328,7 +1394,11 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
 
     # Try Profile class for vault_key, fall back to legacy MAILCONFIG
     try:
-        vault_key = config.get("vault_key") or config.get("MAILCONFIG") or config.get("mailconfig")
+        vault_key = (
+            config.get("vault_key")
+            or config.get("MAILCONFIG")
+            or config.get("mailconfig")
+        )
         if vault_key:
             profile = Profile(args.profile, config)
             secret = profile.load_smtp_from_vault()
@@ -1367,7 +1437,9 @@ def _prepare_message_body(param: Any, config: dict[str, Any], files: list[str]) 
     param = get_newsletter_name(files, param)
     if not param.message:
         param.message = config["default_message"]
-        param.message = param.message.replace("${newsletter_name}", param.newsletter_name)
+        param.message = param.message.replace(
+            "${newsletter_name}", param.newsletter_name
+        )
         param.message = param.message.replace("${body}", body_txt)
     return param
 
@@ -1438,7 +1510,7 @@ def _check_common_params(param: Any) -> bool:
 def _check_data_source(param: Any) -> bool:
     """Return False if neither a database path nor a (SA + sheetid) pair is configured."""
     if not hasattr(param, "database") and not (
-            hasattr(param, "sa") and hasattr(param, "sheetid")
+        hasattr(param, "sa") and hasattr(param, "sheetid")
     ):
         log.error("Database path or (Service Account (SA) and SheetID) is mandatory")
         return False
@@ -1447,7 +1519,14 @@ def _check_data_source(param: Any) -> bool:
 
 def _check_smtp_imap_params(param: Any) -> bool:
     """Return False and log errors for missing SMTP/IMAP mandatory parameters."""
-    required = ["smtp_port", "imap_host", "imap_port", "username", "password", "sent_folder"]
+    required = [
+        "smtp_port",
+        "imap_host",
+        "imap_port",
+        "username",
+        "password",
+        "sent_folder",
+    ]
     ret = True
     for p in required:
         if not hasattr(param, p) or getattr(param, p) is None:
@@ -1486,7 +1565,11 @@ def check_mandatory_param(param: Any) -> bool:
     """
     common_ok = _check_common_params(param)
     data_ok = _check_data_source(param)
-    method_ok = _check_smtp_imap_params(param) if hasattr(param, "smtp_host") else _check_gmail_params(param)
+    method_ok = (
+        _check_smtp_imap_params(param)
+        if hasattr(param, "smtp_host")
+        else _check_gmail_params(param)
+    )
     ret = common_ok and data_ok and method_ok
 
     if not ret:

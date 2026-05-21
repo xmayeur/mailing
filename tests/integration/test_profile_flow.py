@@ -19,7 +19,7 @@ class TestProfileFlow:
             "name": "artscroises",
             "vault_key": "mailconfig: artscroises",
             "sender": "sender@artscroises.com",
-            "default_message": "Default message"
+            "default_message": "Default message",
         }
         profile = Profile("artscroises", config)
 
@@ -30,7 +30,7 @@ class TestProfileFlow:
             "username": "artscroises_user",
             "password": "artscroises_pass",
             "sender": "sender@artscroises.com",
-            "sendername": "Arts Croisés"
+            "sendername": "Arts Croisés",
         }
 
         # Execute profile loading
@@ -48,8 +48,22 @@ class TestProfileFlow:
 
         profile1 = Profile("profile1", config1)
 
-        response1 = {"smtp_host": "smtp1.com", "smtp_port": 587, "username": "user1", "password": "pass1", "sender": "user1@test.com", "sendername": "User1"}
-        response2 = {"smtp_host": "smtp2.com", "smtp_port": 587, "username": "user2", "password": "pass2", "sender": "user2@test.com", "sendername": "User2"}
+        response1 = {
+            "smtp_host": "smtp1.com",
+            "smtp_port": 587,
+            "username": "user1",
+            "password": "pass1",
+            "sender": "user1@test.com",
+            "sendername": "User1",
+        }
+        response2 = {
+            "smtp_host": "smtp2.com",
+            "smtp_port": 587,
+            "username": "user2",
+            "password": "pass2",
+            "sender": "user2@test.com",
+            "sendername": "User2",
+        }
 
         with patch("src.profile_manager.get_secret") as mock_get:
             mock_get.return_value = response1
@@ -74,7 +88,10 @@ class TestProfileFlow:
         config = {"name": "test_profile", "vault_key": "mailconfig: test"}
         profile = Profile("test_profile", config)
 
-        with patch("src.profile_manager.get_secret", side_effect=ConnectionError("Vault timeout")):
+        with patch(
+            "src.profile_manager.get_secret",
+            side_effect=ConnectionError("Vault timeout"),
+        ):
             with pytest.raises(ProfileLoadError) as exc:
                 profile.load_smtp_from_vault()
 

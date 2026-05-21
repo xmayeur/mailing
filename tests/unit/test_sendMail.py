@@ -18,7 +18,9 @@ import yaml as _real_yaml
 from googleapiclient import errors
 
 # Add source directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
+)
 
 # Mock external dependencies
 # Note: googleDriveLib is tested separately in test_googleDriveLib.py
@@ -324,7 +326,8 @@ class TestEmailBuilding:
 
         # HTML body is attached inside a multipart/related part
         related_parts = [
-            p for p in msg.get_payload()  # type: ignore[union-attr]
+            p
+            for p in msg.get_payload()  # type: ignore[union-attr]
             if not isinstance(p, str) and p.get_content_subtype() == "related"
         ]
         assert related_parts, "Expected a multipart/related part with HTML body"
@@ -413,7 +416,7 @@ class TestHTMLProcessing:
     @patch("sendMail.Image")
     @patch("sendMail.BeautifulSoup")
     def test_prepare_html_and_get_images(
-            self, mock_bs, mock_image, mock_temp, mock_join, mock_exists
+        self, mock_bs, mock_image, mock_temp, mock_join, mock_exists
     ):
         _dir = tempfile.TemporaryDirectory(dir="./tests")
         """Test HTML processing with image optimization"""
@@ -461,7 +464,7 @@ class TestHTMLProcessing:
     @patch("sendMail.BeautifulSoup")
     @patch("email.utils.make_msgid")
     def test_prepare_html_and_get_images_base64(
-            self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open
+        self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open
     ):
         _dir = tempfile.TemporaryDirectory(dir="./tests").name
         """Test HTML processing with base64 image"""
@@ -527,7 +530,7 @@ class TestHTMLProcessing:
     @patch("sendMail.BeautifulSoup")
     @patch("sendMail.log")
     def test_prepare_html_and_get_images_base64_error(
-            self, mock_log, mock_bs, mock_temp, mock_exists
+        self, mock_log, mock_bs, mock_temp, mock_exists
     ):
         """Test HTML processing with invalid base64 image"""
         _dir = tempfile.TemporaryDirectory(dir="./tests")
@@ -547,9 +550,7 @@ class TestHTMLProcessing:
 
         mock_bs.return_value = mock_soup
 
-        _, images, _ = sendMail.prepare_html_and_get_images(
-            "/basepath/test.html"
-        )
+        _, images, _ = sendMail.prepare_html_and_get_images("/basepath/test.html")
 
         # Should skip the image and log error
         assert len(images) == 0
@@ -746,16 +747,16 @@ class TestGmailFunctions:
     @patch("sendMail.sleep")
     @patch("sendMail.filter")
     def test_generate_mailing_gmail_success(
-            self,
-            mock_filter,
-            mock_sleep,
-            mock_get_gmail,
-            mock_send_gmail,
-            mock_send_mail,
-            mock_build,
-            mock_format,
-            mock_indices,
-            mock_reader_func,
+        self,
+        mock_filter,
+        mock_sleep,
+        mock_get_gmail,
+        mock_send_gmail,
+        mock_send_mail,
+        mock_build,
+        mock_format,
+        mock_indices,
+        mock_reader_func,
     ):
         """Test successful mailing generation for ArtsCroises profile"""
         param = Mock()
@@ -878,16 +879,16 @@ class TestMailingGeneration:
     @patch("sendMail.sleep")
     @patch("sendMail.filter")
     def test_generate_mailing_smtp_success(
-            self,
-            mock_filter,
-            mock_sleep,
-            mock_get_gmail,
-            mock_send_gmail,
-            mock_send_mail,
-            mock_build,
-            mock_format,
-            mock_indices,
-            mock_reader_func,
+        self,
+        mock_filter,
+        mock_sleep,
+        mock_get_gmail,
+        mock_send_gmail,
+        mock_send_mail,
+        mock_build,
+        mock_format,
+        mock_indices,
+        mock_reader_func,
     ):
         """Test successful mailing generation for ArtsCroises profile"""
         param = Mock()
@@ -971,7 +972,7 @@ class TestGoogleSheetHelpers:
     @patch("sendMail.gspread")
     @patch("sendMail.get_secret")
     def test_open_google_db_members_sheet(
-            self, mock_get_secret, mock_gspread, mock_sac
+        self, mock_get_secret, mock_gspread, mock_sac
     ):
         sa_key = "sa_key"
         id_key = "id_key"
@@ -1025,7 +1026,7 @@ class TestGetGmailService:
     @patch("sendMail.Credentials")
     @patch("sendMail.build")
     def test_get_gmail_service_with_token_file(
-            self, mock_build, mock_credentials, mock_exists
+        self, mock_build, mock_credentials, mock_exists
     ):
         param = Mock()
         param.token_file = "token.json"
@@ -1049,13 +1050,13 @@ class TestGetGmailService:
     @patch("sendMail.build")
     @patch("builtins.open", new_callable=mock_open)
     def test_get_gmail_service_oauth_flow(
-            self,
-            mock_file,
-            mock_build,
-            mock_flow_cls,
-            mock_credentials,
-            mock_get_secret,
-            mock_exists,
+        self,
+        mock_file,
+        mock_build,
+        mock_flow_cls,
+        mock_credentials,
+        mock_get_secret,
+        mock_exists,
     ):
         param = Mock()
         param.token_file = "token.json"
@@ -1120,13 +1121,13 @@ class TestProcessFunctions:
     @patch("sendMail.getpass")
     @patch("builtins.open", new_callable=mock_open, read_data="key: value")
     def test_process_artscroises_success(
-            self,
-            mock_file,
-            mock_getpass,
-            mock_generate,
-            mock_proc_attach,
-            mock_get_secret,
-            mock_check_param,
+        self,
+        mock_file,
+        mock_getpass,
+        mock_generate,
+        mock_proc_attach,
+        mock_get_secret,
+        mock_check_param,
     ):
         """Test process_artscroises success path"""
         args = Mock()
@@ -1195,7 +1196,7 @@ def test_prepare_html_for_cid_with_invalid_src():
             import bs4
 
             with patch(
-                    "sendMail.BeautifulSoup", side_effect=bs4.BeautifulSoup
+                "sendMail.BeautifulSoup", side_effect=bs4.BeautifulSoup
             ) as mock_bs:
                 # Force the mock to NOT be a MagicMock if it's already one?
                 # Actually, patch should work if called correctly.
@@ -1260,9 +1261,7 @@ def test_prepare_html_and_get_images_exceptions():
     with patch("builtins.open", mock_open(read_data=html_content)):
         with patch("os.path.exists", return_value=True):
             with patch("sendMail.Image.open", side_effect=OSError("Corrupt image")):
-                _, images, temp_dir = sendMail.prepare_html_and_get_images(
-                    "dummy.html"
-                )
+                _, images, temp_dir = sendMail.prepare_html_and_get_images("dummy.html")
                 assert len(images) == 0
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
@@ -1572,12 +1571,12 @@ def test_build_email_image_error(tmp_path):
     param.profile = "other"
     param.max_addr_per_mail = 50
     with patch(
-            "sendMail.prepare_html_and_get_images",
-            return_value=(
-                    "html",
-                    [{"path": "nonexistent.png", "cid": "cid1"}],
-                    str(tmp_path),
-            ),
+        "sendMail.prepare_html_and_get_images",
+        return_value=(
+            "html",
+            [{"path": "nonexistent.png", "cid": "cid1"}],
+            str(tmp_path),
+        ),
     ):
         with patch("builtins.open", side_effect=FileNotFoundError):
             msg, _ = sendMail.build_email(param, message="dummy.html")
@@ -1643,7 +1642,7 @@ def test_process_artscroises_wait_and_cleanup():
 
     with patch("sendMail.get_secret", return_value=secret_config):
         with patch(
-                "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
+            "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
         ):
             with patch("sendMail.generate_mailing", return_value="OK"):
                 with patch("os.rename"):
@@ -1676,18 +1675,18 @@ def test_process_artscroises():
             "MAILCONFIG": "secret",
         }
         with patch(
-                "sendMail.yaml.safe_load",
-                return_value={"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}},
+            "sendMail.yaml.safe_load",
+            return_value={"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}},
         ):
             with patch("sendMail.get_secret", return_value=secret_config):
                 with patch(
-                        "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
+                    "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
                 ):
                     with patch("sendMail.generate_mailing", return_value="OK"):
                         with patch("os.rename"):
                             with patch("os.remove"):
                                 with patch(
-                                        "sendMail.check_mandatory_param", return_value=True
+                                    "sendMail.check_mandatory_param", return_value=True
                                 ):
                                     ret = sendMail.main()
                                     assert ret == 0
@@ -1849,7 +1848,6 @@ def test_main_missing_profile():
                 assert ret == -1
 
 
-
 def test_make_html_images_inline():
     html_content = '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
     # Use a real file instead of mock_open to avoid BeautifulSoup issues if it uses other file methods
@@ -1858,8 +1856,9 @@ def test_make_html_images_inline():
         html_file = os.path.join(tmp_dir, "test.html")
         with open(html_file, "w", encoding="utf-8") as f:
             f.write(html_content)
-        with patch("sendMail.file_to_base64", return_value="YWJj"), patch("sendMail.guess_type",
-                                                                          return_value="image/png"):
+        with patch("sendMail.file_to_base64", return_value="YWJj"), patch(
+            "sendMail.guess_type", return_value="image/png"
+        ):
             sendMail.make_html_images_inline(html_file, html_file)
         with open(html_file, encoding="utf-8") as f:
             html_content = f.read()
@@ -1907,7 +1906,7 @@ def test_process_profile_message_replacement_and_password_prompt():
         # Verify lines 1187-1190: message was replaced in param, not args
         called_param = mock_generate.call_args[0][0]
         assert (
-                called_param.message == "Newsletter: MyNewsletter, Body: Test Body Content"
+            called_param.message == "Newsletter: MyNewsletter, Body: Test Body Content"
         )
 
         # Verify line 1194: getpass was called
@@ -2063,7 +2062,7 @@ def test_get_default_config_path_creates_dir_and_file():
 
             # Verify default config was written (line 99)
             mock_yaml_dump.assert_called_once()
-            default_config = mock_yaml_dump.call_args[0][0]['default']
+            default_config = mock_yaml_dump.call_args[0][0]["default"]
             assert default_config["username"] == "jdoe"
             assert default_config["sender"] == "john.doe@example.com"
             assert "filter" in default_config
@@ -2084,7 +2083,6 @@ def test_get_default_config_path_dir_exists_file_not():
             patch("builtins.open", mock_open()) as mock_file,
             patch("sendMail.yaml.dump") as mock_yaml_dump,
             patch("sendMail.log.warning") as mock_log_warning,
-
         ):
             # Config file doesn't exist (line 74), but .config directory exists (line 76)
             mock_exists.side_effect = [False, True]

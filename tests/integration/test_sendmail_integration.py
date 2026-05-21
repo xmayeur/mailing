@@ -19,7 +19,7 @@ import sendMail as sm
 class TestSendMailFullWorkflow:
     """Test complete sendMail workflows."""
 
-    @patch('sendMail.SMTP')
+    @patch("sendMail.SMTP")
     def test_full_smtp_send_workflow(self, mock_smtp_class: Any) -> None:
         """Complete workflow: load config, format template, send via SMTP."""
         mock_conn = MagicMock()
@@ -43,7 +43,9 @@ class TestSendMailFullWorkflow:
     def test_csv_subscriber_batch_processing(self, tmp_path: Any) -> None:
         """Process batch of subscribers from CSV file."""
         csv_file = tmp_path / "subscribers.csv"
-        csv_file.write_text("name,email,status\nAlice,alice@example.com,active\nBob,bob@example.com,active\n")
+        csv_file.write_text(
+            "name,email,status\nAlice,alice@example.com,active\nBob,bob@example.com,active\n"
+        )
 
         # Read and process
         with open(str(csv_file)) as f:
@@ -71,7 +73,7 @@ class TestSendMailFullWorkflow:
 class TestSendMailErrorScenarios:
     """Test error handling in realistic scenarios."""
 
-    @patch('sendMail.SMTP')
+    @patch("sendMail.SMTP")
     def test_smtp_connection_failure_recovery(self, mock_smtp_class: Any) -> None:
         """Recover from temporary SMTP connection failure."""
         # First attempt fails
@@ -84,6 +86,7 @@ class TestSendMailErrorScenarios:
         # Would attempt retry logic here
         with pytest.raises(OSError):
             from smtplib import SMTP
+
             SMTP(param.smtp_host, param.smtp_port)
 
     def test_template_with_missing_required_field(self) -> None:
@@ -105,10 +108,7 @@ class TestSendMailPerformance:
         template = "Hello ${name}, your ID is ${id}"
 
         # Format 100 recipients
-        recipients = [
-            (["User" + str(i), str(i)], ["name", "id"])
-            for i in range(100)
-        ]
+        recipients = [(["User" + str(i), str(i)], ["name", "id"]) for i in range(100)]
 
         results = []
         for row, header in recipients:
@@ -154,6 +154,8 @@ class TestSendMailStateManagement:
         """Track rate limit state across batch sends."""
         rate_limit_per_second = 5
         total_to_send = 100
-        batches_needed = (total_to_send + rate_limit_per_second - 1) // rate_limit_per_second
+        batches_needed = (
+            total_to_send + rate_limit_per_second - 1
+        ) // rate_limit_per_second
 
         assert batches_needed == 20
