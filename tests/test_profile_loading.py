@@ -1,7 +1,9 @@
 """Tests for profile loading and SMTP vault integration."""
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 import logging
+from unittest.mock import patch
+
+import pytest
+
 from src.profile_manager import Profile, ProfileLoadError
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class TestProfileVaultLoading:
             assert mock_get.call_count == 1
 
             # Second call - should use cache
-            result = profile.get_smtp_params()
+            profile.get_smtp_params()
             assert mock_get.call_count == 1  # Not called again
 
             # After cache invalidate - fetches again
@@ -145,7 +147,6 @@ class TestLoggingLevels:
 
     def test_no_debug_messages_at_info_level(self):
         """Production logs at INFO level have no debug messages (T038)."""
-        import logging
 
         # Test that debug-prefixed messages are at DEBUG level
         sendmail_path = "/Users/xavier/PycharmProjects/mailing/src/sendMail.py"

@@ -1,7 +1,7 @@
 """Editor profile styling integration."""
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any, cast
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class EditorProfileStyler:
     """Manage profile-specific styling in editor."""
 
-    def __init__(self, profile_config: Dict[str, Any]) -> None:
+    def __init__(self, profile_config: dict[str, Any]) -> None:
         """Initialize with profile configuration.
 
         Args:
@@ -18,7 +18,7 @@ class EditorProfileStyler:
         self.profile_config = profile_config
         self.current_profile = profile_config.get("name", "default")
 
-    def get_profile_template(self) -> Optional[str]:
+    def get_profile_template(self) -> str | None:
         """Get profile's HTML template path.
 
         Returns:
@@ -72,7 +72,7 @@ class EditorProfileStyler:
         return f"profile-{profile_name}"
 
     @staticmethod
-    def create_profile_css(profile_name: str, css_rules: Optional[Dict[str, str]] = None) -> str:
+    def create_profile_css(profile_name: str, css_rules: dict[str, str] | None = None) -> str:
         """Generate CSS for profile styling.
 
         Args:
