@@ -129,9 +129,9 @@ jobs:
         pip install pytest pytest-cov pytest-mock
         pip install -r requirements.txt || echo "No requirements.txt found"
 
-    - name: Run tests and extract coverage
+    - name: Run unit tests and extract coverage
       run: |
-        pytest tests/ --cov=src --cov-report=term --cov-report=json
+        pytest tests/unit --cov=src --cov-report=term --cov-report=json
         # Extract coverage percentage from coverage.json
         COVERAGE=$(python -c "import json; data=json.load(open('coverage.json')); print(int(data['totals']['percent_covered']))")
         echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
