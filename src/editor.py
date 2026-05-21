@@ -713,7 +713,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         import time
         self._current_profile = profile
         profile_cfg = self._config_data.get(profile, {})
-        log.info("DEBUG: _load_profile_defaults: profile=%s, config_data keys=%s, profile_cfg keys=%s",
+        log.debug("DEBUG: _load_profile_defaults: profile=%s, config_data keys=%s, profile_cfg keys=%s",
                  profile, list(self._config_data.keys()), list(profile_cfg.keys()))
 
         # B024-B025: Clear schema cache for new profile to force fresh load
@@ -753,17 +753,17 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             schema_fields = self._get_database_schema()
             t2 = time.time()
             log.info("TIMING: _get_database_schema took %.2fs", t2-t1)
-            log.info("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
+            log.debug("DEBUG: _load_profile_defaults profile=%s db_path=%s schema_fields=%s",
                      profile, self.database_input.text(), schema_fields)
             self._schema_info = DatabaseSchemaInfo(schema_fields)
             self._filter_builder.schema_info = self._schema_info
-            log.info("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
+            log.debug("DEBUG: FilterBuilder schema_info set, calling refresh_schema")
             # Call refresh_schema on table_widget to update all row dropdowns
             t3 = time.time()
             self._filter_builder._table_widget.refresh_schema(self._schema_info)
             t4 = time.time()
             log.info("TIMING: refresh_schema took %.2fs", t4-t3)
-            log.info("DEBUG: refresh_schema called, row_widgets=%d",
+            log.debug("DEBUG: refresh_schema called, row_widgets=%d",
                      len(self._filter_builder._table_widget._row_widgets))
 
         self.message_input.setPlainText(str(profile_cfg.get("default_message", "")))
@@ -781,6 +781,10 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
         self.load_current_filter(profile)
         self.filter_and_display_records()
+
+        # Reload stylesheet when profile changes (EditorWindow only)
+        if hasattr(self, "_load_default_stylesheet"):
+            self._load_default_stylesheet()
 
     def load_current_filter(self, profile: str) -> None:
         """Load filter from profile config and display in filter field (T036)."""
@@ -983,21 +987,21 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         # B047: Handle both uppercase and lowercase config keys
         sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
         sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
-        log.info("DEBUG: _get_database_schema: profile=%s, db_path=%s, profile_cfg keys=%s, SHEETID=%s, SA=%s",
+        log.debug("DEBUG: _get_database_schema: profile=%s, db_path=%s, profile_cfg keys=%s, SHEETID=%s, SA=%s",
                  self._current_profile, db_path, list(profile_cfg.keys()), sheet_id_val, sa_val)
         if not db_path and sheet_id_val:
             # Google Sheets profile - try to load schema from Google Sheets
             sa = sa_val
             sheet_id = sheet_id_val
-            log.info("DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa, sheet_id)
+            log.debug("DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa, sheet_id)
             if sa and sheet_id:
                 def _load_gsheet_schema() -> list[str]:
                     try:
                         from sendMail import get_google_sheets_schema  # Import directly
 
-                        log.info("DEBUG: Calling get_google_sheets_schema(%s, %s)", str(sa), str(sheet_id))
+                        log.debug("DEBUG: Calling get_google_sheets_schema(%s, %s)", str(sa), str(sheet_id))
                         result = get_google_sheets_schema(str(sa), str(sheet_id))
-                        log.info("DEBUG: get_google_sheets_schema returned: %s", result)
+                        log.debug("DEBUG: get_google_sheets_schema returned: %s", result)
                         if isinstance(result, list):
                             return result
                     except Exception as e:
@@ -1005,7 +1009,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
                     return []
 
                 schema = cast(list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema))
-                log.info("DEBUG: Final schema from cache: %s", schema)
+                log.debug("DEBUG: Final schema from cache: %s", schema)
                 return schema
             return []
 
@@ -3313,9 +3317,9 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         log.info("Available profiles: %s", list(profiles.keys()))
         if profile_name in profiles:
             profile_info = profiles[profile_name]
-            log.info("Profile keys in config: %s", list(profile_info.keys())[:10])  # First 10 keys
+            log.debug("Profile keys in config: %s", list(profile_info.keys())[:10])  # First 10 keys
             default_path = profile_info.get("default_documents_path")
-            log.info("Profile '%s' default_documents_path: %r", profile_name, default_path)
+            log.debug("Profile '%s' default_documents_path: %r", profile_name, default_path)
             # Use profile's path if set (not None and not empty); fallback to system default
             if default_path and default_path != "":
                 self._default_documents_path = default_path
@@ -3384,7 +3388,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return
         # Use profile's default_documents_path; fallback to system default documents folder
         default_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
-        log.info("_menu_open: using directory: %r (current profile: %s)", default_dir, getattr(self, "_current_profile", "unknown"))
+        log.debug("_menu_open: using directory: %r (current profile: %s)", default_dir, getattr(self, "_current_profile", "unknown"))
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Open File",
@@ -3466,17 +3470,19 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return {}
 
     def _load_default_stylesheet(self) -> None:
-        """Load the default profile's stylesheet if available."""
+        """Load the current profile's stylesheet if available."""
         try:
             config_path = self._resolve_send_config_path()
             config_data = self._load_send_config(config_path)
-            styles_path = config_data.get("default", {}).get("styles")
+            # Use current profile, fallback to "default" if not set
+            profile_name = self._current_profile or "default"
+            styles_path = config_data.get(profile_name, {}).get("styles")
             if styles_path and isinstance(styles_path, str):
                 abs_path = os.path.abspath(styles_path)
                 if os.path.exists(abs_path):
                     self._bridge.css_changed.emit(abs_path)
         except Exception as exc:
-            log.debug("Could not load default stylesheet: %s", exc)
+            log.debug("Could not load profile stylesheet: %s", exc)
 
     def _send_with_sendmail(self, dialog: _SendDialog) -> str:
         """Run sendMail with the options selected in the dialog."""
