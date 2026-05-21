@@ -36,6 +36,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        timeout-minutes: 10
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -52,15 +53,16 @@ jobs:
         if: runner.os != 'macOS'
         shell: bash
         run: |
-          python - <<'PY'
-          import shutil
-          import os
-          from pathlib import Path
-
-          root = Path("dist")
-          archive_name = f"sendMailEditor-{os.environ['RUNNER_OS'].lower()}"
-          shutil.make_archive(str(root / archive_name), "zip", root_dir=root, base_dir="sendMailEditor")
-          PY
+          cd dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # Windows: single exe file
+            7z a sendMailEditor-windows.zip sendMailEditor.exe
+          else
+            # Linux: single executable file
+            tar czf sendMailEditor-linux.tar.gz sendMailEditor
+            # Also create zip for consistency
+            zip -j sendMailEditor-linux.zip sendMailEditor
+          fi
 
       - name: Create macOS DMG
         if: runner.os == 'macOS'
@@ -82,6 +84,7 @@ jobs:
           name: sendMailEditor-${{ matrix.os }}
           path: |
             dist/sendMailEditor-*.zip
+            dist/sendMailEditor-*.tar.gz
             dist/sendMailEditor-macos.dmg
           if-no-files-found: ignore
 
@@ -127,5 +130,6 @@ jobs:
           prerelease: false
           files: |
             sendMailEditor-linux.zip
+            sendMailEditor-linux.tar.gz
             sendMailEditor-windows.zip
             sendMailEditor-macos.dmg
