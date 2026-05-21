@@ -61,6 +61,7 @@ import requests
 import yaml
 from bs4 import BeautifulSoup
 from getSecrets import get_secret
+from profile_manager import Profile, ProfileLoadError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -1322,14 +1323,34 @@ def get_newsletter_name(files: list[str], args: Any) -> Any:
 def _load_config_with_secrets(args: Any) -> dict[str, Any]:
     """Merge the profile config with any vault secrets and CLI overrides."""
     config = args.conf[args.profile]
+
+    # Try Profile class for vault_key, fall back to legacy MAILCONFIG
     try:
-        secret = get_secret(config["MAILCONFIG"])
-        if secret is None:
-            log.warning("No secret configuration found")
-            secret = {}
+        vault_key = config.get("vault_key") or config.get("MAILCONFIG")
+        if vault_key:
+            profile = Profile(args.profile, config)
+            secret = profile.load_smtp_from_vault()
+        else:
+            # No vault key configured, use legacy behavior
+            secret = None
+    except ProfileLoadError as e:
+        log.error(f"Failed to load profile '{args.profile}': {str(e)}")
+        raise
     except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
         log.debug(f"No secret configuration found, using config file only: {e}")
-        secret = {}
+        secret = None
+
+    if secret is None:
+        # Try legacy get_secret approach for backward compatibility
+        try:
+            secret = get_secret(config.get("MAILCONFIG", ""))
+            if secret is None:
+                log.warning("No secret configuration found")
+                secret = {}
+        except Exception as e:  # noqa: BLE001
+            log.debug(f"No secret configuration found, using config file only: {e}")
+            secret = {}
+
     config = {**secret, **config}
     for k, v in vars(args).items():
         if v is not None or k not in config:

@@ -107,3 +107,10 @@ CI enforces:
 - This project uses `mypy --strict` and `ruff check .`.
 - Never use `type: ignore` without a human-approved justification.
 - All function signatures must be fully typed.
+
+## Active Technologies
+- Python 3.12+ + google-api-python-client, gspread, beautifulsoup4, markdown2, pillow, pyyaml, get-hc-secrets, PyQt6, PyQt6-WebEngine (008-fix-profile-loading)
+- YAML config files (config.yml), Google Sheets, Google Drive, local filesystem (008-fix-profile-loading)
+
+## Recent Changes
+- 008-fix-profile-loading: Added Python 3.12+ + google-api-python-client, gspread, beautifulsoup4, markdown2, pillow, pyyaml, get-hc-secrets, PyQt6, PyQt6-WebEngine
