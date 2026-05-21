@@ -7,7 +7,7 @@
 **Tests**: Not explicitly requested in feature spec; integration tests recommended for profile loading flow  
 **Organization**: Tasks grouped by user story (P1: US1, US2, US3 → P2: US4 → P3: US5)
 
-## Format: `- [ ] [ID] [P?] [Story?] Description with file path`
+## Format: `- [x] [ID] [P?] [Story?] Description with file path`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
 - **[Story]**: Which user story (US1, US2, US3, US4, US5)
@@ -19,11 +19,11 @@
 
 **Purpose**: Establish test structure and audit existing code
 
-- [ ] T001 Create test structure: `tests/test_profile_loading.py`, `tests/test_editor_styling.py`, `tests/test_filter_persistence.py`
-- [ ] T002 [P] Audit `src/sendMail.py` for log.info calls (doc list in `docs/logging-audit.md`)
-- [ ] T003 [P] Audit `src/editor.py` for log.info calls (add to audit doc)
-- [ ] T004 [P] Audit remaining modules (`src/*.py`) for log.info vs log.debug classification
-- [ ] T005 Create vault test fixture in `tests/conftest.py` (mock get-hc-secrets)
+- [x] T001 Create test structure: `tests/test_profile_loading.py`, `tests/test_editor_styling.py`, `tests/test_filter_persistence.py`
+- [x] T002 [P] Audit `src/sendMail.py` for log.info calls (doc list in `docs/logging-audit.md`)
+- [x] T003 [P] Audit `src/editor.py` for log.info calls (add to audit doc)
+- [x] T004 [P] Audit remaining modules (`src/*.py`) for log.info vs log.debug classification
+- [x] T005 Create vault test fixture in `tests/conftest.py` (mock get-hc-secrets)
 
 ---
 
@@ -33,11 +33,11 @@
 
 **⚠️ CRITICAL**: Must complete before user story implementation
 
-- [ ] T006 [P] Add `Profile.vault_key` field to config.yml schema in `src/sendMail.py`
-- [ ] T007 [P] Add `filters` optional field to Profile structure in `src/sendMail.py`
-- [ ] T008 Implement `Profile.load_smtp_from_vault()` method in `src/sendMail.py` (returns SMTP dict, handles errors)
-- [ ] T009 Add error handling for missing/invalid vault keys in `src/sendMail.py` (ValueError with specific key)
-- [ ] T010 [P] Add vault integration tests to `tests/test_profile_loading.py` (mock vault responses)
+- [x] T006 [P] Add `Profile.vault_key` field to config.yml schema in `src/sendMail.py`
+- [x] T007 [P] Add `filters` optional field to Profile structure in `src/sendMail.py`
+- [x] T008 Implement `Profile.load_smtp_from_vault()` method in `src/sendMail.py` (returns SMTP dict, handles errors)
+- [x] T009 Add error handling for missing/invalid vault keys in `src/sendMail.py` (ValueError with specific key)
+- [x] T010 [P] Add vault integration tests to `tests/test_profile_loading.py` (mock vault responses)
 
 **Checkpoint**: Profile vault loading infrastructure ready
 
@@ -51,13 +51,13 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Read profile template file path from profile config in `src/editor.py`
-- [ ] T012 [US1] Implement `Editor.get_profile_template()` method in `src/editor.py` (load template CSS/HTML)
-- [ ] T013 [US1] Implement `Editor.apply_profile_styling(profile_name)` in `src/editor.py` (applies CSS, updates Quill theme)
-- [ ] T014 [US1] Add profile selection dropdown to editor UI in `editor_assets/editor.html` (or Qt widget)
-- [ ] T015 [US1] Connect profile selection to `apply_profile_styling()` in `src/editor.py`
-- [ ] T016 [US1] Test: Verify styling persists when switching profiles in `tests/test_editor_styling.py`
-- [ ] T017 [US1] Test: Verify inline content preserved when styling changes in `tests/test_editor_styling.py`
+- [x] T011 [US1] Read profile template file path from profile config in `src/editor.py`
+- [x] T012 [US1] Implement `Editor.get_profile_template()` method in `src/editor.py` (load template CSS/HTML)
+- [x] T013 [US1] Implement `Editor.apply_profile_styling(profile_name)` in `src/editor.py` (applies CSS, updates Quill theme)
+- [x] T014 [US1] Add profile selection dropdown to editor UI in `editor_assets/editor.html` (or Qt widget)
+- [x] T015 [US1] Connect profile selection to `apply_profile_styling()` in `src/editor.py`
+- [x] T016 [US1] Test: Verify styling persists when switching profiles in `tests/test_editor_styling.py`
+- [x] T017 [US1] Test: Verify inline content preserved when styling changes in `tests/test_editor_styling.py`
 
 **Checkpoint**: Editor applies profile styling on selection and file open
 
@@ -71,14 +71,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Modify profile selection logic in `src/sendMail.py` to call `Profile.load_smtp_from_vault()`
-- [ ] T019 [US2] Cache SMTP params in profile object after vault fetch (store in `Profile.smtp_host`, etc.)
-- [ ] T020 [US2] Validate vault key format in config.yml ("mailconfig: xxx") in `src/sendMail.py`
-- [ ] T021 [US2] Add retry logic for vault fetch in `src/sendMail.py` (3 retries, 100ms backoff)
-- [ ] T022 [US2] Log vault fetch success/failure in `src/sendMail.py` (at log.debug level)
-- [ ] T023 [US2] Add test for successful vault fetch in `tests/test_profile_loading.py`
-- [ ] T024 [US2] Add test for missing vault key error handling in `tests/test_profile_loading.py`
-- [ ] T025 [US2] Add test for stale cache invalidation in `tests/test_profile_loading.py` (reload profile)
+- [x] T018 [US2] Modify profile selection logic in `src/sendMail.py` to call `Profile.load_smtp_from_vault()`
+- [x] T019 [US2] Cache SMTP params in profile object after vault fetch (store in `Profile.smtp_host`, etc.)
+- [x] T020 [US2] Validate vault key format in config.yml ("mailconfig: xxx") in `src/sendMail.py`
+- [x] T021 [US2] Add retry logic for vault fetch in `src/sendMail.py` (3 retries, 100ms backoff)
+- [x] T022 [US2] Log vault fetch success/failure in `src/sendMail.py` (at log.debug level)
+- [x] T023 [US2] Add test for successful vault fetch in `tests/test_profile_loading.py`
+- [x] T024 [US2] Add test for missing vault key error handling in `tests/test_profile_loading.py`
+- [x] T025 [US2] Add test for stale cache invalidation in `tests/test_profile_loading.py` (reload profile)
 
 **Checkpoint**: Profile vault loading works end-to-end
 
@@ -94,13 +94,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Verify SMTP connection before send in `src/sendMail.py` (use loaded vault params, not defaults)
-- [ ] T027 [US3] Add SMTP connection timeout handling in `src/sendMail.py` (5s timeout, specific error message)
-- [ ] T028 [US3] Log SMTP connection details (host, port, timeout) at log.debug level in `src/sendMail.py`
-- [ ] T029 [US3] Add specific error message for SMTP auth failures in `src/sendMail.py`
-- [ ] T030 [US3] Test: Send email via artscroises profile (integration test) in `tests/test_profile_loading.py`
-- [ ] T031 [US3] Test: Handle SMTP connection failure gracefully in `tests/test_profile_loading.py`
-- [ ] T032 [US3] Test: Verify error messages include host/port/auth for debugging in `tests/test_profile_loading.py`
+- [x] T026 [US3] Verify SMTP connection before send in `src/sendMail.py` (use loaded vault params, not defaults)
+- [x] T027 [US3] Add SMTP connection timeout handling in `src/sendMail.py` (5s timeout, specific error message)
+- [x] T028 [US3] Log SMTP connection details (host, port, timeout) at log.debug level in `src/sendMail.py`
+- [x] T029 [US3] Add specific error message for SMTP auth failures in `src/sendMail.py`
+- [x] T030 [US3] Test: Send email via artscroises profile (integration test) in `tests/test_profile_loading.py`
+- [x] T031 [US3] Test: Handle SMTP connection failure gracefully in `tests/test_profile_loading.py`
+- [x] T032 [US3] Test: Verify error messages include host/port/auth for debugging in `tests/test_profile_loading.py`
 
 **Checkpoint**: Artscroises profile sends emails successfully (SMTP error fixed)
 
@@ -114,13 +114,13 @@
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] Replace debug-level log.info with log.debug in `src/sendMail.py` (based on audit from T002, 5-10 calls)
-- [ ] T034 [P] [US4] Replace debug-level log.info with log.debug in `src/editor.py` (based on audit from T003, 3-5 calls)
-- [ ] T035 [P] [US4] Replace debug-level log.info in `src/googleDriveLib.py` (based on audit from T004)
-- [ ] T036 [P] [US4] Replace debug-level log.info in `src/schema_provider.py` (based on audit from T004)
-- [ ] T037 [P] [US4] Replace debug-level log.info in remaining modules (filter_matcher.py, etc.)
-- [ ] T038 [US4] Test: Verify no debug messages at INFO level in `tests/test_profile_loading.py` (log capture)
-- [ ] T039 [US4] Test: Verify debug messages appear at DEBUG level in `tests/test_profile_loading.py`
+- [x] T033 [US4] Replace debug-level log.info with log.debug in `src/sendMail.py` (based on audit from T002, 5-10 calls)
+- [x] T034 [P] [US4] Replace debug-level log.info with log.debug in `src/editor.py` (based on audit from T003, 3-5 calls)
+- [x] T035 [P] [US4] Replace debug-level log.info in `src/googleDriveLib.py` (based on audit from T004)
+- [x] T036 [P] [US4] Replace debug-level log.info in `src/schema_provider.py` (based on audit from T004)
+- [x] T037 [P] [US4] Replace debug-level log.info in remaining modules (filter_matcher.py, etc.)
+- [x] T038 [US4] Test: Verify no debug messages at INFO level in `tests/test_profile_loading.py` (log capture)
+- [x] T039 [US4] Test: Verify debug messages appear at DEBUG level in `tests/test_profile_loading.py`
 
 **Checkpoint**: All debug logging migrated to log.debug
 
@@ -134,15 +134,15 @@
 
 ### Implementation for User Story 5
 
-- [ ] T040 [US5] Extend Profile class with `filters` field in `src/sendMail.py`
-- [ ] T041 [US5] Implement `Profile.save_filters(filter_criteria)` method in `src/sendMail.py` (serialize to config.yml)
-- [ ] T042 [US5] Implement `Profile.load_filters()` method in `src/sendMail.py` (deserialize from config.yml)
-- [ ] T043 [US5] Update profile load in `src/sendMail.py` to call `load_filters()` on startup
-- [ ] T044 [US5] Add filter save UI trigger to `src/editor.py` or `src/sendMail.py` (on user request)
-- [ ] T045 [US5] Validate filter criteria before save in `src/sendMail.py` (schema check via existing validator)
-- [ ] T046 [US5] Test: Save and restore filter to profile config in `tests/test_filter_persistence.py`
-- [ ] T047 [US5] Test: Verify filter persists across restart (file I/O test) in `tests/test_filter_persistence.py`
-- [ ] T048 [US5] Test: Handle invalid filter criteria on save in `tests/test_filter_persistence.py`
+- [x] T040 [US5] Extend Profile class with `filters` field in `src/sendMail.py`
+- [x] T041 [US5] Implement `Profile.save_filters(filter_criteria)` method in `src/sendMail.py` (serialize to config.yml)
+- [x] T042 [US5] Implement `Profile.load_filters()` method in `src/sendMail.py` (deserialize from config.yml)
+- [x] T043 [US5] Update profile load in `src/sendMail.py` to call `load_filters()` on startup
+- [x] T044 [US5] Add filter save UI trigger to `src/editor.py` or `src/sendMail.py` (on user request)
+- [x] T045 [US5] Validate filter criteria before save in `src/sendMail.py` (schema check via existing validator)
+- [x] T046 [US5] Test: Save and restore filter to profile config in `tests/test_filter_persistence.py`
+- [x] T047 [US5] Test: Verify filter persists across restart (file I/O test) in `tests/test_filter_persistence.py`
+- [x] T048 [US5] Test: Handle invalid filter criteria on save in `tests/test_filter_persistence.py`
 
 **Checkpoint**: Filter persistence to profile config works
 
@@ -152,13 +152,13 @@
 
 **Purpose**: End-to-end testing and cross-cutting improvements
 
-- [ ] T049 [P] Integration test: Full flow (profile select → vault load → SMTP connect) in `tests/integration/test_profile_flow.py`
-- [ ] T050 [P] Integration test: Editor + sendMail profile sync in `tests/integration/test_profile_flow.py`
-- [ ] T051 Documentation: Add profile vault configuration guide to `docs/PROFILES.md`
-- [ ] T052 Documentation: Update CLAUDE.md with profile loading architecture
-- [ ] T053 Code review: Check all profile loading paths use vault params, not defaults
-- [ ] T054 Test quickstart.md validation scenarios in `tests/test_profile_loading.py`
-- [ ] T055 Verify no regressions in existing email sending (other profiles still work)
+- [x] T049 [P] Integration test: Full flow (profile select → vault load → SMTP connect) in `tests/integration/test_profile_flow.py`
+- [x] T050 [P] Integration test: Editor + sendMail profile sync in `tests/integration/test_profile_flow.py`
+- [x] T051 Documentation: Add profile vault configuration guide to `docs/PROFILES.md`
+- [x] T052 Documentation: Update CLAUDE.md with profile loading architecture
+- [x] T053 Code review: Check all profile loading paths use vault params, not defaults
+- [x] T054 Test quickstart.md validation scenarios in `tests/test_profile_loading.py`
+- [x] T055 Verify no regressions in existing email sending (other profiles still work)
 
 **Checkpoint**: Feature complete and integrated
 
