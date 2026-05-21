@@ -193,8 +193,8 @@ def open_google_db_members_sheet(sa: str, sheet_id: str) -> Any:
     ]
 
     creds = ServiceAccountCredentials.from_json_keyfile_dict(
-        get_secret(sa), scope
-    )  # pyright: ignore
+        get_secret(sa), cast(Any, scope)
+    )
     gc = gspread.authorize(creds)  # pyright: ignore
 
     spreadsheet_id = get_secret(sheet_id)["ID"]
