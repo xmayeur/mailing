@@ -76,13 +76,16 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
+    a.binaries if sys.platform == "darwin" else [],
+    a.zipfiles if sys.platform == "darwin" else [],
+    a.datas if sys.platform == "darwin" else [],
+    exclude_binaries=(sys.platform == "darwin"),
     name="sendMailEditor",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
     console=False,          # windowed app (no console window)
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -90,21 +93,21 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon="images/mail.png" if sys.platform != "linux" else None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="sendMailEditor",
+    onefile=(sys.platform != "darwin"),  # single file for Windows/Linux, bundle for macOS
 )
 
 # macOS: bundle as .app (required for Chromium helper processes)
 if sys.platform == "darwin":
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name="sendMailEditor",
+    )
     app = BUNDLE(
         coll,
         name="sendMailEditor.app",
