@@ -452,7 +452,9 @@ def get_smtp_connection(param: Any) -> SMTP | None:
     """
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    context.minimum_version = ssl.TLSVersion.TLSv1_3
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
