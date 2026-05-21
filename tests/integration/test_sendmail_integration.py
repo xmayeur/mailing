@@ -13,7 +13,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-import sendMail as sm
+import sendMail as sm  # noqa: E402
 
 
 class TestSendMailFullWorkflow:
