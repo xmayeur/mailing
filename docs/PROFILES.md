@@ -9,7 +9,7 @@ Email profiles manage SMTP configuration, styling, and filtering for email campa
 ```yaml
 profiles:
   artscroises:
-    vault_key: "mailconfig: artscroises"    # Secrets Manager key for SMTP credentials
+   mailconfig: "artscroises"    # Secrets Manager key for SMTP credentials
     sender: "newsletter@artscroises.com"    # Default sender email
     template_file: "templates/artscroises.html"  # Profile styling template (optional)
     default_message: "Default newsletter content"
@@ -26,28 +26,38 @@ profiles:
 
 1. Store SMTP credentials in Secrets Manager (vault):
    ```bash
-   vault write secret/mailconfig/artscroises \
-     host=smtp.artscroises.com \
-     port=587 \
+   vault write secret/artscroises \
+     smtp_host=smtp.artscroises.com \
+     smtp_port=587 \
      username=artscroises_user \
      password=artscroises_password \
-     security=tls
+     sender=mailing@artscroises.be \
+     sendername="Arts Croisés asbl"
    ```
 
 2. Reference vault key in profile config:
    ```yaml
    artscroises:
-     vault_key: "mailconfig: artscroises"
+     mailconfig: "artscroises"
    ```
 
 ### Required SMTP Fields
 
-The vault key must contain:
-- `host`: SMTP server hostname
-- `port`: SMTP server port (typically 587 for TLS, 465 for SSL)
+The vault key must contain at minimum:
+- `smtp_host`: SMTP server hostname
+- `smtp_port`: SMTP server port (typically 587 for TLS)
 - `username`: SMTP authentication username
 - `password`: SMTP authentication password
-- `security`: TLS/SSL method ("tls", "ssl", or "none")
+
+Optional fields (used when present):
+- `imap_host`: IMAP server hostname
+- `imap_port`: IMAP server port
+- `sender`: Email address to use as sender
+- `sendername`: Display name for sender
+- `sent_folder`: Name of sent items folder (default: "sent")
+- `max_mails_per_hour`: Rate limit
+- `max_addr_per_mail`: Batch size limit
+- `pause`: Pause between batches (seconds)
 
 ### Error Handling
 
