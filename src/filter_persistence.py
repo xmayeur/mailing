@@ -1,6 +1,6 @@
 """Filter persistence to profile configuration."""
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class FilterPersistence:
             return None
 
         logger.debug(f"Loaded filters for profile '{self.profile_name}': {filters}")
-        return filters
+        return cast(Dict[str, Any], filters)
 
     def validate_filter_criteria(self, criteria: Dict[str, Any], schema_columns: list[str]) -> bool:
         """Validate filter criteria against schema columns.
