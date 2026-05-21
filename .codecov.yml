@@ -2,11 +2,21 @@ coverage:
   precision: 2
   round: down
   range: "70..100"
+  status:
+    project: false
+    patch: false
+    changes: false
 
 ignore:
   - "tests"
+  - "tests/**"
   - "src/setup.py"
   - "src/visual_filter_builder.py"
+  - "docs"
+  - "docs/**"
+  - "scripts"
+  - "scripts/**"
 
 codecov:
   require_ci_to_pass: false
+  max_report_age: false
