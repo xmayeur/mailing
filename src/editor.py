@@ -103,7 +103,7 @@ class _LogCapture(logging.Handler):
 # ---------------------------------------------------------------------------
 # Qt imports
 # ---------------------------------------------------------------------------
-from PyQt6.QtCore import (
+from PyQt6.QtCore import (  # noqa: E402
     QByteArray,
     QObject,
     QSize,
@@ -112,7 +112,7 @@ from PyQt6.QtCore import (
     QUrl,
     pyqtSignal,
     pyqtSlot,
-)  # noqa: E402
+)
 from PyQt6.QtGui import QIcon, QPixmap  # noqa: E402
 from PyQt6.QtWebChannel import QWebChannel  # noqa: E402
 from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402

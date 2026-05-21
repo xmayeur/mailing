@@ -1244,9 +1244,9 @@ def _evaluate_condition(field_value: str, op: str, test_value: Any, _k: str) -> 
         return _eval_string(field_value, test_value, op)
 
 
-def filter(
-    filter: dict[str, str], row: list[Any], indices: dict[str, int]
-) -> bool:  # noqa: A001,A002
+def filter(  # noqa: A001
+    filter: dict[str, str], row: list[Any], indices: dict[str, int]  # noqa: A002
+) -> bool:
     """Filter row: return True if should be EXCLUDED, False if INCLUDED.
 
     Applies filter conditions to subscriber row. All filter conditions must
