@@ -1,4 +1,5 @@
 """Filter persistence to profile configuration."""
+
 import logging
 from typing import Any, cast
 

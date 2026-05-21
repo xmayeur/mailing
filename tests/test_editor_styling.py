@@ -1,4 +1,5 @@
 """Tests for editor profile styling application."""
+
 import tempfile
 from pathlib import Path
 

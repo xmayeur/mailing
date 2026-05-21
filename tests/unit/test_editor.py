@@ -4,6 +4,7 @@ Unit tests for src/editor.py
 All PyQt6 modules are mocked before import so these tests run headlessly
 on CI without a display server, following the same pattern used in test_sendMail.py.
 """
+
 # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
 # mypy: ignore-errors
 
@@ -168,9 +169,9 @@ sys.modules["PyQt6.QtCore"].Qt = MagicMock()  # pyright: ignore
 
 sys.modules["PyQt6.QtWidgets"].QMainWindow = _FakeQMainWindow  # pyright: ignore
 sys.modules["PyQt6.QtWidgets"].QDialog = _FakeQDialog  # pyright: ignore
-sys.modules[
-    "PyQt6.QtWidgets"
-].QDialog.DialogCode = _FakeQDialog.DialogCode  # pyright: ignore
+sys.modules["PyQt6.QtWidgets"].QDialog.DialogCode = (
+    _FakeQDialog.DialogCode
+)  # pyright: ignore
 sys.modules["PyQt6.QtWidgets"].QSpinBox = MagicMock()  # pyright: ignore
 
 # Add source directory to path so editor can be imported
@@ -1195,21 +1196,23 @@ class TestEditorWindowHelpers:
         return win
 
     def test_editor_window_init_paths(self, monkeypatch):
-        with patch.object(
-            editor.EditorWindow, "_load_editor_page", autospec=True
-        ) as mock_load, patch.object(
-            editor.EditorWindow, "open_file", autospec=True
-        ) as mock_open:
+        with (
+            patch.object(
+                editor.EditorWindow, "_load_editor_page", autospec=True
+            ) as mock_load,
+            patch.object(editor.EditorWindow, "open_file", autospec=True) as mock_open,
+        ):
             window = editor.EditorWindow()
             assert window._file_path is None
             mock_load.assert_called_once_with(window, "")  # pyright: ignore
             mock_open.assert_not_called()  # pyright: ignore
 
-        with patch.object(
-            editor.EditorWindow, "_load_editor_page", autospec=True
-        ) as mock_load, patch.object(
-            editor.EditorWindow, "open_file", autospec=True
-        ) as mock_open:
+        with (
+            patch.object(
+                editor.EditorWindow, "_load_editor_page", autospec=True
+            ) as mock_load,
+            patch.object(editor.EditorWindow, "open_file", autospec=True) as mock_open,
+        ):
             window = editor.EditorWindow(file_path="sample.md")
             mock_open.assert_called_once_with(window, "sample.md")  # pyright: ignore
             mock_load.assert_not_called()  # pyright: ignore
@@ -1271,10 +1274,13 @@ class TestEditorWindowHelpers:
             win._menu_open()
         win.open_file.assert_not_called()  # pyright: ignore
 
-        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(
-            editor.QFileDialog,
-            "getOpenFileName",
-            return_value=(str(tmp_path / "doc.md"), ""),
+        with (
+            patch.object(win, "_ask_save_if_dirty", return_value=True),
+            patch.object(
+                editor.QFileDialog,
+                "getOpenFileName",
+                return_value=(str(tmp_path / "doc.md"), ""),
+            ),
         ):
             win._menu_open()
         win.open_file.assert_called_with(str(tmp_path / "doc.md"))  # pyright: ignore
@@ -1289,10 +1295,13 @@ class TestEditorWindowHelpers:
         )  # pyright: ignore
 
         (template_dir / "template.md").unlink()
-        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(
-            editor.QFileDialog,
-            "getOpenFileName",
-            return_value=(str(tmp_path / "fallback.md"), ""),
+        with (
+            patch.object(win, "_ask_save_if_dirty", return_value=True),
+            patch.object(
+                editor.QFileDialog,
+                "getOpenFileName",
+                return_value=(str(tmp_path / "fallback.md"), ""),
+            ),
         ):
             win._open_template()
         win.open_file.assert_called_with(
@@ -1371,11 +1380,14 @@ class TestEditorWindowHelpers:
         assert win._ask_save_if_dirty() is True
 
         win._bridge.is_dirty = True
-        with patch.object(
-            editor.QMessageBox,
-            "question",
-            return_value=editor.QMessageBox.StandardButton.Save,
-        ), patch.object(win, "_save", return_value=True) as mock_save:
+        with (
+            patch.object(
+                editor.QMessageBox,
+                "question",
+                return_value=editor.QMessageBox.StandardButton.Save,
+            ),
+            patch.object(win, "_save", return_value=True) as mock_save,
+        ):
             assert win._ask_save_if_dirty() is True
             mock_save.assert_called_once()  # pyright: ignore
 

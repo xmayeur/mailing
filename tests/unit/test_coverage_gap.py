@@ -411,8 +411,9 @@ class TestCoverageGap2:
 
     def test_get_google_sheets_schema_empty_data(self):
         """Cover line 233: empty data returns []."""
-        with patch("sendMail.open_google_db_members_sheet") as mock_open, patch(
-            "sendMail.read_all_sheet", return_value=[]
+        with (
+            patch("sendMail.open_google_db_members_sheet") as mock_open,
+            patch("sendMail.read_all_sheet", return_value=[]),
         ):
             mock_open.return_value = MagicMock()
             result = sendMail.get_google_sheets_schema("sa", "sheet_id")
@@ -427,14 +428,12 @@ class TestCoverageGap2:
         mock_service = MagicMock()
         mock_files = [{"id": "f1", "name": "news.html"}]
 
-        with patch(
-            "sendMail.gd.connect_google_driver", return_value=mock_service
-        ), patch("sendMail.gd.get_files", return_value={"files": mock_files}), patch(
-            "sendMail.gd.download_file"
-        ), patch(
-            "sendMail.glob", return_value=[]
-        ), patch(
-            "sendMail.os.remove"
+        with (
+            patch("sendMail.gd.connect_google_driver", return_value=mock_service),
+            patch("sendMail.gd.get_files", return_value={"files": mock_files}),
+            patch("sendMail.gd.download_file"),
+            patch("sendMail.glob", return_value=[]),
+            patch("sendMail.os.remove"),
         ):
             files, service, gd_files = sendMail.process_attachments(args, config)
 
@@ -490,13 +489,12 @@ class TestCoverageGap2:
         mock_msg._temp_dirs = [temp_dir]
         mock_recipients = ["to@test.com"]
 
-        with patch(
-            "sendMail.build_email", return_value=(mock_msg, mock_recipients)
-        ), patch("sendMail.send_mail", return_value=True), patch(
-            "sendMail.log"
-        ) as mock_log, patch(
-            "sendMail.shutil.rmtree"
-        ) as mock_rmtree:
+        with (
+            patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)),
+            patch("sendMail.send_mail", return_value=True),
+            patch("sendMail.log") as mock_log,
+            patch("sendMail.shutil.rmtree") as mock_rmtree,
+        ):
             sendMail._build_and_send(param, ["to@test.com"], ["to@test.com"], ["email"])
 
         mock_rmtree.assert_called_once_with(temp_dir)
@@ -516,13 +514,12 @@ class TestCoverageGap2:
         mock_msg._temp_dirs = ["/nonexistent/dir"]
         mock_recipients = ["to@test.com"]
 
-        with patch(
-            "sendMail.build_email", return_value=(mock_msg, mock_recipients)
-        ), patch("sendMail.send_mail", return_value=True), patch(
-            "sendMail.shutil.rmtree", side_effect=OSError("no such dir")
-        ), patch(
-            "sendMail.log"
-        ) as mock_log:
+        with (
+            patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)),
+            patch("sendMail.send_mail", return_value=True),
+            patch("sendMail.shutil.rmtree", side_effect=OSError("no such dir")),
+            patch("sendMail.log") as mock_log,
+        ):
             sendMail._build_and_send(param, ["to@test.com"], ["to@test.com"], ["email"])
 
         mock_log.error.assert_called()
@@ -564,12 +561,12 @@ class TestCoverageGap2:
         mock_msg._temp_dirs = []
         mock_recipients = ["a@b.com"]
 
-        with patch(
-            "sendMail.get_subscriber_reader", return_value=(iter(rows), mock_file)
-        ), patch(
-            "sendMail.build_email", return_value=(mock_msg, mock_recipients)
-        ), patch(
-            "sendMail.send_mail", return_value=True
+        with (
+            patch(
+                "sendMail.get_subscriber_reader", return_value=(iter(rows), mock_file)
+            ),
+            patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)),
+            patch("sendMail.send_mail", return_value=True),
         ):
             sendMail.generate_mailing(param)
 
@@ -611,9 +608,11 @@ class TestCoverageGap2:
         mock_service = MagicMock()
         google_drive_files = [{"id": "f1", "name": "news.html"}]
 
-        with patch("sendMail.gd.rename_file") as mock_rename, patch(
-            "sendMail.glob", return_value=[str(input_file)]
-        ), patch("sendMail.os.remove") as mock_remove:
+        with (
+            patch("sendMail.gd.rename_file") as mock_rename,
+            patch("sendMail.glob", return_value=[str(input_file)]),
+            patch("sendMail.os.remove") as mock_remove,
+        ):
             sendMail._post_send_cleanup(mock_service, google_drive_files)
 
         mock_rename.assert_called_once_with(mock_service, "f1", "published_news.html")
@@ -656,25 +655,26 @@ class TestCoverageGap2:
             filter_applied["filter"] = param.filter
             return "OK"
 
-        with patch(
-            "sendMail._load_config_with_secrets",
-            return_value={
-                "sender": "me@test.com",
-                "sendername": "Me",
-                "subject": "Sub",
-                "message": "Body",
-                "database": "data.csv",
-                "filter": {"email": "is not empty"},
-                "test": False,
-            },
-        ), patch("sendMail.check_mandatory_param", return_value=True), patch(
-            "sendMail.process_attachments", return_value=(["file.html"], None, [])
-        ), patch(
-            "sendMail._prepare_message_body", side_effect=lambda p, c, f: p
-        ), patch(
-            "sendMail.generate_mailing", side_effect=capture_filter
-        ), patch(
-            "sendMail._post_send_cleanup"
+        with (
+            patch(
+                "sendMail._load_config_with_secrets",
+                return_value={
+                    "sender": "me@test.com",
+                    "sendername": "Me",
+                    "subject": "Sub",
+                    "message": "Body",
+                    "database": "data.csv",
+                    "filter": {"email": "is not empty"},
+                    "test": False,
+                },
+            ),
+            patch("sendMail.check_mandatory_param", return_value=True),
+            patch(
+                "sendMail.process_attachments", return_value=(["file.html"], None, [])
+            ),
+            patch("sendMail._prepare_message_body", side_effect=lambda p, c, f: p),
+            patch("sendMail.generate_mailing", side_effect=capture_filter),
+            patch("sendMail._post_send_cleanup"),
         ):
             sendMail.process_profile(args)
 
@@ -686,22 +686,24 @@ class TestCoverageGap2:
         args.session_filter = None
         args.profile = "test"
 
-        with patch(
-            "sendMail._load_config_with_secrets",
-            return_value={
-                "sender": "me@test.com",
-                "sendername": "Me",
-                "subject": "Sub",
-                "message": "Body",
-                "database": "data.csv",
-                "test": False,
-            },
-        ), patch("sendMail.check_mandatory_param", return_value=True), patch(
-            "sendMail.process_attachments", return_value=(["file.html"], None, [])
-        ), patch(
-            "sendMail._prepare_message_body", side_effect=lambda p, c, f: p
-        ), patch(
-            "sendMail.generate_mailing", return_value="Error"
+        with (
+            patch(
+                "sendMail._load_config_with_secrets",
+                return_value={
+                    "sender": "me@test.com",
+                    "sendername": "Me",
+                    "subject": "Sub",
+                    "message": "Body",
+                    "database": "data.csv",
+                    "test": False,
+                },
+            ),
+            patch("sendMail.check_mandatory_param", return_value=True),
+            patch(
+                "sendMail.process_attachments", return_value=(["file.html"], None, [])
+            ),
+            patch("sendMail._prepare_message_body", side_effect=lambda p, c, f: p),
+            patch("sendMail.generate_mailing", return_value="Error"),
         ):
             result = sendMail.process_profile(args)
         assert result == "Error"

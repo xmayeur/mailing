@@ -10,6 +10,7 @@ Usage:
 The editor saves output as .html, ready for sendMail:
     python src/sendMail.py --profile cambristi data/newsletter.html
 """
+
 from __future__ import annotations
 
 import json
@@ -700,9 +701,11 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sendMail config",
-            str(Path(self.config_input.text()).parent)
-            if self.config_input.text()
-            else str(Path.home()),
+            (
+                str(Path(self.config_input.text()).parent)
+                if self.config_input.text()
+                else str(Path.home())
+            ),
             "YAML Files (*.yml *.yaml);;All Files (*)",
         )
         if path:
@@ -713,9 +716,11 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select database",
-            str(Path(self.database_input.text()).parent)
-            if self.database_input.text()
-            else str(Path.home()),
+            (
+                str(Path(self.database_input.text()).parent)
+                if self.database_input.text()
+                else str(Path.home())
+            ),
             "Data Files (*.csv *.xlsx *.xlsm *.xls *.ods);;All Files (*)",
         )
         if path:
@@ -1569,8 +1574,9 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         parent: QWidget | None = None,
         *,
         config_path: str,
-        config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]]
-        | None = None,
+        config_data: (
+            dict[str, dict[str, str | int | list[str] | dict[str, str]]] | None
+        ) = None,
         initial_profile: str = "default",
     ) -> None:
         super().__init__(parent)
@@ -1765,9 +1771,11 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sendMail config",
-            str(Path(self.config_input.text()).parent)
-            if self.config_input.text()
-            else str(Path.home()),
+            (
+                str(Path(self.config_input.text()).parent)
+                if self.config_input.text()
+                else str(Path.home())
+            ),
             "YAML Files (*.yml *.yaml);;All Files (*)",
         )
         if path:
@@ -2935,15 +2943,13 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         """Clear previously applied profile stylesheet."""
         if hasattr(self, "_view") and self._view:
             # Clear the user-css element by applying empty CSS (must happen BEFORE new stylesheet)
-            self._run_js(
-                """
+            self._run_js("""
             setTimeout(function() {
               if (typeof applyCSS === 'function') {
                 applyCSS('');
               }
             }, 10);
-            """
-            )
+            """)
         log.debug("Cleared profile stylesheet")
 
     def _apply_profile_stylesheet(self, css_path: Path) -> None:
