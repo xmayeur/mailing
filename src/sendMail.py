@@ -950,14 +950,14 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
             try:
                 shutil.rmtree(d)
                 if param.verbose:
-                    log.info(f"Dossier temporaire supprimé : {d}")
+                    log.debug(f"Dossier temporaire supprimé : {d}")
             except OSError as e:
                 log.error(f"Erreur lors du nettoyage de {d}: {e}")
 
 
 def _skip_to_index(reader: Any, from_index: int) -> int:
     """Advance *reader* past records before *from_index* and return the updated row index."""
-    log.info(f"Reprise à l'index {from_index}")
+    log.debug(f"Reprise à l'index {from_index}")
     idx = 1
     for _ in range(2, from_index):
         next(reader, None)
