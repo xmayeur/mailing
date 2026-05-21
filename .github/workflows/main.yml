@@ -1,17 +1,32 @@
 name: Build and Release Executables
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Enter the version (e.g., v1.0.0)"
-        required: true
 
 permissions:
   contents: read
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      tag: ${{ steps.extract.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Extract version from pyproject.toml
+        id: extract
+        run: |
+          version=$(grep 'version = ' pyproject.toml | head -1 | cut -d'"' -f2)
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "tag=v$version" >> $GITHUB_OUTPUT
+
   build:
+    needs: version
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
@@ -71,7 +86,7 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    needs: build
+    needs: [build, version]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -85,16 +100,29 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: Delete existing release assets (if version unchanged)
+        run: |
+          # Check if release exists and delete old assets for same version
+          release_id=$(gh release view ${{ needs.version.outputs.tag }} --json id -q .id 2>/dev/null || echo "")
+          if [ -n "$release_id" ]; then
+            echo "Found existing release for ${{ needs.version.outputs.tag }}, will overwrite assets"
+            gh release delete-asset ${{ needs.version.outputs.tag }} sendMailEditor-linux.zip -y 2>/dev/null || true
+            gh release delete-asset ${{ needs.version.outputs.tag }} sendMailEditor-windows.zip -y 2>/dev/null || true
+            gh release delete-asset ${{ needs.version.outputs.tag }} sendMailEditor-macos.dmg -y 2>/dev/null || true
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Make files executable (Linux/Mac)
         run: chmod +x sendMailEditor-* || true
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.event.inputs.version }}
-          name: Release ${{ github.event.inputs.version }}
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Release ${{ needs.version.outputs.version }}
           draft: false
           prerelease: false
           files: |
