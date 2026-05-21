@@ -57,6 +57,7 @@ The editor is a separate desktop app for creating and editing newsletter content
 - Insert links, tables, horizontal rules, and named anchors
 - Apply custom CSS to preview and exported HTML
 - Preserve sendMail-ready HTML output for direct campaign use
+- **Profile dropdown** to switch email profiles and load SMTP settings
 - Advanced filter validation with real-time syntax checking
 - Database preview showing filtered subscriber records
 - Google Sheets and CSV database integration
@@ -88,19 +89,20 @@ pip install -r requirements.txt
 
 ### Dependencies
 
-- gspread
-- google-auth
-- google-auth-oauthlib
-- google-auth-httplib2
+**Core** (sendMail CLI):
 - google-api-python-client
-- oauth2client
-- PyYAML
+- gspread
+- google-auth, google-auth-oauthlib
 - beautifulsoup4
-- Pillow
-- requests
-- certifi
 - markdown2
-- python-calamine
+- pillow
+- pyyaml
+- get-hc-secrets (vault integration)
+
+**Editor** (WYSIWYG newsletter editor):
+- PyQt6 (≥6.7.0)
+- PyQt6-WebEngine (≥6.7.0)
+- html2text
 
 ## Configuration
 
