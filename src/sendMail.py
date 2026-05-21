@@ -61,6 +61,7 @@ import requests
 import yaml
 from bs4 import BeautifulSoup
 from getSecrets import get_secret
+from profile_manager import Profile, ProfileLoadError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -451,7 +452,9 @@ def get_smtp_connection(param: Any) -> SMTP | None:
     """
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    context.minimum_version = ssl.TLSVersion.TLSv1_3
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -484,7 +487,7 @@ def get_gmail_service(param: Any) -> Any:
     :rtype: googleapiclient.discovery.Resource
     """
     if os.path.exists(param.token_file):
-        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)  # type: ignore[no-untyped-call]
+        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
     else:
         creds = None
     # else:
@@ -954,7 +957,7 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
 
 def _skip_to_index(reader: Any, from_index: int) -> int:
     """Advance *reader* past records before *from_index* and return the updated row index."""
-    log.info(f"Reprise à l'index {from_index}")
+    log.debug(f"Reprise à l'index {from_index}")
     idx = 1
     for _ in range(2, from_index):
         next(reader, None)
@@ -1322,14 +1325,34 @@ def get_newsletter_name(files: list[str], args: Any) -> Any:
 def _load_config_with_secrets(args: Any) -> dict[str, Any]:
     """Merge the profile config with any vault secrets and CLI overrides."""
     config = args.conf[args.profile]
+
+    # Try Profile class for vault_key, fall back to legacy MAILCONFIG
     try:
-        secret = get_secret(config["MAILCONFIG"])
-        if secret is None:
-            log.warning("No secret configuration found")
-            secret = {}
+        vault_key = config.get("vault_key") or config.get("MAILCONFIG") or config.get("mailconfig")
+        if vault_key:
+            profile = Profile(args.profile, config)
+            secret = profile.load_smtp_from_vault()
+        else:
+            # No vault key configured, use legacy behavior
+            secret = None
+    except ProfileLoadError as e:
+        log.error(f"Failed to load profile '{args.profile}': {str(e)}")
+        raise
     except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
         log.debug(f"No secret configuration found, using config file only: {e}")
-        secret = {}
+        secret = None
+
+    if secret is None:
+        # Try legacy get_secret approach for backward compatibility
+        try:
+            secret = get_secret(config.get("MAILCONFIG", ""))
+            if secret is None:
+                log.warning("No secret configuration found")
+                secret = {}
+        except Exception as e:  # noqa: BLE001
+            log.debug(f"No secret configuration found, using config file only: {e}")
+            secret = {}
+
     config = {**secret, **config}
     for k, v in vars(args).items():
         if v is not None or k not in config:
