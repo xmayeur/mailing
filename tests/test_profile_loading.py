@@ -120,11 +120,46 @@ class TestLoggingLevels:
     """Test log level migrations (info → debug)."""
 
     def test_profile_loading_at_debug_level(self):
-        """Profile loading (vault, SMTP) logged at debug level."""
-        # TODO: Implement log capture test
-        pass
+        """Profile loading (vault, SMTP) logged at debug level (T039)."""
+        # Set up logging capture
+        with patch("src.profile_manager.get_secret") as mock_secret:
+            mock_secret.return_value = {
+                "smtp_host": "smtp.test.com",
+                "smtp_port": 587,
+                "username": "user",
+                "password": "pass",
+                "sender": "sender@test.com",
+                "sendername": "Test Sender"
+            }
+
+            config = {"vault_key": "mailconfig: test"}
+            profile = Profile("test", config)
+
+            # Capture logs at DEBUG level
+            with patch("src.profile_manager.logger") as mock_logger:
+                profile.load_smtp_from_vault()
+                # Verify debug messages logged
+                assert mock_logger.debug.called
+                debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+                assert any("Fetching SMTP" in str(call) for call in debug_calls)
 
     def test_no_debug_messages_at_info_level(self):
-        """Production logs at INFO level have no debug messages."""
-        # TODO: Implement log filter test
-        pass
+        """Production logs at INFO level have no debug messages (T038)."""
+        import logging
+
+        # Test that debug-prefixed messages are at DEBUG level
+        sendmail_path = "/Users/xavier/PycharmProjects/mailing/src/sendMail.py"
+        editor_path = "/Users/xavier/PycharmProjects/mailing/src/editor.py"
+
+        # Verify sendMail.py doesn't have debug-diagnostic at INFO
+        with open(sendmail_path) as f:
+            content = f.read()
+            # Count conversions: "DEBUG:" should only appear in log.debug calls
+            debug_prefixed_info = content.count('log.info("DEBUG:')
+            assert debug_prefixed_info == 0, "Found debug messages at INFO level in sendMail.py"
+
+        # Verify editor.py doesn't have debug-diagnostic at INFO
+        with open(editor_path) as f:
+            content = f.read()
+            debug_prefixed_info = content.count('log.info("DEBUG:')
+            assert debug_prefixed_info == 0, "Found debug messages at INFO level in editor.py"

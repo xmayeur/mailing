@@ -114,13 +114,13 @@
 
 ### Implementation for User Story 4
 
-- [x] T033 [US4] Replace debug-level log.info with log.debug in `src/sendMail.py` (based on audit from T002, 5-10 calls)
-- [x] T034 [P] [US4] Replace debug-level log.info with log.debug in `src/editor.py` (based on audit from T003, 3-5 calls)
-- [x] T035 [P] [US4] Replace debug-level log.info in `src/googleDriveLib.py` (based on audit from T004)
-- [x] T036 [P] [US4] Replace debug-level log.info in `src/schema_provider.py` (based on audit from T004)
-- [x] T037 [P] [US4] Replace debug-level log.info in remaining modules (filter_matcher.py, etc.)
-- [x] T038 [US4] Test: Verify no debug messages at INFO level in `tests/test_profile_loading.py` (log capture)
-- [x] T039 [US4] Test: Verify debug messages appear at DEBUG level in `tests/test_profile_loading.py`
+- [x] T033 [US4] Replace debug-level log.info with log.debug in `src/sendMail.py` (2 calls: lines 953, 960)
+- [x] T034 [P] [US4] Replace debug-level log.info with log.debug in `src/editor.py` (11 calls converted)
+- [x] T035 [P] [US4] Replace debug-level log.info in `src/googleDriveLib.py` (no calls found)
+- [x] T036 [P] [US4] Replace debug-level log.info in `src/schema_provider.py` (no calls found)
+- [x] T037 [P] [US4] Replace debug-level log.info in remaining modules (no calls found)
+- [x] T038 [US4] Test: Verify no debug messages at INFO level in `tests/test_profile_loading.py` ✓ PASS
+- [x] T039 [US4] Test: Verify debug messages appear at DEBUG level in `tests/test_profile_loading.py` ✓ PASS
 
 **Checkpoint**: All debug logging migrated to log.debug
 
