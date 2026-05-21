@@ -1,6 +1,6 @@
 """Profile management and vault integration for email profiles."""
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 from getSecrets import get_secret
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class Profile:
             if vault_key.startswith("mailconfig:"):
                 secret_key = vault_key.split(":", 1)[1].strip()
 
-            smtp_params = get_secret(secret_key)
+            smtp_params = cast(Dict[str, Any], get_secret(secret_key))
             if not smtp_params:
                 raise ProfileLoadError(
                     f"Vault key not found or empty: {vault_key}"

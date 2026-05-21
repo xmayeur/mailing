@@ -1,7 +1,7 @@
 """Editor profile styling integration."""
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class EditorProfileStyler:
             raise FileNotFoundError(f"Template file not found: {template_file}")
 
         logger.debug(f"Found template file for profile '{self.current_profile}': {template_file}")
-        return template_file
+        return cast(str, template_file)
 
     def apply_profile_styling(self, html_content: str) -> str:
         """Apply profile styling to HTML content.
