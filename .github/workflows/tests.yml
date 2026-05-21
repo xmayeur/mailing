@@ -104,11 +104,10 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv,env,build,dist,release
         # Exit-zero treats all errors as warnings
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv,env,build,dist,release
-      continue-on-error: true
+      continue-on-error: false
 
     - name: Check code formatting with black
-      run: |
-        black --check . || echo "Code formatting issues found"
-      continue-on-error: true
+      run: black --check . --exclude='(venv|env|\.venv|release|\.git)'
+      continue-on-error: false
 
 
