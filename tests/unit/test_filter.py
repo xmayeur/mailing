@@ -30,7 +30,9 @@ sys.modules["oauth2client.service_account"] = MagicMock()
 sys.modules["PIL"] = MagicMock()
 
 # Add source directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
+)
 
 import sendMail  # noqa: E402
 

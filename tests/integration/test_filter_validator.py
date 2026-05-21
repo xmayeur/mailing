@@ -49,7 +49,9 @@ class TestFilterValidator:
         missing = validator.validate_field_names(filter_dict, schema)
         assert set(missing) == {"salary"}
 
-    def test_validate_field_names_empty_filter(self, validator: FilterValidator) -> None:
+    def test_validate_field_names_empty_filter(
+        self, validator: FilterValidator
+    ) -> None:
         """Test validation with empty filter returns no missing."""
         missing = validator.validate_field_names({}, ["age", "name"])
         assert missing == []

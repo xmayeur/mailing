@@ -37,6 +37,7 @@ sys.modules["googleapiclient"] = MagicMock()
 sys.modules["googleapiclient.discovery"] = MagicMock()
 sys.modules["googleapiclient.http"] = MagicMock()
 
+
 # Mock googleapiclient.errors with HttpError class
 class MockHttpError(Exception):
     def __init__(self, resp, content, uri=None):
@@ -59,7 +60,9 @@ sys.modules["yaml"] = _real_yaml
 
 def pytest_configure(config):
     """Register custom pytest markers."""
-    config.addinivalue_line("markers", "slow: slow tests (deselect with '-m \"not slow\"')")
+    config.addinivalue_line(
+        "markers", "slow: slow tests (deselect with '-m \"not slow\"')"
+    )
     config.addinivalue_line("markers", "integration: integration tests")
     config.addinivalue_line("markers", "unit: unit tests")
     config.addinivalue_line("markers", "bdd: BDD behavior tests")
@@ -75,13 +78,15 @@ def _auto_patch_profile_manager_get_secret(monkeypatch):
     from unittest.mock import MagicMock
 
     # Create a default mock that returns SMTP fields
-    default_mock = MagicMock(return_value={
-        "smtp_host": "smtp.example.com",
-        "smtp_port": 587,
-        "username": "test_user",
-        "password": "test_password",
-        "sender": "test@example.com"
-    })
+    default_mock = MagicMock(
+        return_value={
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "username": "test_user",
+            "password": "test_password",
+            "sender": "test@example.com",
+        }
+    )
 
     # Patch get_secret in profile_manager
     monkeypatch.setattr("src.profile_manager.get_secret", default_mock)
@@ -93,7 +98,10 @@ def _auto_patch_profile_manager_get_secret(monkeypatch):
 def tmp_yaml_file(tmp_path):
     """Create a temporary YAML config file for testing."""
     yaml_file = tmp_path / "config.yml"
-    yaml_file.write_text("default:\n  sender: test@example.com\ntest:\n  sender: test2@example.com\n", encoding="utf-8")
+    yaml_file.write_text(
+        "default:\n  sender: test@example.com\ntest:\n  sender: test2@example.com\n",
+        encoding="utf-8",
+    )
     return yaml_file
 
 
@@ -101,7 +109,10 @@ def tmp_yaml_file(tmp_path):
 def tmp_csv_file(tmp_path):
     """Create a temporary CSV subscriber file for testing."""
     csv_file = tmp_path / "subscribers.csv"
-    csv_file.write_text("name,email,status\nAlice,alice@example.com,active\nBob,bob@example.com,inactive\n", encoding="utf-8")
+    csv_file.write_text(
+        "name,email,status\nAlice,alice@example.com,active\nBob,bob@example.com,inactive\n",
+        encoding="utf-8",
+    )
     return csv_file
 
 
@@ -109,7 +120,10 @@ def tmp_csv_file(tmp_path):
 def tmp_html_file(tmp_path):
     """Create a temporary HTML file for testing."""
     html_file = tmp_path / "newsletter.html"
-    html_file.write_text("<!DOCTYPE html>\n<html><head><title>Test</title></head><body><h1>Test</h1></body></html>", encoding="utf-8")
+    html_file.write_text(
+        "<!DOCTYPE html>\n<html><head><title>Test</title></head><body><h1>Test</h1></body></html>",
+        encoding="utf-8",
+    )
     return html_file
 
 
@@ -128,7 +142,7 @@ def mock_vault_smtp_response():
         "username": "test_user",
         "password": "test_password",
         "sender": "test@example.com",
-        "sendername": "Test Sender"
+        "sendername": "Test Sender",
     }
 
 
@@ -141,7 +155,4 @@ def vault_fixture(monkeypatch, mock_vault_smtp_response):
 
     # Monkeypatch the vault access function (location depends on implementation)
     # This will be adjusted when Profile.load_smtp_from_vault() is implemented
-    return {
-        "mock_get_secrets": mock_get_secrets,
-        "response": mock_vault_smtp_response
-    }
+    return {"mock_get_secrets": mock_get_secrets, "response": mock_vault_smtp_response}

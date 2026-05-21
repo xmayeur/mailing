@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 class ProfileLoadError(Exception):
     """Raised when profile loading fails."""
+
     pass
 
 
@@ -33,7 +34,11 @@ class Profile:
     @property
     def vault_key(self) -> str | None:
         """Get vault key for this profile's SMTP credentials."""
-        return self.config.get("vault_key") or self.config.get("MAILCONFIG") or self.config.get("mailconfig")
+        return (
+            self.config.get("vault_key")
+            or self.config.get("MAILCONFIG")
+            or self.config.get("mailconfig")
+        )
 
     @property
     def filters(self) -> dict[str, Any] | None:
@@ -60,7 +65,9 @@ class Profile:
                 f"Add 'vault_key: mailconfig: <key>' to profile config."
             )
 
-        logger.debug(f"Fetching SMTP params for profile '{self.name}' from vault key '{vault_key}'")
+        logger.debug(
+            f"Fetching SMTP params for profile '{self.name}' from vault key '{vault_key}'"
+        )
 
         try:
             # Parse vault key format: "mailconfig: artscroisesmailing" → "artscroisesmailing"
@@ -70,9 +77,7 @@ class Profile:
 
             smtp_params = cast(dict[str, Any], get_secret(secret_key))
             if not smtp_params:
-                raise ProfileLoadError(
-                    f"Vault key not found or empty: {vault_key}"
-                )
+                raise ProfileLoadError(f"Vault key not found or empty: {vault_key}")
 
             logger.debug(f"Successfully loaded SMTP params for profile '{self.name}'")
 

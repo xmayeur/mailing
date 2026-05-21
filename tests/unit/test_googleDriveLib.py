@@ -9,7 +9,9 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 # Add source directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
+)
 
 # Mock external dependencies before importing
 mock_get_secret = MagicMock(return_value={"key": "value"})
@@ -169,7 +171,7 @@ class TestDownloadFile:
     @patch("googleDriveLib.io.BytesIO")
     @patch("builtins.open", create=True)
     def test_download_file_success(
-            self, mock_open_file, mock_bytesio, mock_downloader_class
+        self, mock_open_file, mock_bytesio, mock_downloader_class
     ):
         """Test successful file download"""
         mock_service = Mock()

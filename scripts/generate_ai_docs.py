@@ -52,25 +52,35 @@ def build_context() -> str:
                 break
             for doc_file in sorted(DOCS_DIR.glob(ext)):
                 if doc_file.is_file() and doc_file.name not in [".DS_Store"]:
-                    parts.append(f"## {doc_file.name}\n\n{doc_file.read_text(encoding='utf-8')}")
+                    parts.append(
+                        f"## {doc_file.name}\n\n{doc_file.read_text(encoding='utf-8')}"
+                    )
     # Fallback: use CLAUDE.md if available
     if not parts:
         claude_md = REPO_ROOT / "CLAUDE.md"
         if claude_md.exists():
             parts.append(f"## CLAUDE.md\n\n{claude_md.read_text(encoding='utf-8')}")
-    return "\n\n---\n\n".join(parts) if parts else "(No documentation found in docs/ or CLAUDE.md)"
+    return (
+        "\n\n---\n\n".join(parts)
+        if parts
+        else "(No documentation found in docs/ or CLAUDE.md)"
+    )
 
 
 def validate_markdown_structure(content: str) -> list[str]:
     """Return list of missing required section names (FR-012)."""
     headers = re.findall(r"^#{1,3}\s+(.+)$", content, re.MULTILINE)
     headers_lower = [h.strip().lower() for h in headers]
-    return [s for s in REQUIRED_SECTIONS if not any(s.lower() in h for h in headers_lower)]
+    return [
+        s for s in REQUIRED_SECTIONS if not any(s.lower() in h for h in headers_lower)
+    ]
 
 
 def validate_markdown_syntax(content: str) -> bool:
     """Run pymarkdownlnt scan on content; return True if no errors (FR-012)."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    ) as f:
         f.write(content)
         tmp_path = f.name
     try:
@@ -98,7 +108,9 @@ def run_claude(prompt: str) -> str:
         timeout=CLAUDE_TIMEOUT,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"claude exited {result.returncode}: {result.stderr.strip()}")
+        raise RuntimeError(
+            f"claude exited {result.returncode}: {result.stderr.strip()}"
+        )
     if not result.stdout.strip():
         raise RuntimeError("claude returned empty output")
     return result.stdout

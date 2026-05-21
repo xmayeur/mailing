@@ -51,9 +51,11 @@ def _make_pyqtSlot(*args, **kwargs):  # noqa: N802, ARG001
     if len(args) == 1 and _inspect.isfunction(args[0]) and not kwargs:
         # Bare @pyqtSlot — args[0] is the function being decorated
         return args[0]
+
     # @pyqtSlot(str), @pyqtSlot(str, result=str), etc. — return a decorator
     def _decorator(fn):
         return fn
+
     return _decorator
 
 
@@ -70,8 +72,10 @@ def _make_pyqtSignal(*args, **kwargs):  # noqa: N802, ARG001
 # MagicMock instances cannot be used as base classes reliably —
 # attribute access on subclasses with _-prefixed names raises AttributeError.
 
+
 class _FakeQObject:
     """Stand-in for QObject."""
+
     def __init__(self, parent=None):
         self._q_parent = parent
 
@@ -81,6 +85,7 @@ class _FakeQObject:
 
 class _FakeQMainWindow(_FakeQObject):
     """Stand-in for QMainWindow."""
+
     def menuBar(self):  # noqa: N802
         return MagicMock()
 
@@ -119,6 +124,7 @@ class _FakeQMainWindow(_FakeQObject):
 
 class _FakeQDialog(_FakeQObject):
     """Stand-in for QDialog."""
+
     class DialogCode:
         Accepted = 1
         Rejected = 0
@@ -162,11 +168,15 @@ sys.modules["PyQt6.QtCore"].Qt = MagicMock()  # pyright: ignore
 
 sys.modules["PyQt6.QtWidgets"].QMainWindow = _FakeQMainWindow  # pyright: ignore
 sys.modules["PyQt6.QtWidgets"].QDialog = _FakeQDialog  # pyright: ignore
-sys.modules["PyQt6.QtWidgets"].QDialog.DialogCode = _FakeQDialog.DialogCode  # pyright: ignore
+sys.modules[
+    "PyQt6.QtWidgets"
+].QDialog.DialogCode = _FakeQDialog.DialogCode  # pyright: ignore
 sys.modules["PyQt6.QtWidgets"].QSpinBox = MagicMock()  # pyright: ignore
 
 # Add source directory to path so editor can be imported
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
+)
 
 import editor  # noqa: E402  (must come after sys.modules patching)
 from editor import EditorBridge  # noqa: E402
@@ -174,6 +184,7 @@ from editor import EditorBridge  # noqa: E402
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_bridge():
     """Return an EditorBridge with a mocked dirty_changed signal."""
@@ -186,6 +197,7 @@ def _make_bridge():
 # ---------------------------------------------------------------------------
 # EditorBridge tests
 # ---------------------------------------------------------------------------
+
 
 class TestEditorBridgeContentTracking:
     def test_initial_state_is_clean(self):
@@ -241,7 +253,9 @@ class TestEditorBridgeImageInsert:
     def test_returns_data_uri_on_file_selection(self):
         bridge = _make_bridge()
         with (
-            patch("editor.QFileDialog.getOpenFileName", return_value=("/tmp/img.png", "")),
+            patch(
+                "editor.QFileDialog.getOpenFileName", return_value=("/tmp/img.png", "")
+            ),
             patch("editor.sm") as mock_sm,
         ):
             mock_sm.file_to_base64.return_value = "abc123"
@@ -259,7 +273,9 @@ class TestEditorBridgeImageInsert:
     def test_returns_empty_string_on_exception(self):
         bridge = _make_bridge()
         with (
-            patch("editor.QFileDialog.getOpenFileName", return_value=("/bad/path.png", "")),
+            patch(
+                "editor.QFileDialog.getOpenFileName", return_value=("/bad/path.png", "")
+            ),
             patch("editor.sm") as mock_sm,
         ):
             mock_sm.file_to_base64.side_effect = FileNotFoundError("not found")
@@ -273,14 +289,18 @@ class TestEditorBridgeImageInsert:
             tmp.write(b"\x89PNG\r\n\x1a\n")  # minimal PNG header bytes
             tmp_path = tmp.name
         try:
-            with patch("editor.QFileDialog.getOpenFileName", return_value=(tmp_path, "")):
+            with patch(
+                "editor.QFileDialog.getOpenFileName", return_value=(tmp_path, "")
+            ):
                 orig = editor._SM_AVAILABLE
                 editor._SM_AVAILABLE = False
                 try:
                     result = bridge.request_image_insert()
                 finally:
                     editor._SM_AVAILABLE = orig
-            assert result.startswith("data:image/png;base64,") or result.startswith("data:")
+            assert result.startswith("data:image/png;base64,") or result.startswith(
+                "data:"
+            )
         finally:
             os.unlink(tmp_path)
 
@@ -327,11 +347,13 @@ class TestEditorBridgeLinkInsert:
 # HTML ↔ Markdown conversion tests
 # ---------------------------------------------------------------------------
 
+
 class TestHtmlToMarkdown:
     """Tests for EditorWindow._write_md_file logic (exercised directly)."""
 
     def _convert(self, html: str) -> str:
         import html2text
+
         h = html2text.HTML2Text()
         h.body_width = 0
         h.protect_links = True
@@ -373,10 +395,13 @@ class TestHtmlFileWriter:
 
     def _write(self, path: str, body_html: str, css_path=None) -> None:
         """Call _write_html_file with a temp _BASE that has no css/ dir."""
+
         class _FakeWindow:
             _css_path = css_path
+
             def _get_stylesheet_path(self) -> Path:
                 return Path(tempfile.gettempdir()) / "styles.css"
+
         with patch.object(editor, "_BASE", Path(tempfile.gettempdir())):
             editor.EditorWindow._write_html_file(_FakeWindow(), path, body_html)
 
@@ -425,10 +450,14 @@ class TestHtmlFileWriter:
 
     def test_user_css_overrides_default(self):
         """When _css_path is set, its contents must appear in the saved HTML."""
-        with tempfile.NamedTemporaryFile(suffix=".css", delete=False, mode="w", encoding="utf-8") as css_tmp:
+        with tempfile.NamedTemporaryFile(
+            suffix=".css", delete=False, mode="w", encoding="utf-8"
+        ) as css_tmp:
             css_tmp.write("body { font-size: 20px; }")
             css_path = css_tmp.name
-        with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w") as html_tmp:
+        with tempfile.NamedTemporaryFile(
+            suffix=".html", delete=False, mode="w"
+        ) as html_tmp:
             html_path = html_tmp.name
         try:
             self._write(html_path, "<p>styled</p>", css_path=css_path)
@@ -442,6 +471,7 @@ class TestHtmlFileWriter:
 # ---------------------------------------------------------------------------
 # Table insert dialog tests
 # ---------------------------------------------------------------------------
+
 
 class TestEditorBridgeTableInsert:
     def test_returns_json_on_confirm(self):
@@ -473,6 +503,7 @@ class TestEditorBridgeTableInsert:
 # Local image inlining tests
 # ---------------------------------------------------------------------------
 
+
 class TestLocalImageInlining:
     """Tests for EditorWindow._html_to_body_html image-inlining behaviour."""
 
@@ -485,10 +516,14 @@ class TestLocalImageInlining:
     def test_local_img_inlined_via_sm(self):
         """When _SM_AVAILABLE, make_html_images_inline is called and data URIs appear."""
         win = self._make_window()
-        inlined_html = '<html><body><img src="data:image/png;base64,abc"/></body></html>'
+        inlined_html = (
+            '<html><body><img src="data:image/png;base64,abc"/></body></html>'
+        )
         with (
             patch.object(editor, "_SM_AVAILABLE", True),
-            patch("editor.sm.make_html_images_inline", return_value=inlined_html) as mock_inline,
+            patch(
+                "editor.sm.make_html_images_inline", return_value=inlined_html
+            ) as mock_inline,
         ):
             result = win._html_to_body_html("/fake/file.html")
 
@@ -517,6 +552,7 @@ class TestLocalImageInlining:
 # HR insertion tests
 # ---------------------------------------------------------------------------
 
+
 class TestHrInsertion:
     """Verify that HR menu item fires insertHR() via _run_js."""
 
@@ -538,6 +574,7 @@ class TestHrInsertion:
 # ---------------------------------------------------------------------------
 # Vertical alignment tests
 # ---------------------------------------------------------------------------
+
 
 class TestVerticalAlignment:
     """Verify that vertical alignment menu items fire setVAlign() via _run_js."""
@@ -567,6 +604,7 @@ class TestVerticalAlignment:
 # Blank paragraph collapse tests
 # ---------------------------------------------------------------------------
 
+
 class TestBlankParagraphCollapse:
     """Tests for EditorWindow._collapse_blank_paragraphs."""
 
@@ -575,21 +613,24 @@ class TestBlankParagraphCollapse:
         result = editor.EditorWindow._collapse_blank_paragraphs(html)
         # Should contain no more than 2 consecutive empty paragraphs
         import re
-        empties = re.findall(r'<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>', result, re.IGNORECASE)
+
+        empties = re.findall(r"<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>", result, re.IGNORECASE)
         assert len(empties) <= 2
 
     def test_five_blank_paragraphs_collapsed_to_two(self):
         html = "<p><br></p>" * 5
         result = editor.EditorWindow._collapse_blank_paragraphs(html)
         import re
-        empties = re.findall(r'<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>', result, re.IGNORECASE)
+
+        empties = re.findall(r"<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>", result, re.IGNORECASE)
         assert len(empties) <= 2
 
     def test_two_blank_paragraphs_preserved(self):
         html = "<p><br></p><p><br></p>"
         result = editor.EditorWindow._collapse_blank_paragraphs(html)
         import re
-        empties = re.findall(r'<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>', result, re.IGNORECASE)
+
+        empties = re.findall(r"<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>", result, re.IGNORECASE)
         assert len(empties) == 2
 
     def test_content_paragraphs_not_affected(self):
@@ -604,7 +645,8 @@ class TestBlankParagraphCollapse:
         assert "Intro" in result
         assert "Body" in result
         import re
-        empties = re.findall(r'<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>', result, re.IGNORECASE)
+
+        empties = re.findall(r"<p[^>]*>(?:\s*<br\s*/?>)?\s*</p>", result, re.IGNORECASE)
         assert len(empties) <= 2
 
 
@@ -612,34 +654,35 @@ class TestBlankParagraphCollapse:
 # Anchor handling tests
 # ---------------------------------------------------------------------------
 
+
 class TestAnchorHandling:
     """Tests for anchor ↔ span conversion utilities."""
 
     def test_anchor_tag_converted_to_span_on_load(self):
         html = '<a id="intro" name="intro"></a><p>text</p>'
         result = editor.EditorWindow._anchors_to_spans(html)
-        assert 'editor-anchor' in result
+        assert "editor-anchor" in result
         assert 'data-anchor-id="intro"' in result
-        assert '⚓' in result
+        assert "⚓" in result
         # Original <a> should be gone
         assert '<a id="intro"' not in result
 
     def test_anchor_with_href_not_converted(self):
         html = '<a href="https://example.com">link</a>'
         result = editor.EditorWindow._anchors_to_spans(html)
-        assert 'editor-anchor' not in result
+        assert "editor-anchor" not in result
         assert 'href="https://example.com"' in result
 
     def test_spans_converted_to_anchor_tags_on_save(self):
         html = '<span class="editor-anchor" data-anchor-id="section1" title="Anchor: section1">⚓</span>'
         result = editor.EditorWindow._spans_to_anchors(html)
         assert '<a id="section1" name="section1"></a>' in result
-        assert 'editor-anchor' not in result
+        assert "editor-anchor" not in result
 
     def test_multiple_anchors_converted(self):
         html = (
             '<span class="editor-anchor" data-anchor-id="a1" title="Anchor: a1">⚓</span>'
-            '<p>text</p>'
+            "<p>text</p>"
             '<span class="editor-anchor" data-anchor-id="a2" title="Anchor: a2">⚓</span>'
         )
         result = editor.EditorWindow._spans_to_anchors(html)
@@ -650,7 +693,7 @@ class TestAnchorHandling:
         """Anchor survives load→display→save cycle."""
         original_html = '<a id="top" name="top"></a><p>Content</p>'
         display_html = editor.EditorWindow._anchors_to_spans(original_html)
-        assert 'editor-anchor' in display_html
+        assert "editor-anchor" in display_html
         saved_html = editor.EditorWindow._spans_to_anchors(display_html)
         assert '<a id="top" name="top"></a>' in saved_html
 
@@ -658,6 +701,7 @@ class TestAnchorHandling:
 # ---------------------------------------------------------------------------
 # Table cell normalization tests
 # ---------------------------------------------------------------------------
+
 
 class TestTableCellNormalization:
     """Tests for EditorWindow._normalize_table_cells.
@@ -669,15 +713,16 @@ class TestTableCellNormalization:
     @staticmethod
     def _row_ids(html: str) -> list:
         import re
+
         return re.findall(r'data-row="([^"]+)"', html)
 
     def test_data_row_added_to_each_cell(self):
-        html = '<table><tr><td>a</td><td>b</td></tr></table>'
+        html = "<table><tr><td>a</td><td>b</td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
         assert result.count('data-row="') == 2
 
     def test_cells_in_same_row_share_row_id(self):
-        html = '<table><tr><td>a</td><td>b</td><td>c</td></tr></table>'
+        html = "<table><tr><td>a</td><td>b</td><td>c</td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
         ids = self._row_ids(result)
         assert len(ids) == 3
@@ -685,89 +730,91 @@ class TestTableCellNormalization:
 
     def test_different_rows_have_different_ids(self):
         html = (
-            '<table>'
-            '<tr><td>a</td><td>b</td></tr>'
-            '<tr><td>c</td><td>d</td></tr>'
-            '</table>'
+            "<table>"
+            "<tr><td>a</td><td>b</td></tr>"
+            "<tr><td>c</td><td>d</td></tr>"
+            "</table>"
         )
         result = editor.EditorWindow._normalize_table_cells(html)
         ids = self._row_ids(result)
         assert len(ids) == 4
-        assert ids[0] == ids[1]      # row 1 cells share id
-        assert ids[2] == ids[3]      # row 2 cells share id
-        assert ids[0] != ids[2]      # rows differ
+        assert ids[0] == ids[1]  # row 1 cells share id
+        assert ids[2] == ids[3]  # row 2 cells share id
+        assert ids[0] != ids[2]  # rows differ
 
     def test_row_id_format_matches_quill(self):
-        html = '<table><tr><td>x</td></tr></table>'
+        html = "<table><tr><td>x</td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
         ids = self._row_ids(result)
         import re
-        assert re.fullmatch(r'row-[0-9a-f]+', ids[0])
+
+        assert re.fullmatch(r"row-[0-9a-f]+", ids[0])
 
     def test_paragraph_inside_cell_is_unwrapped(self):
-        html = '<table><tr><td><p>text</p></td></tr></table>'
+        html = "<table><tr><td><p>text</p></td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
-        assert '<p>' not in result
-        assert 'text' in result
+        assert "<p>" not in result
+        assert "text" in result
 
     def test_image_inside_cell_kept_without_p_wrapper(self):
         html = '<table><tr><td><p><img src="data:image/png;base64,abc"/></p></td></tr></table>'
         result = editor.EditorWindow._normalize_table_cells(html)
         # No <p> remains in the cell — img sits directly inside <td>
-        assert '<p>' not in result
-        assert '<img' in result
-        assert 'data:image/png;base64,abc' in result
+        assert "<p>" not in result
+        assert "<img" in result
+        assert "data:image/png;base64,abc" in result
 
     def test_bare_image_in_cell_preserved(self):
         html = '<table><tr><td><img src="data:image/png;base64,abc"/></td></tr></table>'
         result = editor.EditorWindow._normalize_table_cells(html)
-        assert '<img' in result
-        assert 'data:image/png;base64,abc' in result
+        assert "<img" in result
+        assert "data:image/png;base64,abc" in result
 
     def test_multiple_paragraphs_in_cell_joined_with_br(self):
-        html = '<table><tr><td><p>line1</p><p>line2</p></td></tr></table>'
+        html = "<table><tr><td><p>line1</p><p>line2</p></td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
-        assert '<p>' not in result
-        assert 'line1' in result
-        assert 'line2' in result
-        assert '<br' in result
+        assert "<p>" not in result
+        assert "line1" in result
+        assert "line2" in result
+        assert "<br" in result
 
     def test_heading_inside_cell_is_unwrapped(self):
-        html = '<table><tr><td><h2>Title</h2></td></tr></table>'
+        html = "<table><tr><td><h2>Title</h2></td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
-        assert '<h2>' not in result
-        assert 'Title' in result
+        assert "<h2>" not in result
+        assert "Title" in result
 
     def test_inline_formatting_preserved(self):
-        html = '<table><tr><td><p><strong>bold</strong> text</p></td></tr></table>'
+        html = "<table><tr><td><p><strong>bold</strong> text</p></td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
-        assert '<p>' not in result
-        assert '<strong>bold</strong>' in result
+        assert "<p>" not in result
+        assert "<strong>bold</strong>" in result
 
     def test_multiple_cells_with_images(self):
         html = (
-            '<table><tr>'
+            "<table><tr>"
             '<td><img src="data:image/png;base64,aaa"/></td>'
             '<td><img src="data:image/png;base64,bbb"/></td>'
-            '</tr></table>'
+            "</tr></table>"
         )
         result = editor.EditorWindow._normalize_table_cells(html)
-        assert result.count('<img') == 2
-        assert 'data:image/png;base64,aaa' in result
-        assert 'data:image/png;base64,bbb' in result
+        assert result.count("<img") == 2
+        assert "data:image/png;base64,aaa" in result
+        assert "data:image/png;base64,bbb" in result
 
     def test_nested_block_in_cell_unwrapped(self):
         """<div><p>x</p></div> inside cell → 'x' (both blocks unwrapped)."""
-        html = '<table><tr><td><div><p>x</p></div></td></tr></table>'
+        html = "<table><tr><td><div><p>x</p></div></td></tr></table>"
         result = editor.EditorWindow._normalize_table_cells(html)
-        assert '<div>' not in result
-        assert '<p>' not in result
-        assert 'x' in result
+        assert "<div>" not in result
+        assert "<p>" not in result
+        assert "x" in result
 
 
 # ---------------------------------------------------------------------------
 # Config dialog and window behavior tests
 # ---------------------------------------------------------------------------
+
 
 class _LineEditLike:
     def __init__(self, text=""):
@@ -991,10 +1038,15 @@ class TestConfigDialogHelpers:
         monkeypatch.setattr(editor, "QPlainTextEdit", _PlainTextLike)
         monkeypatch.setattr(editor, "yaml", real_yaml)
         import sendMail
+
         monkeypatch.setattr(sendMail, "yaml", real_yaml)
         # Explicitly set yaml in function globals to use the real module
-        monkeypatch.setitem(editor._ConfigDialog._load_yaml_block.__globals__, "yaml", real_yaml)
-        monkeypatch.setitem(editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(
+            editor._ConfigDialog._load_yaml_block.__globals__, "yaml", real_yaml
+        )
+        monkeypatch.setitem(
+            editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml
+        )
         dlg = _make_config_dialog_stub()
 
         normalized = dlg._normalize_config_data({"alpha": {"x": 1}, "skip": "nope"})
@@ -1005,8 +1057,13 @@ class TestConfigDialogHelpers:
         assert dlg._profile_value("missing") == {}
         assert dlg._dump_yaml_block({"email": "is not empty"})
         assert dlg._dump_yaml_block(None) == ""
-        assert dlg._load_yaml_block("email: is not empty", "filter") == {"email": "is not empty"}
-        assert dlg._load_yaml_block("scope-a, scope-b", "scopes") == ["scope-a", "scope-b"]
+        assert dlg._load_yaml_block("email: is not empty", "filter") == {
+            "email": "is not empty"
+        }
+        assert dlg._load_yaml_block("scope-a, scope-b", "scopes") == [
+            "scope-a",
+            "scope-b",
+        ]
         with pytest.raises(ValueError):
             dlg._load_yaml_block("[]", "filter")
 
@@ -1034,8 +1091,12 @@ class TestConfigDialogHelpers:
         monkeypatch.setattr(editor, "QSpinBox", _SpinBoxLike)
         monkeypatch.setattr(editor, "QCheckBox", _CheckBoxLike)
         monkeypatch.setattr(editor, "QPlainTextEdit", _PlainTextLike)
-        monkeypatch.setitem(editor._ConfigDialog._read_config_file.__globals__, "yaml", real_yaml)
-        monkeypatch.setitem(editor._ConfigDialog._save_config.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(
+            editor._ConfigDialog._read_config_file.__globals__, "yaml", real_yaml
+        )
+        monkeypatch.setitem(
+            editor._ConfigDialog._save_config.__globals__, "yaml", real_yaml
+        )
         dlg = _make_config_dialog_stub()
 
         cfg_path = tmp_path / "config.yml"
@@ -1062,7 +1123,9 @@ class TestConfigDialogHelpers:
         dlg.profile_combo = _FakeCombo()
         dlg.profile_combo.current = "alpha"
         dlg._load_profile = MagicMock()
-        dlg._read_config_file = MagicMock(return_value={"alpha": {"sender": "loaded@example.com"}})
+        dlg._read_config_file = MagicMock(
+            return_value={"alpha": {"sender": "loaded@example.com"}}
+        )
         dlg._reload_profiles("alpha")
         assert dlg.profile_combo.items[0] == "alpha"
         assert "default" in dlg.profile_combo.items
@@ -1078,15 +1141,23 @@ class TestConfigDialogHelpers:
             assert "gamma" in dlg._config_data
 
         dlg._current_profile = "alpha"
-        dlg._collect_profile_data = MagicMock(return_value={"sender": "copy@example.com"})
+        dlg._collect_profile_data = MagicMock(
+            return_value={"sender": "copy@example.com"}
+        )
         dlg._reload_profiles = MagicMock()
-        with patch.object(editor.QInputDialog, "getText", return_value=("alpha-copy", True)):
+        with patch.object(
+            editor.QInputDialog, "getText", return_value=("alpha-copy", True)
+        ):
             dlg._duplicate_profile()
             assert dlg._config_data["alpha-copy"]["sender"] == "copy@example.com"
 
         dlg._current_profile = "alpha-copy"
         dlg._reload_profiles = MagicMock()
-        with patch.object(editor.QMessageBox, "question", return_value=editor.QMessageBox.StandardButton.Yes):
+        with patch.object(
+            editor.QMessageBox,
+            "question",
+            return_value=editor.QMessageBox.StandardButton.Yes,
+        ):
             dlg._delete_profile()
         assert "alpha-copy" not in dlg._config_data
 
@@ -1099,7 +1170,9 @@ class TestConfigDialogHelpers:
             mock_info.assert_called_once()  # pyright: ignore
 
 
-@pytest.mark.xfail(reason="Test isolation issue: pass individually, fail in batch due to shared module state")
+@pytest.mark.xfail(
+    reason="Test isolation issue: pass individually, fail in batch due to shared module state"
+)
 class TestEditorWindowHelpers:
     def _make_window(self):
         win = object.__new__(editor.EditorWindow)
@@ -1116,20 +1189,26 @@ class TestEditorWindowHelpers:
         win.open_file = MagicMock()
         win.statusBar = MagicMock(return_value=_FakeStatusBar())
         win.setWindowTitle = MagicMock()
-        win.style = MagicMock(return_value=MagicMock(standardIcon=MagicMock(return_value="icon")))
+        win.style = MagicMock(
+            return_value=MagicMock(standardIcon=MagicMock(return_value="icon"))
+        )
         return win
 
     def test_editor_window_init_paths(self, monkeypatch):
-        with patch.object(editor.EditorWindow, "_load_editor_page", autospec=True) as mock_load, patch.object(
-                editor.EditorWindow, "open_file", autospec=True
+        with patch.object(
+            editor.EditorWindow, "_load_editor_page", autospec=True
+        ) as mock_load, patch.object(
+            editor.EditorWindow, "open_file", autospec=True
         ) as mock_open:
             window = editor.EditorWindow()
             assert window._file_path is None
             mock_load.assert_called_once_with(window, "")  # pyright: ignore
             mock_open.assert_not_called()  # pyright: ignore
 
-        with patch.object(editor.EditorWindow, "_load_editor_page", autospec=True) as mock_load, patch.object(
-                editor.EditorWindow, "open_file", autospec=True
+        with patch.object(
+            editor.EditorWindow, "_load_editor_page", autospec=True
+        ) as mock_load, patch.object(
+            editor.EditorWindow, "open_file", autospec=True
         ) as mock_open:
             window = editor.EditorWindow(file_path="sample.md")
             mock_open.assert_called_once_with(window, "sample.md")  # pyright: ignore
@@ -1138,8 +1217,12 @@ class TestEditorWindowHelpers:
     def test_resolve_load_and_format_helpers(self, monkeypatch, tmp_path):
         win = self._make_window()
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
-        monkeypatch.setattr(editor.sm, "get_default_config_path", lambda: str(tmp_path / "cfg.yml"))
-        monkeypatch.setitem(editor.EditorWindow._load_send_config.__globals__, "yaml", real_yaml)
+        monkeypatch.setattr(
+            editor.sm, "get_default_config_path", lambda: str(tmp_path / "cfg.yml")
+        )
+        monkeypatch.setitem(
+            editor.EditorWindow._load_send_config.__globals__, "yaml", real_yaml
+        )
         assert win._resolve_send_config_path() == str(tmp_path / "cfg.yml")
 
         monkeypatch.setattr(editor.sm, "get_default_config_path", lambda: -1)
@@ -1163,12 +1246,16 @@ class TestEditorWindowHelpers:
         win._file_path = str(tmp_path / "doc.html")
         win._bridge.is_dirty = True
         win._update_title()
-        win.setWindowTitle.assert_called_with("sendMail Editor — doc.html *")  # pyright: ignore
+        win.setWindowTitle.assert_called_with(
+            "sendMail Editor — doc.html *"
+        )  # pyright: ignore
 
         win._file_path = None
         win._bridge.is_dirty = False
         win._update_title()
-        win.setWindowTitle.assert_called_with("sendMail Editor — New Document")  # pyright: ignore
+        win.setWindowTitle.assert_called_with(
+            "sendMail Editor — New Document"
+        )  # pyright: ignore
 
         win._run_js("quill.format('font', 'Arial')")
         assert "Arial" in win._view.page().runJavaScript.call_args.args[0]
@@ -1184,9 +1271,11 @@ class TestEditorWindowHelpers:
             win._menu_open()
         win.open_file.assert_not_called()  # pyright: ignore
 
-        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(editor.QFileDialog,
-                                                                                      "getOpenFileName", return_value=(
-                        str(tmp_path / "doc.md"), "")):
+        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(
+            editor.QFileDialog,
+            "getOpenFileName",
+            return_value=(str(tmp_path / "doc.md"), ""),
+        ):
             win._menu_open()
         win.open_file.assert_called_with(str(tmp_path / "doc.md"))  # pyright: ignore
 
@@ -1195,25 +1284,39 @@ class TestEditorWindowHelpers:
         (template_dir / "template.md").write_text("# t", encoding="utf-8")
         with patch.object(win, "_ask_save_if_dirty", return_value=True):
             win._open_template()
-        win.open_file.assert_called_with(str(template_dir / "template.md"))  # pyright: ignore
+        win.open_file.assert_called_with(
+            str(template_dir / "template.md")
+        )  # pyright: ignore
 
         (template_dir / "template.md").unlink()
-        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(editor.QFileDialog,
-                                                                                      "getOpenFileName", return_value=(
-                        str(tmp_path / "fallback.md"), "")):
+        with patch.object(win, "_ask_save_if_dirty", return_value=True), patch.object(
+            editor.QFileDialog,
+            "getOpenFileName",
+            return_value=(str(tmp_path / "fallback.md"), ""),
+        ):
             win._open_template()
-        win.open_file.assert_called_with(str(tmp_path / "fallback.md"))  # pyright: ignore
+        win.open_file.assert_called_with(
+            str(tmp_path / "fallback.md")
+        )  # pyright: ignore
 
         win._run_js = MagicMock()
-        win._bridge.request_image_insert = MagicMock(return_value="data:image/png;base64,abc")
+        win._bridge.request_image_insert = MagicMock(
+            return_value="data:image/png;base64,abc"
+        )
         win._menu_insert_image()
         assert "insertEmbed" in win._run_js.call_args.args[0]
 
-        win._bridge.request_link_insert = MagicMock(return_value=json.dumps({"url": "#anchor", "text": "Anchor"}))
+        win._bridge.request_link_insert = MagicMock(
+            return_value=json.dumps({"url": "#anchor", "text": "Anchor"})
+        )
         win._menu_insert_link()
         assert "quill.insertText" in win._run_js.call_args.args[0]
 
-        with patch.object(editor.QFileDialog, "getOpenFileName", return_value=(str(tmp_path / "style.css"), "")):
+        with patch.object(
+            editor.QFileDialog,
+            "getOpenFileName",
+            return_value=(str(tmp_path / "style.css"), ""),
+        ):
             win._menu_apply_css()
         win._bridge.css_changed.emit.assert_called_once()  # pyright: ignore
 
@@ -1254,7 +1357,9 @@ class TestEditorWindowHelpers:
         win._run_js = MagicMock()
         win._on_css_changed(str(css_path))
         assert win._css_path == str(css_path)
-        win._css_status_label.setText.assert_called_with("CSS: style.css")  # pyright: ignore
+        win._css_status_label.setText.assert_called_with(
+            "CSS: style.css"
+        )  # pyright: ignore
         assert "applyCSS" in win._run_js.call_args.args[0]
 
         bad = tmp_path / "missing.css"
@@ -1266,16 +1371,26 @@ class TestEditorWindowHelpers:
         assert win._ask_save_if_dirty() is True
 
         win._bridge.is_dirty = True
-        with patch.object(editor.QMessageBox, "question",
-                          return_value=editor.QMessageBox.StandardButton.Save), patch.object(win, "_save",
-                                                                                             return_value=True) as mock_save:
+        with patch.object(
+            editor.QMessageBox,
+            "question",
+            return_value=editor.QMessageBox.StandardButton.Save,
+        ), patch.object(win, "_save", return_value=True) as mock_save:
             assert win._ask_save_if_dirty() is True
             mock_save.assert_called_once()  # pyright: ignore
 
-        with patch.object(editor.QMessageBox, "question", return_value=editor.QMessageBox.StandardButton.Discard):
+        with patch.object(
+            editor.QMessageBox,
+            "question",
+            return_value=editor.QMessageBox.StandardButton.Discard,
+        ):
             assert win._ask_save_if_dirty() is True
 
-        with patch.object(editor.QMessageBox, "question", return_value=editor.QMessageBox.StandardButton.Cancel):
+        with patch.object(
+            editor.QMessageBox,
+            "question",
+            return_value=editor.QMessageBox.StandardButton.Cancel,
+        ):
             assert win._ask_save_if_dirty() is False
 
         event = MagicMock()
@@ -1316,7 +1431,9 @@ class TestEditorWindowHelpers:
         assert win._view.load.called
         assert win._view.loadFinished.connected
         win._view.loadFinished.connected[0](True)
-        win._inject_initial_content.assert_called_once_with("<p>hello</p>")  # pyright: ignore
+        win._inject_initial_content.assert_called_once_with(
+            "<p>hello</p>"
+        )  # pyright: ignore
 
         css_path = tmp_path / "style.css"
         css_path.write_text("body { color: blue; }", encoding="utf-8")
@@ -1341,12 +1458,18 @@ class TestEditorWindowHelpers:
         win._bridge.reset.assert_called_once()  # pyright: ignore
         status_bar.showMessage.assert_called_once()  # pyright: ignore
 
-        with patch.object(editor.QFileDialog, "getSaveFileName", return_value=(str(tmp_path / "custom.html"), "")):
+        with patch.object(
+            editor.QFileDialog,
+            "getSaveFileName",
+            return_value=(str(tmp_path / "custom.html"), ""),
+        ):
             win._file_path = None
             win._save = MagicMock(return_value=True)
             assert editor.EditorWindow._save_as(win) is True
 
-        win._bridge.request_table_insert = MagicMock(return_value=json.dumps({"rows": 2, "cols": 3}))
+        win._bridge.request_table_insert = MagicMock(
+            return_value=json.dumps({"rows": 2, "cols": 3})
+        )
         win._run_js = MagicMock()
         win._menu_table_insert()
         assert "insertTable" in win._run_js.call_args.args[0]
@@ -1388,8 +1511,12 @@ class TestEditorWindowHelpers:
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
         output_html = tmp_path / "output.html"
         output_html.write_text("<html><body><p>ok</p></body></html>", encoding="utf-8")
-        monkeypatch.setattr(editor.sm, "md2html", lambda *_args, **_kwargs: str(output_html))
-        with patch.object(editor.EditorWindow, "_html_to_body_html", return_value="<p>ok</p>") as mock_convert:
+        monkeypatch.setattr(
+            editor.sm, "md2html", lambda *_args, **_kwargs: str(output_html)
+        )
+        with patch.object(
+            editor.EditorWindow, "_html_to_body_html", return_value="<p>ok</p>"
+        ) as mock_convert:
             output = win._md_to_body_html(str(md_path))
             assert output == "<p>ok</p>"
             assert not output_html.exists()
@@ -1402,12 +1529,17 @@ class TestEditorWindowHelpers:
             mock_warning.assert_called_once()  # pyright: ignore
 
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
-        monkeypatch.setattr(editor.sm, "make_html_images_inline",
-                            lambda path: f'<html><body><img src="{path}"/></body></html>')
+        monkeypatch.setattr(
+            editor.sm,
+            "make_html_images_inline",
+            lambda path: f'<html><body><img src="{path}"/></body></html>',
+        )
         body = win._html_to_body_html(str(html_path))
         assert "img" in body
 
-        with patch.object(editor.sm, "make_html_images_inline", side_effect=RuntimeError("boom")):
+        with patch.object(
+            editor.sm, "make_html_images_inline", side_effect=RuntimeError("boom")
+        ):
             assert win._html_to_body_html(str(html_path)) == ""
 
 
@@ -1415,18 +1547,23 @@ class TestEditorWindowHelpers:
 # _LogCapture tests
 # ---------------------------------------------------------------------------
 
+
 class TestLogCapture:
     def test_emit_appends_formatted_message(self):
         import logging as _logging
+
         log_list: list[str] = []
         handler = editor._LogCapture(log_list)
-        record = _logging.LogRecord("test.logger", _logging.INFO, "", 0, "Hello world", None, None)
+        record = _logging.LogRecord(
+            "test.logger", _logging.INFO, "", 0, "Hello world", None, None
+        )
         handler.emit(record)
         assert len(log_list) == 1
         assert "Hello world" in log_list[0]
 
     def test_emit_multiple_records(self):
         import logging as _logging
+
         log_list: list[str] = []
         handler = editor._LogCapture(log_list)
         for msg in ("first", "second", "third"):
@@ -1438,6 +1575,7 @@ class TestLogCapture:
 
     def test_emit_includes_levelname(self):
         import logging as _logging
+
         log_list: list[str] = []
         handler = editor._LogCapture(log_list)
         record = _logging.LogRecord("x", _logging.ERROR, "", 0, "boom", None, None)
@@ -1449,7 +1587,10 @@ class TestLogCapture:
 # Small dialog constructor / getter tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="Test isolation issue: pass individually, fail in batch due to shared module state")
+
+@pytest.mark.xfail(
+    reason="Test isolation issue: pass individually, fail in batch due to shared module state"
+)
 class TestSmallDialogs:
     """Exercise dialog constructors (covers __init__ bodies) and getter methods."""
 
@@ -1502,7 +1643,10 @@ class TestSmallDialogs:
 # _ConfigDialog tab builder tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="Test isolation issue: pass individually, fail in batch due to shared module state")
+
+@pytest.mark.xfail(
+    reason="Test isolation issue: pass individually, fail in batch due to shared module state"
+)
 class TestConfigDialogTabBuilders:
     """Verify that all _build_*_tab methods run and populate _widgets."""
 
@@ -1576,7 +1720,15 @@ class TestConfigDialogTabBuilders:
         monkeypatch.setitem(
             editor._ConfigDialog._browse_config.__globals__,
             "QFileDialog",
-            type("QFD", (), {"getOpenFileName": staticmethod(lambda *a, **k: ("/new/config.yml", ""))}),
+            type(
+                "QFD",
+                (),
+                {
+                    "getOpenFileName": staticmethod(
+                        lambda *a, **k: ("/new/config.yml", "")
+                    )
+                },
+            ),
         )
         dlg._browse_config()
         assert dlg.config_input.text() == "/new/config.yml"
@@ -1588,7 +1740,9 @@ class TestConfigDialogTabBuilders:
         monkeypatch.setitem(
             editor._ConfigDialog._browse_config.__globals__,
             "QFileDialog",
-            type("QFD", (), {"getOpenFileName": staticmethod(lambda *a, **k: ("", ""))}),
+            type(
+                "QFD", (), {"getOpenFileName": staticmethod(lambda *a, **k: ("", ""))}
+            ),
         )
         dlg._browse_config()
         dlg._reload_profiles.assert_not_called()
@@ -1598,7 +1752,10 @@ class TestConfigDialogTabBuilders:
 # _SendDialog stub factory and tests
 # ---------------------------------------------------------------------------
 
-def _make_send_dialog_stub(*, config_data=None, attachment="/tmp/test.html", profile="default"):
+
+def _make_send_dialog_stub(
+    *, config_data=None, attachment="/tmp/test.html", profile="default"
+):
     """Return a _SendDialog bypassing __init__, with all widgets as testable stubs."""
     dlg = object.__new__(editor._SendDialog)
     dlg._config_data = config_data or {}
@@ -1646,13 +1803,19 @@ def _make_send_dialog_stub(*, config_data=None, attachment="/tmp/test.html", pro
 class TestSendDialogReloadProfiles:
     def test_loads_from_yaml_file(self, tmp_path):
         cfg = tmp_path / "config.yml"
-        cfg.write_text("alpha:\n  sender: a@test.com\nbeta:\n  sender: b@test.com\n", encoding="utf-8")
+        cfg.write_text(
+            "alpha:\n  sender: a@test.com\nbeta:\n  sender: b@test.com\n",
+            encoding="utf-8",
+        )
         dlg = _make_send_dialog_stub()
         dlg.config_input = _LineEditLike(str(cfg))
         dlg._load_profile_defaults = MagicMock()
 
         import yaml as real_yaml
-        with patch.dict(editor._SendDialog._reload_profiles.__globals__, {"yaml": real_yaml}):
+
+        with patch.dict(
+            editor._SendDialog._reload_profiles.__globals__, {"yaml": real_yaml}
+        ):
             dlg._reload_profiles()
 
         assert "alpha" in dlg._config_data
@@ -1700,10 +1863,12 @@ class TestSendDialogLoadCurrentFilter:
 
     def test_loads_filter_test_when_test_checked(self):
         dlg = _make_send_dialog_stub(
-            config_data={"default": {
-                "filter": {"email": "is not empty"},
-                "filter_test": {"email": "is test@test.com"},
-            }}
+            config_data={
+                "default": {
+                    "filter": {"email": "is not empty"},
+                    "filter_test": {"email": "is test@test.com"},
+                }
+            }
         )
         dlg.test_check = _CheckBoxLike(True)
         dlg._current_profile = "default"
@@ -1745,7 +1910,11 @@ class TestSendDialogRunFilterValidation:
     def test_with_validator_calls_update_ui(self):
         dlg = _make_send_dialog_stub()
         mock_validator = MagicMock()
-        mock_validator.get_validation_status.return_value = {"is_valid": True, "syntax_errors": [], "missing_fields": []}
+        mock_validator.get_validation_status.return_value = {
+            "is_valid": True,
+            "syntax_errors": [],
+            "missing_fields": [],
+        }
         dlg._filter_validator = mock_validator
         dlg._get_database_schema = MagicMock(return_value=[])
         dlg._update_validation_ui = MagicMock()
@@ -1762,7 +1931,9 @@ class TestSendDialogGetSchemaCache:
         mock_cache_instance = MagicMock()
         mock_cache_cls.return_value = mock_cache_instance
 
-        with patch.dict(sys.modules, {"schema_cache": MagicMock(SchemaCacheProvider=mock_cache_cls)}):
+        with patch.dict(
+            sys.modules, {"schema_cache": MagicMock(SchemaCacheProvider=mock_cache_cls)}
+        ):
             result = dlg._get_schema_cache()
 
         assert result is mock_cache_instance
@@ -1778,7 +1949,9 @@ class TestSendDialogUpdateValidationUi:
     def test_valid_status_sets_green_style(self):
         dlg = _make_send_dialog_stub()
         dlg.filter_and_display_records = MagicMock()
-        dlg._update_validation_ui({"is_valid": True, "syntax_errors": [], "missing_fields": []})
+        dlg._update_validation_ui(
+            {"is_valid": True, "syntax_errors": [], "missing_fields": []}
+        )
         # Verify the status label was called
         dlg.filter_status_label.setText.assert_called_with("")
         dlg.filter_and_display_records.assert_called_once()
@@ -1786,11 +1959,13 @@ class TestSendDialogUpdateValidationUi:
     def test_invalid_status_sets_error_message(self):
         dlg = _make_send_dialog_stub()
         dlg.filter_and_display_records = MagicMock()
-        dlg._update_validation_ui({
-            "is_valid": False,
-            "syntax_errors": ["bad syntax"],
-            "missing_fields": ["unknown_field"],
-        })
+        dlg._update_validation_ui(
+            {
+                "is_valid": False,
+                "syntax_errors": ["bad syntax"],
+                "missing_fields": ["unknown_field"],
+            }
+        )
         dlg.filter_status_label.setText.assert_called()
         call_arg = dlg.filter_status_label.setText.call_args[0][0]
         assert "bad syntax" in call_arg or "unknown_field" in call_arg
@@ -1805,7 +1980,9 @@ class TestSendDialogLoadDatabaseRecords:
 
     def test_csv_path_loads_data(self, tmp_path):
         csv_file = tmp_path / "data.csv"
-        csv_file.write_text("name,email\nAlice,alice@test.com\nBob,bob@test.com\n", encoding="utf-8")
+        csv_file.write_text(
+            "name,email\nAlice,alice@test.com\nBob,bob@test.com\n", encoding="utf-8"
+        )
         dlg = _make_send_dialog_stub()
         dlg.database_input = _LineEditLike(str(csv_file))
         rows, headers = dlg.load_database_records()
@@ -1821,15 +1998,18 @@ class TestSendDialogLoadDatabaseRecords:
         assert headers == ["name", "email"]
 
     def test_gsheet_profile_loads_via_sendmail(self):
-        dlg = _make_send_dialog_stub(config_data={
-            "gsheet_profile": {"SHEETID": "sheet123", "SA": "sa_key"}
-        })
+        dlg = _make_send_dialog_stub(
+            config_data={"gsheet_profile": {"SHEETID": "sheet123", "SA": "sa_key"}}
+        )
         dlg._current_profile = "gsheet_profile"
 
         mock_wb = MagicMock()
         mock_sm = MagicMock()
         mock_sm.open_google_db_members_sheet.return_value = mock_wb
-        mock_sm.read_all_sheet.return_value = [["name", "email"], ["Alice", "alice@test.com"]]
+        mock_sm.read_all_sheet.return_value = [
+            ["name", "email"],
+            ["Alice", "alice@test.com"],
+        ]
 
         with patch.dict(sys.modules, {"sendMail": mock_sm}):
             rows, headers = dlg.load_database_records()
@@ -1856,10 +2036,12 @@ class TestSendDialogFilterAndDisplayRecords:
 
     def test_full_flow_with_data(self, tmp_path):
         dlg = _make_send_dialog_stub()
-        dlg.load_database_records = MagicMock(return_value=(
-            [["Alice", "a@test.com"], ["Bob", "b@test.com"]],
-            ["name", "email"],
-        ))
+        dlg.load_database_records = MagicMock(
+            return_value=(
+                [["Alice", "a@test.com"], ["Bob", "b@test.com"]],
+                ["name", "email"],
+            )
+        )
         dlg.filter_and_display_records()
         dlg.record_count_label.setText.assert_called()
 
@@ -1874,7 +2056,9 @@ class TestSendDialogFilterAndDisplayRecords:
     def test_apply_filter_with_invalid_yaml(self):
         mock_validator = MagicMock()
         mock_validator.get_validation_status.return_value = {
-            "is_valid": False, "syntax_errors": ["bad yaml"], "missing_fields": []
+            "is_valid": False,
+            "syntax_errors": ["bad yaml"],
+            "missing_fields": [],
         }
         dlg = _make_send_dialog_stub()
         dlg._filter_validator = mock_validator
@@ -1886,7 +2070,9 @@ class TestSendDialogFilterAndDisplayRecords:
     def test_apply_filter_with_valid_yaml(self):
         mock_validator = MagicMock()
         mock_validator.get_validation_status.return_value = {
-            "is_valid": True, "syntax_errors": [], "missing_fields": []
+            "is_valid": True,
+            "syntax_errors": [],
+            "missing_fields": [],
         }
         dlg = _make_send_dialog_stub()
         dlg._filter_validator = mock_validator
@@ -1965,6 +2151,7 @@ class TestSendDialogBuildArgs:
 # EditorWindow.open_file + related tests
 # ---------------------------------------------------------------------------
 
+
 class TestEditorWindowOpenFile:
     def _make_window(self):
         win = object.__new__(editor.EditorWindow)
@@ -1986,7 +2173,9 @@ class TestEditorWindowOpenFile:
         win._save_documents_path = MagicMock()
         win.statusBar = MagicMock(return_value=_FakeStatusBar())
         win.setWindowTitle = MagicMock()
-        win.style = MagicMock(return_value=MagicMock(standardIcon=MagicMock(return_value="icon")))
+        win.style = MagicMock(
+            return_value=MagicMock(standardIcon=MagicMock(return_value="icon"))
+        )
         return win
 
     def test_open_nonexistent_file_warns(self):
@@ -2008,7 +2197,9 @@ class TestEditorWindowOpenFile:
         win = self._make_window()
         html = tmp_path / "doc.html"
         html.write_text("<html><body><p>hi</p></body></html>")
-        with patch.object(editor.EditorWindow, "_html_to_body_html", return_value="<p>hi</p>"):
+        with patch.object(
+            editor.EditorWindow, "_html_to_body_html", return_value="<p>hi</p>"
+        ):
             win.open_file(str(html))
         assert str(html) in win._file_path
         win._load_editor_page.assert_called_once()
@@ -2017,7 +2208,9 @@ class TestEditorWindowOpenFile:
         win = self._make_window()
         md = tmp_path / "doc.md"
         md.write_text("# Title")
-        with patch.object(editor.EditorWindow, "_md_to_body_html", return_value="<h1>Title</h1>"):
+        with patch.object(
+            editor.EditorWindow, "_md_to_body_html", return_value="<h1>Title</h1>"
+        ):
             win.open_file(str(md))
         assert str(md) in win._file_path
 
@@ -2028,7 +2221,10 @@ class TestEditorWindowOpenFile:
 
     def test_is_template_file_true_for_template_suffix(self):
         win = self._make_window()
-        assert editor.EditorWindow._is_template_file(win, "newsletter.template.html") is True
+        assert (
+            editor.EditorWindow._is_template_file(win, "newsletter.template.html")
+            is True
+        )
 
     def test_is_template_file_false_for_regular(self):
         win = self._make_window()
@@ -2047,7 +2243,9 @@ class TestEditorWindowOpenFile:
 
     def test_validate_documents_path_invalid(self):
         win = self._make_window()
-        assert editor.EditorWindow._validate_documents_path(win, "/no/such/dir") is False
+        assert (
+            editor.EditorWindow._validate_documents_path(win, "/no/such/dir") is False
+        )
 
     def test_load_config_no_file_does_not_raise(self, tmp_path):
         win = self._make_window()
@@ -2075,7 +2273,9 @@ class TestEditorWindowOpenFile:
         css_file = tmp_path / "style.css"
         css_file.write_text("body { color: black; }")
         win._resolve_send_config_path = MagicMock(return_value="cfg.yml")
-        win._load_send_config = MagicMock(return_value={"default": {"styles": str(css_file)}})
+        win._load_send_config = MagicMock(
+            return_value={"default": {"styles": str(css_file)}}
+        )
         win._bridge = _FakeBridge()
         win._bridge.css_changed = MagicMock()
         editor.EditorWindow._load_default_stylesheet(win)

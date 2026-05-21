@@ -34,7 +34,9 @@ for _mod in [
     if _mod not in sys.modules:
         sys.modules[_mod] = MagicMock()
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
+)
 
 from filter_matcher import FilterMatcher  # noqa: E402
 from schema_provider import DatabaseSchemaProvider  # noqa: E402
@@ -42,6 +44,7 @@ from schema_provider import DatabaseSchemaProvider  # noqa: E402
 # ===========================================================================
 # FilterMatcher tests
 # ===========================================================================
+
 
 class TestFilterMatcherInit:
     def test_available_when_sendmail_importable(self):
@@ -189,10 +192,13 @@ class TestFilterMatcherFilterRowsWithCount:
 # DatabaseSchemaProvider tests
 # ===========================================================================
 
+
 class TestDatabaseSchemaProviderFromCsv:
     def test_reads_header_row(self, tmp_path):
         csv_file = tmp_path / "test.csv"
-        csv_file.write_text("name,email,status\nAlice,alice@example.com,active\n", encoding="utf-8")
+        csv_file.write_text(
+            "name,email,status\nAlice,alice@example.com,active\n", encoding="utf-8"
+        )
         result = DatabaseSchemaProvider.from_csv(str(csv_file))
         assert result == ["name", "email", "status"]
 
@@ -241,7 +247,9 @@ class TestDatabaseSchemaProviderFromGoogleSheets:
         mock_ws2.row_values.return_value = ["id", "name"]
         mock_service = MagicMock()
         mock_service.worksheets.return_value = [mock_ws1, mock_ws2]
-        result = DatabaseSchemaProvider.from_google_sheets(mock_service, "sheet_id", sheet_name="Members")
+        result = DatabaseSchemaProvider.from_google_sheets(
+            mock_service, "sheet_id", sheet_name="Members"
+        )
         assert result == ["id", "name"]
 
     def test_named_sheet_not_found(self):
@@ -249,7 +257,9 @@ class TestDatabaseSchemaProviderFromGoogleSheets:
         mock_ws.title = "Sheet1"
         mock_service = MagicMock()
         mock_service.worksheets.return_value = [mock_ws]
-        result = DatabaseSchemaProvider.from_google_sheets(mock_service, "sheet_id", sheet_name="Missing")
+        result = DatabaseSchemaProvider.from_google_sheets(
+            mock_service, "sheet_id", sheet_name="Missing"
+        )
         assert result == []
 
     def test_empty_worksheets_list(self):
@@ -289,7 +299,9 @@ class TestDatabaseSchemaProviderDetectAndExtract:
         assert result == ["a", "b", "c"]
 
     def test_nonexistent_csv_returns_empty(self, tmp_path):
-        result = DatabaseSchemaProvider.detect_and_extract(str(tmp_path / "missing.csv"))
+        result = DatabaseSchemaProvider.detect_and_extract(
+            str(tmp_path / "missing.csv")
+        )
         assert result == []
 
     def test_google_sheets_url(self):

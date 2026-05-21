@@ -42,6 +42,7 @@ def _init_log() -> logging.Logger:
 
     # Use absolute path for log file to work in bundled app
     from pathlib import Path
+
     log_path = Path.home() / "sendMail.log"
     file_handler = logging.FileHandler(str(log_path))
     file_handler.setLevel(logging.DEBUG)
@@ -71,14 +72,18 @@ def connect_google_driver(service_account_id: str = "artscroisesServiceAccount")
     creds = get_secret(service_account_id)
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)  # pyright: ignore
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+            creds, scope
+        )  # pyright: ignore
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
         _log.error(e)
         return None
 
 
-def get_files(service: Any = None, folder_id: str | None = None) -> dict[str, Any] | None:
+def get_files(
+    service: Any = None, folder_id: str | None = None
+) -> dict[str, Any] | None:
     """List files from Google Drive folder (excluding published files).
 
     Args:
@@ -108,7 +113,9 @@ def get_files(service: Any = None, folder_id: str | None = None) -> dict[str, An
         return None
 
 
-def rename_file(service: Any = None, file_id: str | None = None, new_title: str | None = None) -> dict[str, Any] | None:
+def rename_file(
+    service: Any = None, file_id: str | None = None, new_title: str | None = None
+) -> dict[str, Any] | None:
     """Rename file in Google Drive.
 
     Args:
@@ -125,7 +132,11 @@ def rename_file(service: Any = None, file_id: str | None = None, new_title: str 
     return service.files().update(fileId=file_id, body=body).execute()  # type: ignore[no-any-return]
 
 
-def download_file(service: Any = None, files: list[dict[str, Any]] | None = None, folder: str = "input") -> None:
+def download_file(
+    service: Any = None,
+    files: list[dict[str, Any]] | None = None,
+    folder: str = "input",
+) -> None:
     """Download files from Google Drive to local folder.
 
     Downloads each file in the list with progress reporting.

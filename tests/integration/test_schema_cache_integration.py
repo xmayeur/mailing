@@ -52,11 +52,15 @@ class TestProfileSwitching:
         cache = SchemaCacheProvider()
 
         # Load profile A schema
-        schema_a = cache.get("profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a))
+        schema_a = cache.get(
+            "profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a)
+        )
         assert schema_a == ["email", "name", "status"]
 
         # Load profile B schema
-        schema_b = cache.get("profile_b", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_b))
+        schema_b = cache.get(
+            "profile_b", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_b)
+        )
         assert schema_b == ["id", "full_name", "active"]
 
         # Invalidate profile A (user switched away from A)
@@ -83,11 +87,15 @@ class TestProfileSwitching:
         cache = SchemaCacheProvider()
 
         # Load A
-        cache.get("profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a))
+        cache.get(
+            "profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a)
+        )
 
         # Switch to B
         cache.invalidate("profile_a")
-        cache.get("profile_b", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_b))
+        cache.get(
+            "profile_b", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_b)
+        )
 
         # Switch back to A
         cache.invalidate("profile_b")
@@ -108,12 +116,16 @@ class TestCachePerformance:
         cache = SchemaCacheProvider()
 
         # First load (uncached)
-        schema = cache.get("profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a))
+        schema = cache.get(
+            "profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a)
+        )
         assert schema == ["email", "name", "status"]
 
         # Timed cache hit (should be <1ms)
         start = time.perf_counter_ns()
-        schema = cache.get("profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a))
+        schema = cache.get(
+            "profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a)
+        )
         elapsed_ms = (time.perf_counter_ns() - start) / 1_000_000
 
         # Cache hit should be much faster than disk read
@@ -124,14 +136,14 @@ class TestCachePerformance:
 class TestRefreshWithModifiedDatabase:
     """Test refresh() when database schema changes."""
 
-    def test_refresh_reloads_after_schema_change(
-        self, csv_file_profile_a: str
-    ) -> None:
+    def test_refresh_reloads_after_schema_change(self, csv_file_profile_a: str) -> None:
         """refresh() reloads schema even if cached."""
         cache = SchemaCacheProvider()
 
         # Initial load
-        schema1 = cache.get("profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a))
+        schema1 = cache.get(
+            "profile_a", lambda: DatabaseSchemaProvider.from_csv(csv_file_profile_a)
+        )
         assert schema1 == ["email", "name", "status"]
 
         # Modify CSV file to add a column

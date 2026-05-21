@@ -22,7 +22,7 @@ class TestFilterPersistence:
         """Load saved filters from profile on initialization."""
         config = {
             "name": "test_profile",
-            "filters": {"criteria": {"status": "active"}, "active": True}
+            "filters": {"criteria": {"status": "active"}, "active": True},
         }
         persistence = FilterPersistence(config)
 
@@ -93,7 +93,7 @@ class TestFilterPersistence:
         """User can clear saved filters."""
         config = {
             "name": "test_profile",
-            "filters": {"criteria": {"status": "active"}, "active": True}
+            "filters": {"criteria": {"status": "active"}, "active": True},
         }
         persistence = FilterPersistence(config)
 
