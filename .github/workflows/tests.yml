@@ -107,7 +107,7 @@ jobs:
       continue-on-error: false
 
     - name: Check code formatting with black
-      run: black --check . --exclude='(venv|env|\.venv|release|\.git)'
+      run: black --check . --target-version py312 --exclude='(venv|env|\.venv|release|\.git)'
       continue-on-error: false
 
 
