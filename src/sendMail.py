@@ -487,7 +487,7 @@ def get_gmail_service(param: Any) -> Any:
     :rtype: googleapiclient.discovery.Resource
     """
     if os.path.exists(param.token_file):
-        creds = cast(Credentials, Credentials.from_authorized_user_file(param.token_file, param.scopes))  # type: ignore[no-untyped-call]
+        creds = cast(Credentials, Credentials.from_authorized_user_file(param.token_file, param.scopes))
     else:
         creds = None
     # else:
@@ -496,7 +496,7 @@ def get_gmail_service(param: Any) -> Any:
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())  # type: ignore[no-untyped-call]
+            creds.refresh(Request())
         else:
             credentials = get_secret(param.credentials_id)
             flow = InstalledAppFlow.from_client_config(credentials, param.scopes)
