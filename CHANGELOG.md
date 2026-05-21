@@ -1,3 +1,104 @@
+## v1.10.0 (2026-05-21)
+
+### Feat
+
+- **Phase 8**: Integration tests, documentation, and verification
+- **US4**: Migrate debug log.info calls to log.debug
+- Fix profile loading and configuration (008-fix-profile-loading)
+- Complete Phase 9 — Multi-version Python testing (T071-T074)
+- Phase 3 start - comprehensive email engine test suite (T019)
+- Phase 2 partial - add type hints to critical sendMail functions
+- implement Phase 1 test infrastructure and baseline
+- add comprehensive testing & coverage improvement spec
+- improve `Open File` dialog to respect profile-specific default paths
+- raise test coverage from 61% to 81% with GUI and unit test expansion
+- raise test coverage from 61% to 81% with GUI and unit test expansion
+- raise test coverage from 61% to 81% with GUI and unit test expansion
+- Complete 005-editor-profile-clipboard feature - all 4 user stories
+- Implement profile selector and clipboard infrastructure (Phase 1-3 core)
+- Allow comma-separated list values in filter editor (B054)
+- implement T041-T042 - Error handling UI and validation
+- integrate FilterBuilder with _SendDialog (T035-T038)
+- implement responsive filter, dialog clarity, and template safety (US2-US5)
+- implement persistent document folder for editor (US1)
+
+### Fix
+
+- Address flake8 code quality warnings
+- Pin black version to 26.5.1 in CI workflow
+- Add --target-version py312 to black in GitHub workflow
+- Align GitHub workflow lint checks with local testing
+- Apply noqa comments to ruff violations in editor.py and sendMail.py
+- Use cast(Any) for ServiceAccountCredentials.from_json_keyfile_dict scopes
+- Add version constraints to requirements.txt
+- Add type: ignore for untyped google-auth library functions
+- Remove unused type ignore comments
+- Add type: ignore for untyped google-auth functions
+- Resolve ruff linting issues
+- Use cast() for untyped google-auth function
+- Add auto-patch fixture for profile_manager.get_secret
+- Remove unused type ignore comment
+- Move mock setup to conftest.py and fix verbose logging level
+- Add type casts for mypy --strict compatibility
+- Downgrade SMTP TLS to 1.2 and disable strict cert verification for OVH
+- Complete vault key parsing and SMTP field validation
+- Load stylesheet from current profile, not hardcoded default
+- Fix type narrowing for untyped yaml returns
+- Add type:ignore[no-any-return] for yaml untyped returns
+- Install project dependencies in lint CI job for proper mypy type checking
+- correct mypy type ignore error codes and remove unused comments
+- Use bare type:ignore comments for better cross-version compatibility
+- Register Office file MIME types for Windows compatibility
+- Resolve remaining mypy --strict type checking errors
+- Mark untestable Qt dialog classes with pragma:no-cover
+- Exclude visual_filter_builder.py from coverage (unit tests mock it)
+- Mark visual_filter_builder.py with pragma:no-cover (unit tests mock it)
+- Resolve all mypy/pyright type checking errors
+- Correct return type annotation for setup_argparse
+- Add type annotations to sendMail.py functions
+- align type annotations with Python 3.13 + stubs environment
+- resolve all 50 pre-existing mypy errors in src/
+- clean up ruff warnings in test files
+- Complete 006-send-dialog-improvements - all bugs resolved
+- Revert async deferral, restore sync loading for Send dialog
+- Use consistent config file path across all editor dialogs
+- Pass selected profile to Settings/Config dialog
+- Pass selected profile to Send mailing dialog
+- Always update file dialog path when profile selected
+- Handle empty string in default_documents_path from config
+- _open_template() also uses profile's default_documents_path
+- Use correct config key 'default_documents_path' in profile loader
+- Profile selection file dialog opens to default_document_path (BF001)
+- Add Excel file support to editor database loading
+- Enable Excel file support in schema provider using calamine
+- Prevent UI blocking during filter editing - defer record loading and add caching (B053)
+- Suppress combo signals during schema refresh to prevent cascading loads (B052)
+- Skip row_changed signal during schema refresh if no rows (B051)
+- Use repaint() for immediate visual update of combos (B049)
+- Force visual update of combo boxes when populated (B049)
+- Preserve operator selection during schema refresh (B048)
+- Case-insensitive config keys in load_database_records (B047)
+- Handle both uppercase and lowercase config keys (B047)
+- Improve Google Sheets schema loading diagnostics (B045)
+- Center text vertically in QLineEdit value inputs (B044)
+- Handle list values in FilterRow for multi-value operators
+- Debug and resolve three critical filter widget bugs (B001-B003)
+- use directory picker for default_documents_path config field
+- force light palette for all UI elements
+- use Fusion style for light mode UI in all dialogs
+- force light mode in macOS app - disable dark theme support
+- PyInstaller bundle - fix module imports and log file paths
+
+### Refactor
+
+- Use system defaults for fallback paths instead of hardcoded 'data'
+- reorder imports in sendMail.py for readability and consistency
+
+### Perf
+
+- Defer expensive database operations during Send dialog init
+- Add timing measurements for schema and record loading (B050)
+
 ## v1.9.0 (2026-05-17)
 
 ### Feat
