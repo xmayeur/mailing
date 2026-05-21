@@ -1,6 +1,7 @@
 """Profile management and vault integration for email profiles."""
 import logging
-from typing import Any, Dict, Optional, cast
+from typing import Any, cast
+
 from getSecrets import get_secret
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ class ProfileLoadError(Exception):
 class Profile:
     """Email profile with SMTP configuration and optional filters."""
 
-    def __init__(self, name: str, config: Dict[str, Any]) -> None:
+    def __init__(self, name: str, config: dict[str, Any]) -> None:
         """Initialize profile from configuration dictionary.
 
         Args:
@@ -26,24 +27,24 @@ class Profile:
         """
         self.name = name
         self.config = config
-        self._smtp_cache: Optional[Dict[str, Any]] = None
+        self._smtp_cache: dict[str, Any] | None = None
         self._smtp_cached = False
 
     @property
-    def vault_key(self) -> Optional[str]:
+    def vault_key(self) -> str | None:
         """Get vault key for this profile's SMTP credentials."""
         return self.config.get("vault_key") or self.config.get("MAILCONFIG") or self.config.get("mailconfig")
 
     @property
-    def filters(self) -> Optional[Dict[str, Any]]:
+    def filters(self) -> dict[str, Any] | None:
         """Get saved filters for this profile."""
         return self.config.get("filters")
 
-    def set_filters(self, filters: Dict[str, Any]) -> None:
+    def set_filters(self, filters: dict[str, Any]) -> None:
         """Set/update filters for this profile."""
         self.config["filters"] = filters
 
-    def load_smtp_from_vault(self) -> Dict[str, Any]:
+    def load_smtp_from_vault(self) -> dict[str, Any]:
         """Load SMTP parameters from vault.
 
         Returns:
@@ -67,7 +68,7 @@ class Profile:
             if vault_key.startswith("mailconfig:"):
                 secret_key = vault_key.split(":", 1)[1].strip()
 
-            smtp_params = cast(Dict[str, Any], get_secret(secret_key))
+            smtp_params = cast(dict[str, Any], get_secret(secret_key))
             if not smtp_params:
                 raise ProfileLoadError(
                     f"Vault key not found or empty: {vault_key}"
@@ -95,9 +96,9 @@ class Profile:
                 raise
             raise ProfileLoadError(
                 f"Failed to fetch SMTP parameters from vault for profile '{self.name}': {str(e)}"
-            )
+            ) from e
 
-    def get_smtp_params(self) -> Dict[str, Any]:
+    def get_smtp_params(self) -> dict[str, Any]:
         """Get SMTP parameters (from cache if available, else load from vault).
 
         Returns:

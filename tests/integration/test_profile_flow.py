@@ -1,7 +1,10 @@
 """Integration tests for profile loading and email sending."""
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, Mock
+
 from src.profile_manager import Profile, ProfileLoadError
+
 # Note: FilterPersistence is from US5 (P3) - not yet implemented
 # from src.filter_persistence import FilterPersistence
 
@@ -42,10 +45,8 @@ class TestProfileFlow:
     def test_profile_switch_invalidates_cache(self):
         """Switching profiles invalidates previous cache."""
         config1 = {"name": "profile1", "vault_key": "mailconfig: profile1"}
-        config2 = {"name": "profile2", "vault_key": "mailconfig: profile2"}
 
         profile1 = Profile("profile1", config1)
-        profile2 = Profile("profile2", config2)
 
         response1 = {"smtp_host": "smtp1.com", "smtp_port": 587, "username": "user1", "password": "pass1", "sender": "user1@test.com", "sendername": "User1"}
         response2 = {"smtp_host": "smtp2.com", "smtp_port": 587, "username": "user2", "password": "pass2", "sender": "user2@test.com", "sendername": "User2"}

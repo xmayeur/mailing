@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+import yaml as _real_yaml
 
 # Add project root and src directory to Python path for imports
 project_root = Path(__file__).parent.parent
@@ -14,9 +15,6 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 if str(src_dir) not in sys.path:
     sys.path.insert(1, str(src_dir))
-
-# Save real yaml module to restore after mocking (for sendMail import)
-import yaml as _real_yaml
 
 # Setup global mocks for external dependencies BEFORE any test imports
 # This must happen at module load time, before test files import sendMail
@@ -137,7 +135,7 @@ def mock_vault_smtp_response():
 @pytest.fixture
 def vault_fixture(monkeypatch, mock_vault_smtp_response):
     """Mock get-hc-secrets for vault integration testing."""
-    from unittest.mock import Mock, patch
+    from unittest.mock import Mock
 
     mock_get_secrets = Mock(return_value=mock_vault_smtp_response)
 
