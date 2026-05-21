@@ -67,6 +67,30 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "bdd: BDD behavior tests")
 
 
+@pytest.fixture(autouse=True)
+def _auto_patch_profile_manager_get_secret(monkeypatch):
+    """Auto-patch profile_manager.get_secret for all tests.
+
+    This ensures vault tests work even when real getSecrets is installed,
+    by providing a default mock that can be overridden by individual tests.
+    """
+    from unittest.mock import MagicMock
+
+    # Create a default mock that returns SMTP fields
+    default_mock = MagicMock(return_value={
+        "smtp_host": "smtp.example.com",
+        "smtp_port": 587,
+        "username": "test_user",
+        "password": "test_password",
+        "sender": "test@example.com"
+    })
+
+    # Patch get_secret in profile_manager
+    monkeypatch.setattr("src.profile_manager.get_secret", default_mock)
+
+    return default_mock
+
+
 @pytest.fixture
 def tmp_yaml_file(tmp_path):
     """Create a temporary YAML config file for testing."""
