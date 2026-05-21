@@ -52,7 +52,7 @@ from os.path import exists, join
 from pathlib import Path
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 from time import sleep, time
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import gspread
@@ -487,7 +487,7 @@ def get_gmail_service(param: Any) -> Any:
     :rtype: googleapiclient.discovery.Resource
     """
     if os.path.exists(param.token_file):
-        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
+        creds = cast(Credentials, Credentials.from_authorized_user_file(param.token_file, param.scopes))
     else:
         creds = None
     # else:
