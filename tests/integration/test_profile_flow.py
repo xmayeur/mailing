@@ -1,4 +1,5 @@
 """Integration tests for profile loading and email sending."""
+
 from unittest.mock import patch
 
 import pytest

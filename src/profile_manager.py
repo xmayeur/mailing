@@ -1,4 +1,5 @@
 """Profile management and vault integration for email profiles."""
+
 import logging
 from typing import Any, cast
 

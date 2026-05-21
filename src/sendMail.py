@@ -24,6 +24,7 @@ Key functions:
     filter: Filter subscriber rows based on criteria
     generate_mailing: Generate and send campaign emails
 """
+
 from __future__ import annotations
 
 import argparse

@@ -96,9 +96,9 @@ class TestGoogleDriveFileOperations:
         mock_service = MagicMock()
         mock_build.return_value = mock_service
 
-        mock_service.files().get_media(
-            fileId="file123"
-        ).execute.return_value = b"file content"
+        mock_service.files().get_media(fileId="file123").execute.return_value = (
+            b"file content"
+        )
 
         result = mock_service.files().get_media(fileId="file123").execute()
         assert result == b"file content"
@@ -111,9 +111,9 @@ class TestGoogleDriveFileOperations:
 
         from googleapiclient.errors import HttpError
 
-        mock_service.files().get_media(
-            fileId="invalid"
-        ).execute.side_effect = HttpError(MagicMock(status=404), b"Not found")
+        mock_service.files().get_media(fileId="invalid").execute.side_effect = (
+            HttpError(MagicMock(status=404), b"Not found")
+        )
 
         with pytest.raises(HttpError):
             mock_service.files().get_media(fileId="invalid").execute()

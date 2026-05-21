@@ -4,6 +4,7 @@ Tests for filter_matcher.py and schema_provider.py.
 Uses sys.modules mocking (same pattern as test_sendMail.py / test_coverage_gap.py)
 so that sendMail is importable when FilterMatcher tries to import it inside __init__.
 """
+
 import os
 import sys
 from unittest.mock import MagicMock, patch

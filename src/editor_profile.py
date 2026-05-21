@@ -1,4 +1,5 @@
 """Editor profile styling integration."""
+
 import logging
 from pathlib import Path
 from typing import Any, cast

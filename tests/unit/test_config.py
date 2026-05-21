@@ -17,15 +17,13 @@ class TestConfigLoading:
     def test_load_valid_yaml_config(self, tmp_path: Any) -> None:
         """Load valid YAML configuration file."""
         config_file = tmp_path / "config.yml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 profiles:
   default:
     smtp_host: localhost
     smtp_port: 25
     from_address: test@example.com
-"""
-        )
+""")
         # Would test actual config loading here
         assert config_file.exists()
 
@@ -37,13 +35,11 @@ profiles:
     def test_load_invalid_yaml_syntax(self, tmp_path: Any) -> None:
         """Handle invalid YAML syntax."""
         config_file = tmp_path / "bad_config.yml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 invalid: yaml: content:
   - bad
   - indentation
-"""
-        )
+""")
         # YAML is valid, but structure might be unexpected
         assert config_file.exists()
 

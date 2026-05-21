@@ -1,4 +1,5 @@
 """Tests for profile loading and SMTP vault integration."""
+
 import logging
 from unittest.mock import patch
 
