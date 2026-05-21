@@ -57,11 +57,12 @@ def sample_email_config():
 def mock_vault_smtp_response():
     """Provide mock vault response for SMTP credentials."""
     return {
-        "host": "smtp.example.com",
-        "port": 587,
+        "smtp_host": "smtp.example.com",
+        "smtp_port": 587,
         "username": "test_user",
         "password": "test_password",
-        "security": "tls"
+        "sender": "test@example.com",
+        "sendername": "Test Sender"
     }
 
 

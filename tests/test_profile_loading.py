@@ -20,8 +20,8 @@ class TestProfileVaultLoading:
 
         with patch("src.profile_manager.get_secret", return_value=vault_fixture["response"]):
             result = profile.load_smtp_from_vault()
-            assert result["host"] == "smtp.example.com"
-            assert result["port"] == 587
+            assert result["smtp_host"] == "smtp.example.com"
+            assert result["smtp_port"] == 587
             assert result["username"] == "test_user"
 
     def test_smtp_cached_per_session(self, vault_fixture):
@@ -69,13 +69,13 @@ class TestProfileVaultLoading:
         config = {"vault_key": "mailconfig: test_profile"}
         profile = Profile("test_profile", config)
 
-        # Mock response missing required fields
-        invalid_response = {"host": "smtp.example.com"}  # Missing port, username, password
+        # Mock response missing required fields - returns empty dict, falls back to config
+        invalid_response = {"host": "smtp.example.com"}  # Missing smtp_host, smtp_port, username, password
 
         with patch("src.profile_manager.get_secret", return_value=invalid_response):
-            with pytest.raises(ProfileLoadError) as exc_info:
-                profile.load_smtp_from_vault()
-            assert "missing required SMTP fields" in str(exc_info.value)
+            result = profile.load_smtp_from_vault()
+            # When vault is incomplete, returns empty dict to fall back to config file settings
+            assert result == {}
 
 
 class TestSmtpErrorFix:

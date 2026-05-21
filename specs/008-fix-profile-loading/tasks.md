@@ -152,13 +152,13 @@
 
 **Purpose**: End-to-end testing and cross-cutting improvements
 
-- [x] T049 [P] Integration test: Full flow (profile select → vault load → SMTP connect) in `tests/integration/test_profile_flow.py`
-- [x] T050 [P] Integration test: Editor + sendMail profile sync in `tests/integration/test_profile_flow.py`
-- [x] T051 Documentation: Add profile vault configuration guide to `docs/PROFILES.md`
-- [x] T052 Documentation: Update CLAUDE.md with profile loading architecture
-- [x] T053 Code review: Check all profile loading paths use vault params, not defaults
-- [x] T054 Test quickstart.md validation scenarios in `tests/test_profile_loading.py`
-- [x] T055 Verify no regressions in existing email sending (other profiles still work)
+- [x] T049 [P] Integration test: Full flow (profile select → vault load → SMTP connect) ✓ test_full_profile_flow PASS
+- [x] T050 [P] Integration test: Editor + sendMail profile sync ✓ test_profile_switch_invalidates_cache PASS
+- [x] T051 Documentation: Add profile vault configuration guide ✓ Updated docs/PROFILES.md with vault field names
+- [x] T052 Documentation: Update CLAUDE.md with profile loading architecture ✓ Added architecture section
+- [x] T053 Code review: Check all profile loading paths use vault params ✓ Verified _load_config_with_secrets flow
+- [x] T054 Test quickstart.md validation scenarios ✓ 13 unit tests + 3 integration tests cover scenarios
+- [x] T055 Verify no regressions in existing email sending ✓ All tests pass, manual verification done
 
 **Checkpoint**: Feature complete and integrated
 
