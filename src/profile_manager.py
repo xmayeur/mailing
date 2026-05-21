@@ -32,7 +32,7 @@ class Profile:
     @property
     def vault_key(self) -> Optional[str]:
         """Get vault key for this profile's SMTP credentials."""
-        return self.config.get("vault_key") or self.config.get("MAILCONFIG")
+        return self.config.get("vault_key") or self.config.get("MAILCONFIG") or self.config.get("mailconfig")
 
     @property
     def filters(self) -> Optional[Dict[str, Any]]:
@@ -62,7 +62,12 @@ class Profile:
         logger.debug(f"Fetching SMTP params for profile '{self.name}' from vault key '{vault_key}'")
 
         try:
-            smtp_params = get_secret(vault_key)
+            # Parse vault key format: "mailconfig: artscroisesmailing" → "artscroisesmailing"
+            secret_key = vault_key
+            if vault_key.startswith("mailconfig:"):
+                secret_key = vault_key.split(":", 1)[1].strip()
+
+            smtp_params = get_secret(secret_key)
             if not smtp_params:
                 raise ProfileLoadError(
                     f"Vault key not found or empty: {vault_key}"
@@ -70,9 +75,8 @@ class Profile:
 
             logger.debug(f"Successfully loaded SMTP params for profile '{self.name}'")
 
-            # Validate required SMTP fields (allow partial configs for backward compat)
-            # If all required fields present, use them; otherwise return empty to fall back
-            required_fields = ["host", "port", "username", "password"]
+            # Validate required SMTP fields (vault returns smtp_host, smtp_port, etc.)
+            required_fields = ["smtp_host", "smtp_port", "username", "password"]
             missing = [f for f in required_fields if f not in smtp_params]
             if missing:
                 logger.debug(
