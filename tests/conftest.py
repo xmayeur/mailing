@@ -51,3 +51,30 @@ def tmp_html_file(tmp_path):
 def sample_email_config():
     """Provide sample email configuration for testing."""
     return {"sender": "test@example.com", "smtp_server": "localhost", "smtp_port": 25}
+
+
+@pytest.fixture
+def mock_vault_smtp_response():
+    """Provide mock vault response for SMTP credentials."""
+    return {
+        "host": "smtp.example.com",
+        "port": 587,
+        "username": "test_user",
+        "password": "test_password",
+        "security": "tls"
+    }
+
+
+@pytest.fixture
+def vault_fixture(monkeypatch, mock_vault_smtp_response):
+    """Mock get-hc-secrets for vault integration testing."""
+    from unittest.mock import Mock, patch
+
+    mock_get_secrets = Mock(return_value=mock_vault_smtp_response)
+
+    # Monkeypatch the vault access function (location depends on implementation)
+    # This will be adjusted when Profile.load_smtp_from_vault() is implemented
+    return {
+        "mock_get_secrets": mock_get_secrets,
+        "response": mock_vault_smtp_response
+    }
