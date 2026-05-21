@@ -1,0 +1,12 @@
+coverage:
+  precision: 2
+  round: down
+  range: "70..100"
+
+ignore:
+  - "tests"
+  - "src/setup.py"
+  - "src/visual_filter_builder.py"
+
+codecov:
+  require_ci_to_pass: false
