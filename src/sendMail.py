@@ -61,7 +61,6 @@ import requests
 import yaml
 from bs4 import BeautifulSoup
 from getSecrets import get_secret
-from profile_manager import Profile, ProfileLoadError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -71,6 +70,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from PIL import Image
 
 import googleDriveLib as gd  # noqa: N813
+from profile_manager import Profile, ProfileLoadError
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 _CSP_IMG_DOMAIN = "{_CSP_IMG_DOMAIN}"

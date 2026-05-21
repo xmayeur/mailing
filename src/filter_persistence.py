@@ -1,6 +1,6 @@
 """Filter persistence to profile configuration."""
 import logging
-from typing import Any, Dict, Optional, cast
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 class FilterPersistence:
     """Handle filter save/restore to profile config."""
 
-    def __init__(self, profile_config: Dict[str, Any]) -> None:
+    def __init__(self, profile_config: dict[str, Any]) -> None:
         """Initialize with profile configuration.
 
         Args:
@@ -17,7 +17,7 @@ class FilterPersistence:
         self.profile_config = profile_config
         self.profile_name = profile_config.get("name", "default")
 
-    def save_filter(self, filter_criteria: Dict[str, Any]) -> None:
+    def save_filter(self, filter_criteria: dict[str, Any]) -> None:
         """Save filter criteria to profile config.
 
         Args:
@@ -40,7 +40,7 @@ class FilterPersistence:
             "active": True
         }
 
-    def load_filters(self) -> Optional[Dict[str, Any]]:
+    def load_filters(self) -> dict[str, Any] | None:
         """Load saved filters from profile config.
 
         Returns:
@@ -56,9 +56,9 @@ class FilterPersistence:
             return None
 
         logger.debug(f"Loaded filters for profile '{self.profile_name}': {filters}")
-        return cast(Dict[str, Any], filters)
+        return cast(dict[str, Any], filters)
 
-    def validate_filter_criteria(self, criteria: Dict[str, Any], schema_columns: list[str]) -> bool:
+    def validate_filter_criteria(self, criteria: dict[str, Any], schema_columns: list[str]) -> bool:
         """Validate filter criteria against schema columns.
 
         Args:
@@ -77,7 +77,7 @@ class FilterPersistence:
                 return False
         return True
 
-    def apply_filter(self, criteria: Dict[str, Any], schema_columns: list[str]) -> Dict[str, Any]:
+    def apply_filter(self, criteria: dict[str, Any], schema_columns: list[str]) -> dict[str, Any]:
         """Apply filter, validating against schema.
 
         If criteria invalid, skip with warning.
