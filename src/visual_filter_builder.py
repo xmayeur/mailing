@@ -310,7 +310,7 @@ def _split_operator_value(expr: str) -> tuple[str, str | None]:
 
     for op in operators:
         if expr.startswith(op + " "):
-            value = expr[len(op) + 1:].strip()
+            value = expr[len(op) + 1 :].strip()
             return op, value if value else None
 
     return expr, None
