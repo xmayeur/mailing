@@ -15,7 +15,7 @@ import io
 import logging
 import sys
 from os.path import basename, join
-from typing import Any
+from typing import Any, cast
 
 from getSecrets import get_secret
 from googleapiclient.discovery import build
@@ -73,8 +73,8 @@ def connect_google_driver(service_account_id: str = "artscroisesServiceAccount")
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-            creds, scope
-        )  # pyright: ignore
+            creds, cast(Any, scope)
+        )
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
         _log.error(e)
