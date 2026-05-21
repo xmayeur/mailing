@@ -17,11 +17,11 @@ semver increment automatically.
 ```bash
 git checkout master
 git pull origin master
-git checkout develop
-git pull origin develop
-git merge master          # bring any master fixes into develop first
+git checkout beta
+git pull origin beta
+git merge master          # bring any master fixes into beta first
 git checkout master
-git merge develop         # fast-forward master to develop HEAD
+git merge beta         # fast-forward master to beta HEAD
 ```
 
 ### 2. Check layer boundaries
@@ -119,13 +119,13 @@ gh release create v<NEW_VERSION> --title "v<NEW_VERSION>" --notes "<PASTE NOTES>
 Or create directly on GitHub at https://github.com/xmayeur/mailing/releases/new,
 selecting the version tag and pasting the draft.
 
-### 12. Merge master back into develop
+### 12. Merge master back into beta
 
 ```bash
-git checkout develop
-git pull origin develop
+git checkout beta
+git pull origin beta
 git merge master
-git push origin develop
+git push origin beta
 ```
 
 ## build the package and publish to PyPI
