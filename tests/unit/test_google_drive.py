@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-import googleDriveLib as gd
+import googleDriveLib as gd  # noqa: E402
 
 
 @pytest.mark.xfail(

@@ -15,7 +15,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-import sendMail as sm
+import sendMail as sm  # noqa: E402
 
 
 class TestAttachmentProcessing:
@@ -219,7 +219,7 @@ class TestGmailSending:
         param = MagicMock()
 
         # Should handle None service gracefully
-        _result = sm.send_gmail(param, msg)
+        sm.send_gmail(param, msg)
 
 
 class TestSmtpSending:
@@ -253,7 +253,6 @@ class TestSmtpSending:
         """Handle SMTP connection failures."""
         mock_smtp_class.side_effect = OSError("Connection refused")
 
-        _msg = MIMEText("Test message")
         param = MagicMock()
         param.smtp_host = "localhost"
         param.smtp_port = 25
