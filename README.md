@@ -1,8 +1,7 @@
 # sendMail - Email Campaign Management System
 
 [![Tests](https://github.com/xmayeur/mailing/workflows/Tests/badge.svg)](https://github.com/xmayeur/mailing/actions)
-[![codecov](https://codecov.io/gh/xmayeur/mailing/branch/master/graph/badge.svg)](https://codecov.io/gh/xmayeur/mailing)
-[![Coverage](https://img.shields.io/badge/coverage-72.5%25-brightgreen.svg)](https://codecov.io/gh/xmayeur/mailing)
+[![pytest-coverage](https://img.shields.io/badge/coverage-84%25-brightgreen.svg)
 [![Type Checking](https://img.shields.io/badge/type%20checking-mypy-blue.svg)](https://mypy-lang.org/)
 [![Code Quality](https://img.shields.io/badge/code%20quality-ruff-blue.svg)](https://docs.astral.sh/ruff/)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
