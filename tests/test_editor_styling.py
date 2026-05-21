@@ -1,8 +1,9 @@
 """Tests for editor profile styling application."""
-import pytest
-from unittest.mock import Mock, patch
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
+import pytest
+
 from src.editor_profile import EditorProfileStyler
 
 

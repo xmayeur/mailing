@@ -1,5 +1,6 @@
 """Tests for filter persistence to profile config."""
 import pytest
+
 from src.filter_persistence import FilterPersistence
 
 
