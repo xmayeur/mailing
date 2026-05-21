@@ -782,8 +782,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.load_current_filter(profile)
         self.filter_and_display_records()
 
-        # Reload stylesheet when profile changes
-        self._load_default_stylesheet()
+        # Reload stylesheet when profile changes (EditorWindow only)
+        if hasattr(self, "_load_default_stylesheet"):
+            self._load_default_stylesheet()
 
     def load_current_filter(self, profile: str) -> None:
         """Load filter from profile config and display in filter field (T036)."""

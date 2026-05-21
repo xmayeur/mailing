@@ -1326,7 +1326,7 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
 
     # Try Profile class for vault_key, fall back to legacy MAILCONFIG
     try:
-        vault_key = config.get("vault_key") or config.get("MAILCONFIG")
+        vault_key = config.get("vault_key") or config.get("MAILCONFIG") or config.get("mailconfig")
         if vault_key:
             profile = Profile(args.profile, config)
             secret = profile.load_smtp_from_vault()
