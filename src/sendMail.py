@@ -950,7 +950,7 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
             try:
                 shutil.rmtree(d)
                 if param.verbose:
-                    log.debug(f"Dossier temporaire supprimé : {d}")
+                    log.info(f"Dossier temporaire supprimé : {d}")
             except OSError as e:
                 log.error(f"Erreur lors du nettoyage de {d}: {e}")
 
