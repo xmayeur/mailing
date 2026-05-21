@@ -487,7 +487,7 @@ def get_gmail_service(param: Any) -> Any:
     :rtype: googleapiclient.discovery.Resource
     """
     if os.path.exists(param.token_file):
-        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)  # type: ignore[no-untyped-call]
+        creds = Credentials.from_authorized_user_file(param.token_file, param.scopes)
     else:
         creds = None
     # else:
