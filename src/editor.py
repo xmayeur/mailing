@@ -59,9 +59,15 @@ for mod_path in _MODULES_PATH:
     if str(mod_path) not in sys.path:
         sys.path.insert(0, str(mod_path))
 
-ASSETS_DIR = (
-    _BASE / "Resources" / "editor_assets" if _IS_FROZEN else _BASE / "editor_assets"
-)
+if _IS_FROZEN:
+    # macOS .app bundle: _BASE is Contents/, assets in Contents/Resources/
+    # Windows/Linux onefile: _BASE is _MEIPASS/, assets in _MEIPASS/editor_assets/
+    if sys.platform == "darwin":
+        ASSETS_DIR = _BASE / "Resources" / "editor_assets"
+    else:
+        ASSETS_DIR = _BASE / "editor_assets"
+else:
+    ASSETS_DIR = _BASE / "editor_assets"
 
 FONT_CHOICES = [
     "Arial",
@@ -2899,11 +2905,13 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return home_css
 
         # Fall back to project default
-        default_css = (
-            (_BASE / "Resources" / "css" / "styles.css")
-            if _IS_FROZEN
-            else (_BASE / "css" / "styles.css")
-        )
+        if _IS_FROZEN:
+            if sys.platform == "darwin":
+                default_css = _BASE / "Resources" / "css" / "styles.css"
+            else:
+                default_css = _BASE / "css" / "styles.css"
+        else:
+            default_css = _BASE / "css" / "styles.css"
         return default_css
 
     def _get_css_directory(self) -> Path:
@@ -2923,9 +2931,13 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return home_css_dir
 
         # Fall back to project default
-        default_css_dir = (
-            (_BASE / "Resources" / "css") if _IS_FROZEN else (_BASE / "css")
-        )
+        if _IS_FROZEN:
+            if sys.platform == "darwin":
+                default_css_dir = _BASE / "Resources" / "css"
+            else:
+                default_css_dir = _BASE / "css"
+        else:
+            default_css_dir = _BASE / "css"
         return default_css_dir
 
     def _resolve_stylesheet_path(self, styles_value: str) -> Path | None:
