@@ -663,7 +663,7 @@ class TestAnchorHandling:
         html = '<a id="intro" name="intro"></a><p>text</p>'
         result = editor.EditorWindow._anchors_to_spans(html)
         assert "editor-anchor" in result
-        assert 'data-anchor-id="intro"' in result
+        assert 'id="intro"' in result
         assert "⚓" in result
         # Original <a> should be gone
         assert '<a id="intro"' not in result

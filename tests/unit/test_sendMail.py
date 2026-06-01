@@ -554,7 +554,7 @@ class TestHTMLProcessing:
 
         # Should skip the image and log error
         assert len(images) == 0
-        mock_log.error.assert_called()
+        mock_log.exception.assert_called()
 
 
 class TestAttachmentProcessing:
@@ -1560,7 +1560,7 @@ def test_send_gmail_error():
         result = sendMail.send_gmail(service, message)
         # Verify result is None because of the exception being caught
         assert result is None
-        assert mock_log.error.called
+        assert mock_log.exception.called
 
 
 def test_build_email_image_error(tmp_path):
