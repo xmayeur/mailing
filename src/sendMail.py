@@ -40,6 +40,7 @@ import ssl
 import sys
 import tempfile
 import urllib.parse
+from collections.abc import Callable
 from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -1228,7 +1229,6 @@ def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
 
 def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
     """Helper to evaluate string operations."""
-    from typing import Callable
     handlers: dict[tuple[str, ...], Callable[[], bool]] = {
         ("in", "one of", _OP_ONE_OF): lambda: field_value in test_value,
         ("not in", "none of", _OP_NOT_ONE_OF): lambda: field_value not in test_value,
@@ -1423,7 +1423,7 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
         else:
             # No vault key configured, use legacy behavior
             secret = None
-    except ProfileLoadError as e:
+    except ProfileLoadError:
         log.exception(f"Failed to load profile '{args.profile}'")
         raise
     except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
