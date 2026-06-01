@@ -21,7 +21,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, TypeAlias, cast
+from typing import Any, TypeAlias, cast, override
 
 import yaml
 
@@ -2873,6 +2873,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         # Store file_path for deferred loading (after window shows)
         self._deferred_file_path = file_path
 
+    @override
     def showEvent(self, event: Any) -> None:
         """Load deferred content after window is shown."""
         super().showEvent(event)
