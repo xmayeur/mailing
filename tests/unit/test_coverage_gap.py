@@ -97,7 +97,7 @@ class TestCoverageGap:
         with patch("sendMail.log") as mock_log:
             conn = sendMail.get_smtp_connection(param)
             assert conn is None
-            mock_log.error.assert_called_once()
+            mock_log.exception.assert_called_once()
 
     @patch("sendMail.os.path.exists", return_value=True)
     @patch("sendMail.Credentials")
@@ -208,7 +208,7 @@ class TestCoverageGap:
             )
             assert len(images) == 1
             mock_im1.resize.assert_called()
-            mock_log.error.assert_called_once()
+            mock_log.exception.assert_called_once()
 
     def test_build_email_variants(self):
         """Cover lines 506-508 (max_addr_per_mail=1), 512 (Cc), 517 (artscroises Message-ID)"""
@@ -368,7 +368,7 @@ class TestCoverageGap:
             with patch("sendMail.log") as mock_log:
                 res = sendMail.send_gmail(service, message)
                 assert res is None
-                mock_log.error.assert_called_once()
+                mock_log.exception.assert_called_once()
 
     @patch("sendMail.get_smtp_connection")
     def test_send_mail_error(self, mock_get_conn):
@@ -393,7 +393,7 @@ class TestCoverageGap:
         with patch("sendMail.log") as mock_log:
             with patch("sendMail.sleep") as mock_sleep:
                 sendMail.send_mail(param, msg, ["to@ex.com"])
-                mock_log.error.assert_called()
+                mock_log.exception.assert_called()
                 mock_sleep.assert_called_with(10)
 
 
@@ -469,7 +469,7 @@ class TestCoverageGap2:
             sendMail._attach_body(
                 msg, msg_related, "<html><body>test</body></html>", all_inline_images
             )
-        mock_log.error.assert_called_once()
+        mock_log.exception.assert_called_once()
 
     def test_build_and_send_temp_dir_cleanup_verbose(self, tmp_path):
         """Cover lines 933-938: temp dir cleanup with verbose logging."""
@@ -521,7 +521,7 @@ class TestCoverageGap2:
         ):
             sendMail._build_and_send(param, ["to@test.com"], ["to@test.com"], ["email"])
 
-        mock_log.error.assert_called()
+        mock_log.exception.assert_called()
 
     def test_generate_mailing_empty_header(self):
         """Cover line 993: return 'Header Error' when reader yields nothing."""
