@@ -463,8 +463,8 @@ def get_smtp_connection(param: Any) -> SMTP | None:
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE  # noqa: S303 disabled for provider compatibility
+    context.check_hostname = False  # noqa: S5527 disabled for provider compatibility
+    context.verify_mode = ssl.CERT_NONE  # noqa: S4830,S303 disabled for provider compatibility
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -476,7 +476,7 @@ def get_smtp_connection(param: Any) -> SMTP | None:
         log.critical("Invalid SMTP credentials")
         sys.exit(-1)
     except (OSError, SMTPException) as e:
-        log.error(f"Failed to connect to SMTP: {e}")
+        log.exception("Failed to connect to SMTP")
         return None
 
 
@@ -550,7 +550,7 @@ def save_to_sent(param: Any, msg: MIMEMultipart) -> None:
                 log.warning(f"Retrying IMAP storage: {e}")
                 sleep(10)
             else:
-                log.error(f"Error copying to sent folder: {e}")
+                log.exception("Error copying to sent folder")
 
 
 def _decode_base64_image(src: str, temp_dir: str) -> str | None:
@@ -568,7 +568,7 @@ def _decode_base64_image(src: str, temp_dir: str) -> str | None:
             f.write(img_data)
         return temp_path
     except (ValueError, OSError) as e:
-        log.error(f"Impossible de traiter l'image en base64 : {e}")
+        log.exception("Impossible de traiter l'image en base64")
         return None
 
 
@@ -589,7 +589,7 @@ def _resize_and_save_image(
             im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
         return opt_img_path
     except OSError as e:
-        log.error(f"Impossible de traiter l'image {img_path}: {e}")
+        log.exception(f"Impossible de traiter l'image {img_path}")
         return None
 
 
@@ -914,7 +914,7 @@ def _attach_body(
                 )
                 msg_related.attach(img_part)
             except (OSError, TypeError) as e:
-                log.error(f"Error attaching inline image {img_info['path']}: {e}")
+                log.exception(f"Error attaching inline image {img_info['path']}")
         msg.attach(msg_related)
     else:
         msg.attach(MIMEText(message, "plain"))
@@ -1015,7 +1015,7 @@ def _build_and_send(
                 if param.verbose:
                     log.info(f"Dossier temporaire supprimé : {d}")
             except OSError as e:
-                log.error(f"Erreur lors du nettoyage de {d}: {e}")
+                log.exception(f"Erreur lors du nettoyage de {d}")
 
 
 def _skip_to_index(reader: Any, from_index: int) -> int:
@@ -1325,7 +1325,7 @@ def send_gmail(service: Any, message: Any = None) -> Any:
     try:
         return service.users().messages().send(userId="me", body=body).execute()
     except errors.HttpError as error:
-        log.error(f"Error sending message: {error} to {message['To']}")
+        log.exception(f"Error sending message to {message['To']}")
         return None
 
 
@@ -1363,7 +1363,7 @@ def send_mail(param: Any = None, message: Any = None, recipients: Any = None) ->
                     log.info("sent")
                 break
             except SMTPException as e:
-                log.error(f"SMTP error on attempt {attempt + 1}: {e}")
+                log.exception(f"SMTP error on attempt {attempt + 1}")
                 if attempt == 0:
                     sleep(10)
 
@@ -1425,7 +1425,7 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
             # No vault key configured, use legacy behavior
             secret = None
     except ProfileLoadError as e:
-        log.error(f"Failed to load profile '{args.profile}': {str(e)}")
+        log.exception(f"Failed to load profile '{args.profile}'")
         raise
     except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
         log.debug(f"No secret configuration found, using config file only: {e}")
