@@ -475,7 +475,7 @@ def get_smtp_connection(param: Any) -> SMTP | None:
     except SMTPAuthenticationError:
         log.critical("Invalid SMTP credentials")
         sys.exit(-1)
-    except (OSError, SMTPException) as e:
+    except (OSError, SMTPException):
         log.exception("Failed to connect to SMTP")
         return None
 
@@ -550,7 +550,7 @@ def save_to_sent(param: Any, msg: MIMEMultipart) -> None:
                 log.warning(f"Retrying IMAP storage: {e}")
                 sleep(10)
             else:
-                log.exception("Error copying to sent folder")
+                log.exception("Error copying to sent folder")  # noqa: BLE001
 
 
 def _decode_base64_image(src: str, temp_dir: str) -> str | None:
@@ -567,7 +567,7 @@ def _decode_base64_image(src: str, temp_dir: str) -> str | None:
         with open(temp_path, "wb") as f:
             f.write(img_data)
         return temp_path
-    except (ValueError, OSError) as e:
+    except (ValueError, OSError):
         log.exception("Impossible de traiter l'image en base64")
         return None
 
@@ -588,7 +588,7 @@ def _resize_and_save_image(
             opt_img_path = os.path.join(temp_dir, f"{cid}.jpg")
             im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
         return opt_img_path
-    except OSError as e:
+    except OSError:
         log.exception(f"Impossible de traiter l'image {img_path}")
         return None
 
@@ -913,7 +913,7 @@ def _attach_body(
                     filename=os.path.basename(img_info["path"]),
                 )
                 msg_related.attach(img_part)
-            except (OSError, TypeError) as e:
+            except (OSError, TypeError):
                 log.exception(f"Error attaching inline image {img_info['path']}")
         msg.attach(msg_related)
     else:
@@ -1014,7 +1014,7 @@ def _build_and_send(
                 shutil.rmtree(d)
                 if param.verbose:
                     log.info(f"Dossier temporaire supprimé : {d}")
-            except OSError as e:
+            except OSError:
                 log.exception(f"Erreur lors du nettoyage de {d}")
 
 
@@ -1324,7 +1324,7 @@ def send_gmail(service: Any, message: Any = None) -> Any:
     body = {"raw": encoded_message}
     try:
         return service.users().messages().send(userId="me", body=body).execute()
-    except errors.HttpError as error:
+    except errors.HttpError:
         log.exception(f"Error sending message to {message['To']}")
         return None
 
@@ -1362,7 +1362,7 @@ def send_mail(param: Any = None, message: Any = None, recipients: Any = None) ->
                 if param.verbose:  # pyright: ignore
                     log.info("sent")
                 break
-            except SMTPException as e:
+            except SMTPException:
                 log.exception(f"SMTP error on attempt {attempt + 1}")
                 if attempt == 0:
                     sleep(10)
