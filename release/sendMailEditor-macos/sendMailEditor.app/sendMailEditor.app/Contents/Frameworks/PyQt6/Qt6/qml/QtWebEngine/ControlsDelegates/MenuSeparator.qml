@@ -1,1 +1,0 @@
-../../../../../../Resources/PyQt6/Qt6/qml/QtWebEngine/ControlsDelegates/MenuSeparator.qml

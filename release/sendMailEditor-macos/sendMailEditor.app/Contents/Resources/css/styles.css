@@ -1,0 +1,46 @@
+
+body {
+    background-color: PapayaWhip;
+}
+
+h1 {
+    color: red;
+    text-align: center
+}
+
+h2 {
+    color: darkred;
+    padding-left: 20px;
+}
+
+h3, h4, h5 {
+    padding-left: 20px;
+}
+
+h6 {
+    color: skyblue;
+}
+
+p {
+    color: DarkSlateGray;
+    padding-left: 50px;
+}
+
+ul {
+    color: DarkSlateGray;
+    padding-left: 80px;
+}
+
+li {
+    color: DarkSlateGray;
+    padding-left: 10px;
+}
+
+img {
+    max-width: 1000px;
+    height: auto;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+

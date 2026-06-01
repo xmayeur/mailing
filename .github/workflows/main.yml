@@ -64,12 +64,20 @@ jobs:
             zip -j sendMailEditor-linux.zip sendMailEditor
           fi
 
+      - name: Build sendMailEditor.app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          bash scripts/wrap_onefile_as_app.sh . sendMailEditor_bin sendMailEditor images/mail.png be.sendmail.editor
+          rm dist/sendMailEditor_bin
+
       - name: Create macOS DMG
         if: runner.os == 'macOS'
         shell: bash
         run: |
+          rm -rf release/sendMailEditor-macos
           mkdir -p release/sendMailEditor-macos
-          cp -R dist/sendMailEditor.app release/sendMailEditor-macos/sendMailEditor.app
+          cp -R dist/sendMailEditor.app release/sendMailEditor-macos/
           printf 'Unsigned macOS package for sendMailEditor.\nRun the app from Finder after mounting this DMG.\n' > release/sendMailEditor-macos/README.txt
           hdiutil create \
             -volname "sendMailEditor" \

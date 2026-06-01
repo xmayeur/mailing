@@ -21,7 +21,7 @@ cambristi:
   - https://www.googleapis.com/auth/gmail.readonly
   - https://www.googleapis.com/auth/gmail.modify
   - https://www.googleapis.com/auth/gmail.send
-  TOKEN_FILE: token.json
+  TOKEN_FILE: ~/.config/gmailToken.json
   TOKEN_ID: GmailToken
   CREDENTIALS_ID: GmailCredentials
   WIX_API_TOKEN_ID: cambristiApiToken
@@ -29,14 +29,14 @@ cambristi:
   MAIL: icambristi@gmail.com
   SA: cambristiGoogleServiceAccount
   max_addr_per_mail: 50
-  max_mails_per_hour: 100
+  max_mails_per_hour: 1000
   pause: 1
   sendername: I Cambristi ASBL
   sender: icambristi@gmail.com
   members: https://www.cambristi.com/_functions/members/
   SHEETID: cambristiMemberSheetID
   filter:
-    title: in member, participant, inactive
+    title: is inactive
     email: is not empty
     emailBounced: is not True
   filter_test:
@@ -50,7 +50,7 @@ cambristiEffective:
   - https://www.googleapis.com/auth/gmail.readonly
   - https://www.googleapis.com/auth/gmail.modify
   - https://www.googleapis.com/auth/gmail.send
-  TOKEN_FILE: token.json
+  TOKEN_FILE: ~/.config/gmailToken.json
   TOKEN_ID: GmailToken
   CREDENTIALS_ID: GmailCredentials
   WIX_API_TOKEN_ID: cambristiApiToken
@@ -58,7 +58,7 @@ cambristiEffective:
   MAIL: icambristi@gmail.com
   SA: cambristiGoogleServiceAccount
   max_addr_per_mail: 50
-  max_mails_per_hour: 100
+  max_mails_per_hour: 1000
   pause: 1
   sendername: I Cambristi ASBL
   sender: icambristi@gmail.com

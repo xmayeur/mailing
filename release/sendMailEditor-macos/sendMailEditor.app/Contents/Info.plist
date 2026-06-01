@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>sendMailEditor</string>
 	<key>CFBundleIconFile</key>
-	<string>generated-fc0b42ad3fce4b7b2d71ee7c0c3703ea40853e379f25ed6af5bb05dec1c8c8c0.icns</string>
+	<string>generated-2408a7da413c212ef8c629ac169581b028dacefa8d8dd99517b59c446ab344d0.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>be.sendmail.editor</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -21,6 +21,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSRequiresAquaSystemAppearance</key>
-	<false/>
+	<true/>
 </dict>
 </plist>

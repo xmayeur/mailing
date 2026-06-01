@@ -23,7 +23,7 @@ import sys
 import urllib.error
 import urllib.request
 
-PROJECT_KEY = "pyArchimate_pyArchimate"
+PROJECT_KEY = "mailing_mailing"
 API_URL = f"https://sonarcloud.io/api/issues/search?componentKeys={PROJECT_KEY}&statuses=OPEN,CONFIRMED&ps=500"
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
