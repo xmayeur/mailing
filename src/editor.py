@@ -1180,10 +1180,12 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         """
         db_path = self.database_input.text().strip()
         if self._is_cache_valid(db_path):
+            assert self._cached_records is not None
+            assert self._cached_headers is not None
             log.debug(
-                f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers or [])} headers"
+                f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers)} headers"
             )
-            return self._cached_records, self._cached_headers or []
+            return self._cached_records, self._cached_headers
 
         profile_cfg = self._config_data.get(self._current_profile, {})
         if not db_path:
@@ -2828,6 +2830,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self._load_editor_session()
 
         # Web engine view
+        self._view: QWebEngineView | None = None
         try:
             self._view = QWebEngineView(self)
             self.setCentralWidget(self._view)
@@ -2835,7 +2838,6 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             log.error(f"Failed to create QWebEngineView: {e}")
             # Fallback to text editor
             from PyQt6.QtWidgets import QTextEdit
-            self._view = None
             text_edit = QTextEdit(self)
             text_edit.setPlainText("WebEngine failed to initialize. This is a fallback text editor.\n\nError: " + str(e))
             text_edit.setReadOnly(True)
@@ -2845,9 +2847,10 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self._channel = QWebChannel(self)
         self._bridge = EditorBridge(parent=self)
         self._channel.registerObject("bridge", self._bridge)
-        page = self._view.page()
-        if page:
-            page.setWebChannel(self._channel)
+        if self._view:
+            page = self._view.page()
+            if page:
+                page.setWebChannel(self._channel)
 
         # Connect signals
         self._bridge.dirty_changed.connect(self._on_dirty_changed)
@@ -3068,17 +3071,19 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         if self._view is None:
             log.warning("WebEngineView not available, skipping page load")
             return
+        assert self._view is not None
 
         editor_html_path = ASSETS_DIR / "editor.html"
         if not editor_html_path.exists():
             log.error(f"editor.html not found at {editor_html_path} (ASSETS_DIR={ASSETS_DIR})")
             return
         editor_url = QUrl.fromLocalFile(str(editor_html_path))
+        view = self._view  # Capture for nested function
 
         # Disconnect any previously connected loadFinished handler
         if self._load_finished_connected:
             try:
-                self._view.loadFinished.disconnect()
+                view.loadFinished.disconnect()
             except Exception:  # noqa: S110
                 pass
             self._load_finished_connected = False
@@ -3086,7 +3091,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         def _on_load_finished(ok: bool) -> None:
             # Disconnect self to ensure it fires only once
             try:
-                self._view.loadFinished.disconnect(_on_load_finished)
+                view.loadFinished.disconnect(_on_load_finished)
             except Exception:  # noqa: S110
                 pass
             if ok:
@@ -3094,14 +3099,16 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             else:
                 log.error(f"Failed to load editor page from {editor_url.toLocalFile()}")
 
-        self._view.loadFinished.connect(_on_load_finished)
+        view.loadFinished.connect(_on_load_finished)
         self._load_finished_connected = True
-        self._view.load(editor_url)
+        view.load(editor_url)
 
     def _inject_initial_content(self, html: str) -> None:
         """Push HTML into the Quill editor via runJavaScript."""
         # json.dumps produces a valid JS string literal (handles all escaping)
         safe_js_string = json.dumps(html)
+        if self._view is None:
+            return
         page = self._view.page()
         if page:
             page.runJavaScript(f"setContent({safe_js_string})")
@@ -3411,9 +3418,10 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             self._file_path = html_path
             self._bridge.reset(body_html)
             self._update_title()
-            page = self._view.page()
-            if page:
-                page.runJavaScript("markSaved()")
+            if self._view:
+                page = self._view.page()
+                if page:
+                    page.runJavaScript("markSaved()")
             statusbar = self.statusBar()
             if statusbar:
                 statusbar.showMessage(f"Saved: {html_path}", 4000)
@@ -4141,6 +4149,8 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
     def _run_js(self, script: str) -> None:
         """Fire-and-forget JavaScript execution (wraps runJavaScript)."""
+        if self._view is None:
+            return
         page = self._view.page()
         if page:
             page.runJavaScript(script)

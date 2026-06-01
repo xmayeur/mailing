@@ -1228,7 +1228,8 @@ def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
 
 def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
     """Helper to evaluate string operations."""
-    handlers = {
+    from typing import Callable
+    handlers: dict[tuple[str, ...], Callable[[], bool]] = {
         ("in", "one of", _OP_ONE_OF): lambda: field_value in test_value,
         ("not in", "none of", _OP_NOT_ONE_OF): lambda: field_value not in test_value,
         ("is", _OP_IS_EQUAL_TO, _OP_IS): lambda: field_value == test_value,
