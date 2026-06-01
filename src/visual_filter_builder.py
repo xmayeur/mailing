@@ -630,8 +630,10 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         return ""
 
     def _validate_value_present(self, row_widget: Any) -> str:
-        if not (row_widget.row.operator
-                and row_widget._operator_needs_value(row_widget.row.operator)):
+        if not (
+            row_widget.row.operator
+            and row_widget._operator_needs_value(row_widget.row.operator)
+        ):
             return ""
 
         if self._is_value_empty(row_widget.row.value):
