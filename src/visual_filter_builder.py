@@ -605,49 +605,46 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             return
 
         for row_widget in self._table_widget._row_widgets:
-            field_error = ""
-            operator_error = ""
-            value_error = ""
-
-            # Validate field exists in schema
-            if (
-                row_widget.row.field_name
-                and row_widget.row.field_name not in self.schema_info.field_names
-            ):
-                field_error = (
-                    f"Field '{row_widget.row.field_name}' not in database schema"
-                )
-
-            # Validate operator exists for field type
-            if row_widget.row.operator:
-                valid_operators = self.schema_info.get_operators_for_field(
-                    row_widget.row.field_name
-                )
-                # B042: Convert canonical operator to display label for comparison
-                # row.operator is canonical (lowercase), valid_operators are display labels
-                display_op = _canonical_to_display_operator(row_widget.row.operator)
-                if display_op not in valid_operators:
-                    operator_error = "Operator not valid for field type"
-
-            # Validate value is present if operator requires it
-            if row_widget.row.operator and row_widget._operator_needs_value(
-                row_widget.row.operator
-            ):
-                value_empty = False
-                if not row_widget.row.value:
-                    value_empty = True
-                elif (
-                    isinstance(row_widget.row.value, str)
-                    and not row_widget.row.value.strip()
-                ):
-                    value_empty = True
-                if value_empty:
-                    value_error = (
-                        f"Operator '{row_widget.row.operator}' requires a value"
-                    )
-
-            # Apply error state
+            field_error = self._validate_field_exists(row_widget)
+            operator_error = self._validate_operator_valid(row_widget)
+            value_error = self._validate_value_present(row_widget)
             row_widget.set_error_state(field_error, operator_error, value_error)
+
+    def _validate_field_exists(self, row_widget: Any) -> str:
+        if (
+            row_widget.row.field_name
+            and row_widget.row.field_name not in self.schema_info.field_names
+        ):
+            return f"Field '{row_widget.row.field_name}' not in database schema"
+        return ""
+
+    def _validate_operator_valid(self, row_widget: Any) -> str:
+        if not row_widget.row.operator:
+            return ""
+        valid_operators = self.schema_info.get_operators_for_field(
+            row_widget.row.field_name
+        )
+        display_op = _canonical_to_display_operator(row_widget.row.operator)
+        if display_op not in valid_operators:
+            return "Operator not valid for field type"
+        return ""
+
+    def _validate_value_present(self, row_widget: Any) -> str:
+        if not (row_widget.row.operator
+                and row_widget._operator_needs_value(row_widget.row.operator)):
+            return ""
+
+        if self._is_value_empty(row_widget.row.value):
+            return f"Operator '{row_widget.row.operator}' requires a value"
+        return ""
+
+    @staticmethod
+    def _is_value_empty(value: Any) -> bool:
+        if not value:
+            return True
+        if isinstance(value, str) and not value.strip():
+            return True
+        return False
 
     def _on_table_changed(self) -> None:
         """Handle visual table change—update YAML and emit filter_changed."""

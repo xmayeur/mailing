@@ -405,10 +405,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Send Mailing")
-        # Keep dialog on top of main window (non-blocking show)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-        # B040: Dialog width extends beyond filter widget right edge
-        # Filter widget 900px + scroll area margins/scrollbar + dialog margins = 1150px
         self.setMinimumWidth(1150)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
@@ -424,26 +421,50 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # B036: Make dialog vertically scrollable for many form fields
         from PyQt6.QtWidgets import QScrollArea
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-
-        # Create scrollable content widget
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(16, 16, 16, 12)
         scroll_layout.setSpacing(10)
         scroll.setWidget(scroll_content)
-
         root.addWidget(scroll)
 
-        # Form layout inside scrollable area
         form = QFormLayout()
         form.setLabelAlignment(form.labelAlignment())
         scroll_layout.addLayout(form)
 
+        self._setup_form_fields(form, attachment_path, config_path, initial_profile)
+        self._setup_record_preview(root)
+        self._setup_filter_buttons(root)
+        self._setup_dialog_buttons(root)
+
+        self._reload_profiles()
+        if self.profile_combo.count():
+            idx = self.profile_combo.findText(initial_profile)
+            self.profile_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        else:
+            self._load_profile_defaults("")
+
+    def _setup_form_fields(
+        self,
+        form: QFormLayout,
+        attachment_path: str,
+        config_path: str,
+        initial_profile: str,
+    ) -> None:
+        self._setup_config_row(form, config_path)
+        self._setup_profile_combo(form)
+        self._setup_attachments_widget(form, attachment_path)
+        self._setup_message_fields(form, attachment_path)
+        self._setup_database_row(form)
+        self._setup_filter_editor(form, initial_profile)
+        self._setup_validation()
+        self._setup_parameter_fields(form)
+
+    def _setup_config_row(self, form: QFormLayout, config_path: str) -> None:
         self.config_input = QLineEdit(config_path, self)
         self.config_input.setReadOnly(True)
         config_row = QWidget(self)
@@ -455,10 +476,14 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         config_row_layout.addWidget(config_browse)
         form.addRow("Config", config_row)
 
+    def _setup_profile_combo(self, form: QFormLayout) -> None:
         self.profile_combo = QComboBox(self)
         self.profile_combo.currentTextChanged.connect(self._load_profile_defaults)
         form.addRow("Profile", self.profile_combo)
 
+    def _setup_attachments_widget(
+        self, form: QFormLayout, attachment_path: str
+    ) -> None:
         attachment_label = QLabel(Path(attachment_path).name, self)
         attachment_label.setToolTip(attachment_path)
         attachment_widget = QWidget(self)
@@ -484,6 +509,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         attachment_layout.addWidget(help_label)
         form.addRow("Attachments", attachment_widget)
 
+    def _setup_message_fields(
+        self, form: QFormLayout, attachment_path: str
+    ) -> None:
         self.subject_input = QLineEdit(self)
         extracted_subject = self._extract_subject_from_html(attachment_path)
         self.subject_input.setText(extracted_subject)
@@ -498,6 +526,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.body_input.setPlaceholderText("Optional ${body} replacement text")
         form.addRow("Body", self.body_input)
 
+    def _setup_database_row(self, form: QFormLayout) -> None:
         self.database_input = QLineEdit(self)
         database_row = QWidget(self)
         database_row_layout = QHBoxLayout(database_row)
@@ -507,90 +536,89 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         database_browse.clicked.connect(self._browse_database)
         database_row_layout.addWidget(database_browse)
         form.addRow("Database", database_row)
-        # B015: Clear schema cache when database input changes (retry mechanism)
         self.database_input.textChanged.connect(self._on_database_input_changed)
 
-        # Filter editor (T035: FilterBuilder with visual table + YAML tabs)
+    def _setup_filter_editor(self, form: QFormLayout, initial_profile: str) -> None:
         if _FILTER_BUILDER_AVAILABLE:
-            initial_filter_dict: dict[str, str] = {}
-            try:
-                if config_data and initial_profile in cast(Any, config_data):
-                    profile_cfg = cast(Any, config_data)[initial_profile]
-                    filter_obj = (
-                        cast(Any, profile_cfg).get("filter")
-                        if isinstance(profile_cfg, dict)
-                        else None
-                    )
-                    if isinstance(filter_obj, dict):
-                        initial_filter_dict = cast(dict[str, str], filter_obj)
-            except (KeyError, TypeError, AttributeError) as e:
-                log.debug("Could not extract initial filter from config: %s", e)
-            self._schema_info = DatabaseSchemaInfo([])
-            self._filter_builder = FilterBuilder(
-                self._schema_info,
-                initial_filter=initial_filter_dict,
-                parent=self,
-            )
-            self._filter_builder.filter_changed.connect(self._on_filter_changed)
-            self.filter_status_label = QLabel("", self)
-            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
-            filter_widget = QWidget(self)
-            filter_layout = QVBoxLayout(filter_widget)
-            filter_layout.setContentsMargins(0, 0, 0, 0)
-            filter_layout.setSpacing(4)
-            # B007: Wrap FilterBuilder in scroll area to prevent it from expanding
-            # and hiding elements below (buttons, preview pane)
-            from PyQt6.QtWidgets import QScrollArea
-
-            scroll = QScrollArea()
-            scroll.setWidget(self._filter_builder)
-            scroll.setWidgetResizable(True)
-            # B026-B027 & B031 & B043: Set explicit height/width for filter widget
-            # Height: Allow 5 rows (30px each) + button (30px) = 300px + scrollbar = 320px
-            # Width: minWidth 900px ensures dropdowns, operators, values all visible
-            scroll.setMinimumHeight(320)
-            scroll.setMaximumHeight(340)
-            scroll.setMinimumWidth(900)
-            scroll.setWidgetResizable(True)
-            filter_layout.addWidget(scroll)
-            filter_layout.addWidget(self.filter_status_label)
-            form.addRow("Filter", filter_widget)
-            # Keep filter_text_edit as reference to YAML tab for backward compat (used in _run_filter_validation)
-            self.filter_text_edit = self._filter_builder._yaml_edit
+            self._setup_filter_builder(form, initial_profile)
         else:
-            self.filter_text_edit = QPlainTextEdit(self)
-            self.filter_text_edit.setPlaceholderText(
-                "YAML filter (optional)\nExample: status: is active"
-            )
-            self.filter_text_edit.setMinimumHeight(60)
-            self.filter_status_label = QLabel("", self)
-            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
-            filter_widget = QWidget(self)
-            filter_layout = QVBoxLayout(filter_widget)
-            filter_layout.setContentsMargins(0, 0, 0, 0)
-            filter_layout.setSpacing(4)
-            filter_layout.addWidget(self.filter_text_edit)
-            filter_layout.addWidget(self.filter_status_label)
-            form.addRow("Filter (YAML)", filter_widget)
-            self._filter_builder = None  # type: ignore
+            self._setup_filter_yaml_editor(form)
 
-        # Validation setup (T016, T017)
+    def _setup_filter_builder(self, form: QFormLayout, initial_profile: str) -> None:
+        initial_filter_dict: dict[str, str] = {}
+        try:
+            if self._initial_config_data and initial_profile in cast(Any, self._initial_config_data):
+                profile_cfg = cast(Any, self._initial_config_data)[initial_profile]
+                filter_obj = (
+                    cast(Any, profile_cfg).get("filter")
+                    if isinstance(profile_cfg, dict)
+                    else None
+                )
+                if isinstance(filter_obj, dict):
+                    initial_filter_dict = cast(dict[str, str], filter_obj)
+        except (KeyError, TypeError, AttributeError) as e:
+            log.debug("Could not extract initial filter from config: %s", e)
+
+        self._schema_info = DatabaseSchemaInfo([])
+        self._filter_builder = FilterBuilder(
+            self._schema_info,
+            initial_filter=initial_filter_dict,
+            parent=self,
+        )
+        self._filter_builder.filter_changed.connect(self._on_filter_changed)
+        self.filter_status_label = QLabel("", self)
+        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+
+        from PyQt6.QtWidgets import QScrollArea
+        filter_widget = QWidget(self)
+        filter_layout = QVBoxLayout(filter_widget)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(4)
+
+        scroll = QScrollArea()
+        scroll.setWidget(self._filter_builder)
+        scroll.setWidgetResizable(True)
+        scroll.setMinimumHeight(320)
+        scroll.setMaximumHeight(340)
+        scroll.setMinimumWidth(900)
+        filter_layout.addWidget(scroll)
+        filter_layout.addWidget(self.filter_status_label)
+        form.addRow("Filter", filter_widget)
+        self.filter_text_edit = self._filter_builder._yaml_edit
+
+    def _setup_filter_yaml_editor(self, form: QFormLayout) -> None:
+        self.filter_text_edit = QPlainTextEdit(self)
+        self.filter_text_edit.setPlaceholderText(
+            "YAML filter (optional)\nExample: status: is active"
+        )
+        self.filter_text_edit.setMinimumHeight(60)
+        self.filter_status_label = QLabel("", self)
+        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+        filter_widget = QWidget(self)
+        filter_layout = QVBoxLayout(filter_widget)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(4)
+        filter_layout.addWidget(self.filter_text_edit)
+        filter_layout.addWidget(self.filter_status_label)
+        form.addRow("Filter (YAML)", filter_widget)
+        self._filter_builder = None  # type: ignore
+
+    def _setup_validation(self) -> None:
         self._filter_validator = FilterValidator() if _VALIDATOR_AVAILABLE else None
-        self._schema_cache: Any = None  # Initialized lazily in _get_schema_cache()
-        # B053: Cache database records to avoid repeated Google Sheets API calls
-        self._cached_records: list[list[str]] | None = None  # Records cache
-        self._cached_headers: list[str] | None = None  # Headers cache
-        self._cached_for_profile: str | None = None  # Profile these records are for
-        self._cached_for_db: str | None = None  # Database path these records are for
+        self._schema_cache: Any = None
+        self._cached_records: list[list[str]] | None = None
+        self._cached_headers: list[str] | None = None
+        self._cached_for_profile: str | None = None
+        self._cached_for_db: str | None = None
         self._validation_timer = QTimer(self)
         self._validation_timer.setSingleShot(True)
         self._validation_timer.timeout.connect(self._run_filter_validation)
         if self._filter_builder:
-            # Connect to FilterBuilder filter_changed signal for debounced validation
-            pass  # FilterBuilder already emits on change, validation triggered via _on_filter_changed
+            pass
         else:
             self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
 
+    def _setup_parameter_fields(self, form: QFormLayout) -> None:
         self.password_input = QLineEdit(self)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         form.addRow("Password", self.password_input)
@@ -636,18 +664,17 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         flag_layout.addStretch(1)
         form.addRow("Flags", flag_row)
 
-        # Record preview (T024, T025, T040: retry button for errors)
+    def _setup_record_preview(self, root: QVBoxLayout) -> None:
         root.addSpacing(10)
         record_header_layout = QHBoxLayout()
         self.record_count_label = QLabel("Matching Records: 0", self)
         self.record_count_label.setStyleSheet("font-weight: bold;")
         record_header_layout.addWidget(self.record_count_label)
 
-        # T040: Retry button for database connection failures
         self.retry_load_btn = QPushButton("Retry", self)
         self.retry_load_btn.setMaximumWidth(80)
         self.retry_load_btn.clicked.connect(self.filter_and_display_records)
-        self.retry_load_btn.hide()  # Hidden by default, shown on error
+        self.retry_load_btn.hide()
         record_header_layout.addWidget(self.retry_load_btn)
         record_header_layout.addStretch()
 
@@ -662,7 +689,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.records_table.setRowCount(0)
         root.addWidget(self.records_table)
 
-        # Filter action buttons (T033)
+    def _setup_filter_buttons(self, root: QVBoxLayout) -> None:
         filter_buttons = QWidget(self)
         filter_buttons_layout = QHBoxLayout(filter_buttons)
         filter_buttons_layout.setContentsMargins(0, 0, 0, 0)
@@ -679,29 +706,21 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         filter_buttons_layout.addStretch(1)
         root.addWidget(filter_buttons)
 
-        # Spinner label (shown during send)
         self.spinner_label = QLabel("Sending...", self)
         self.spinner_label.setStyleSheet("color: #666; font-style: italic;")
         self.spinner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.spinner_label.hide()
         root.addWidget(self.spinner_label)
 
+    def _setup_dialog_buttons(self, root: QVBoxLayout) -> None:
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Cancel,
             parent=self,
         )
         buttons.rejected.connect(self.reject)
-        # Add custom Send button (don't auto-close dialog on click)
         self.send_button = QPushButton("Send", self)
         buttons.addButton(self.send_button, QDialogButtonBox.ButtonRole.AcceptRole)
         root.addWidget(buttons)
-
-        self._reload_profiles()
-        if self.profile_combo.count():
-            idx = self.profile_combo.findText(initial_profile)
-            self.profile_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        else:
-            self._load_profile_defaults("")
 
     def _browse_config(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -1160,121 +1179,113 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         Records are cached per (profile, database_path) pair and only loaded once.
         """
         db_path = self.database_input.text().strip()
-        # B053: Check cache first - avoid Google Sheets API call if we have cached records
-        if (
-            self._cached_records is not None
-            and self._cached_for_profile == self._current_profile
-            and self._cached_for_db == db_path
-        ):
+        if self._is_cache_valid(db_path):
             log.debug(
                 f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers or [])} headers"
             )
             return self._cached_records, self._cached_headers or []
 
-        # Check if current profile uses Google Sheets (has SHEETID, no CSV database)
         profile_cfg = self._config_data.get(self._current_profile, {})
-        # B047: Handle both uppercase and lowercase config keys
+        if not db_path:
+            if profile_cfg.get("SHEETID") or profile_cfg.get("sheetid"):
+                return self._load_from_google_sheets(profile_cfg, db_path)
+            log.debug("No database path set")
+            return self._set_cache_and_return([], [], db_path)
+
+        if db_path.endswith(".csv"):
+            return self._load_from_csv(db_path)
+        elif db_path.endswith((".xlsx", ".xls")):
+            return self._load_from_excel(db_path)
+
+        log.debug("Could not load database: unsupported format")
+        return self._set_cache_and_return([], [], db_path)
+
+    def _is_cache_valid(self, db_path: str) -> bool:
+        return (
+            self._cached_records is not None
+            and self._cached_for_profile == self._current_profile
+            and self._cached_for_db == db_path
+        )
+
+    def _set_cache_and_return(
+        self, rows: list[list[str]], headers: list[str], db_path: str
+    ) -> tuple[list[list[str]], list[str]]:
+        self._cached_records = rows
+        self._cached_headers = headers
+        self._cached_for_profile = self._current_profile
+        self._cached_for_db = db_path
+        return rows, headers
+
+    def _load_from_google_sheets(
+        self, profile_cfg: dict[str, Any], db_path: str
+    ) -> tuple[list[list[str]], list[str]]:
         sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
         sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
-        if not db_path and sheet_id_val:
-            # Google Sheets profile - try to load records from Google Sheets
-            sa = sa_val
-            sheet_id = sheet_id_val
-            if sa and sheet_id:
-                try:
-                    import sendMail as sm  # noqa: N813
-
-                    if hasattr(sm, "open_google_db_members_sheet") and hasattr(
-                        sm, "read_all_sheet"
-                    ):
-                        wb = sm.open_google_db_members_sheet(str(sa), str(sheet_id))
-                        data = sm.read_all_sheet(wb)
-                        if data and len(data) > 0:
-                            headers = [h.strip() for h in data[0] if h.strip()]
-                            rows = data[1:]  # Skip header row
-                            log.debug(
-                                f"Loaded {len(rows)} records from Google Sheet {sheet_id}"
-                            )
-                            # B053: Cache the loaded records
-                            self._cached_records = rows
-                            self._cached_headers = headers
-                            self._cached_for_profile = self._current_profile
-                            self._cached_for_db = db_path
-                            return rows, headers
-                except Exception as e:
-                    log.debug("Could not load Google Sheets records: %s", e)
-            # B053: Cache empty result too, so we don't retry failed loads
-            self._cached_records = []
-            self._cached_headers = []
-            self._cached_for_profile = self._current_profile
-            self._cached_for_db = db_path
-            return [], []
-
-        if not db_path:
-            log.debug("No database path set")
-            return [], []
+        if not (sa_val and sheet_id_val):
+            return self._set_cache_and_return([], [], db_path)
 
         try:
-            import csv
+            import sendMail as sm  # noqa: N813
 
-            # Try CSV with robust encoding handling (T043: Unicode support)
-            if db_path.endswith(".csv"):
-                # Try UTF-8 first, fall back to latin-1 if needed
-                encodings = ["utf-8", "latin-1", "utf-8-sig"]
-                for encoding in encodings:
-                    try:
-                        with open(db_path, encoding=encoding) as f:
-                            reader = csv.reader(f)
-                            headers = next(reader, [])
-                            rows = list(reader)
-                            log.debug(
-                                f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})"
-                            )
-                            # B053: Cache the loaded records
-                            self._cached_records = rows
-                            self._cached_headers = headers
-                            self._cached_for_profile = self._current_profile
-                            self._cached_for_db = db_path
-                            return rows, headers
-                    except (UnicodeDecodeError, UnicodeError):
-                        continue
-                # If all encodings fail, raise error
-                raise ValueError(
-                    f"Could not decode {db_path} with any supported encoding"
-                )
+            if not (hasattr(sm, "open_google_db_members_sheet")
+                    and hasattr(sm, "read_all_sheet")):
+                return self._set_cache_and_return([], [], db_path)
 
-            # Handle Excel files (XLSX, XLS) using same approach as sendMail.py
-            if db_path.endswith((".xlsx", ".xls")):
-                from python_calamine import CalamineWorkbook
+            wb = sm.open_google_db_members_sheet(str(sa_val), str(sheet_id_val))
+            data = sm.read_all_sheet(wb)
+            if data and len(data) > 0:
+                headers = [h.strip() for h in data[0] if h.strip()]
+                rows = data[1:]
+                log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id_val}")
+                return self._set_cache_and_return(rows, headers, db_path)
+        except Exception as e:
+            log.debug("Could not load Google Sheets records: %s", e)
 
-                wb = CalamineWorkbook.from_path(db_path)
-                ws = wb.get_sheet_by_index(0)
-                data = ws.to_python()
-                if data and len(data) > 0:
-                    headers = [str(h).strip() for h in data[0] if h]
-                    rows = [
-                        [str(cell) if cell is not None else "" for cell in row]
-                        for row in data[1:]
-                    ]
-                    log.debug(f"Loaded {len(rows)} records from {db_path}")
-                    # B053: Cache the loaded records
-                    self._cached_records = rows
-                    self._cached_headers = headers
-                    self._cached_for_profile = self._current_profile
-                    self._cached_for_db = db_path
-                    return rows, headers
-                else:
-                    log.debug(f"No data found in {db_path}")
-                    raise ValueError(f"No data in {db_path}")
+        return self._set_cache_and_return([], [], db_path)
+
+    def _load_from_csv(self, db_path: str) -> tuple[list[list[str]], list[str]]:
+        import csv
+
+        encodings = ["utf-8", "latin-1", "utf-8-sig"]
+        for encoding in encodings:
+            try:
+                with open(db_path, encoding=encoding) as f:
+                    reader = csv.reader(f)
+                    headers = next(reader, [])
+                    rows = list(reader)
+                    log.debug(
+                        f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})"
+                    )
+                    return self._set_cache_and_return(rows, headers, db_path)
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+            except Exception as e:
+                log.debug("Could not load CSV: %s", e)
+                return self._set_cache_and_return([], [], db_path)
+
+        log.debug("Could not load database: all encoding attempts failed")
+        return self._set_cache_and_return([], [], db_path)
+
+    def _load_from_excel(self, db_path: str) -> tuple[list[list[str]], list[str]]:
+        try:
+            from python_calamine import CalamineWorkbook
+
+            wb = CalamineWorkbook.from_path(db_path)
+            ws = wb.get_sheet_by_index(0)
+            data = ws.to_python()
+            if data and len(data) > 0:
+                headers = [str(h).strip() for h in data[0] if h]
+                rows = [
+                    [str(cell) if cell is not None else "" for cell in row]
+                    for row in data[1:]
+                ]
+                log.debug(f"Loaded {len(rows)} records from {db_path}")
+                return self._set_cache_and_return(rows, headers, db_path)
+            log.debug(f"No data found in {db_path}")
         except Exception as e:
             log.debug("Could not load database: %s", e)
 
-        # B053: Cache empty result
-        self._cached_records = []
-        self._cached_headers = []
-        self._cached_for_profile = self._current_profile
-        self._cached_for_db = db_path
-        return [], []
+        return self._set_cache_and_return([], [], db_path)
 
     def filter_and_display_records(self) -> None:
         """Load, filter, and display database records (T027, T028, T040, T041, T042)."""
@@ -3753,48 +3764,53 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             profile_info = profiles[profile_name]
             log.debug(
                 "Profile keys in config: %s", list(profile_info.keys())[:10]
-            )  # First 10 keys
-            default_path = profile_info.get("default_documents_path")
-            log.debug(
-                "Profile '%s' default_documents_path: %r", profile_name, default_path
             )
-            # Use profile's path if set (not None and not empty); fallback to system default
-            if default_path and default_path != "":
-                self._default_documents_path = default_path
-                self._editor_session.active_profile_default_path = default_path
-                log.info("Updated editor default path to: %s", default_path)
-            else:
-                # Profile has no custom path set; use system default documents folder
-                default_docs_path = self._get_default_documents_path()
-                self._default_documents_path = default_docs_path
-                self._editor_session.active_profile_default_path = default_docs_path
-                log.info(
-                    "Profile has no default_documents_path; using system default: %s",
-                    default_docs_path,
-                )
-
-            # Apply profile stylesheet if defined (load directly from raw config, not transformed profile_info)
-            # Always clear previous stylesheet first
-            self._clear_profile_stylesheet()
-
-            if hasattr(self, "_config_data") and profile_name in self._config_data:
-                raw_profile = self._config_data[profile_name]
-                styles_path = (
-                    raw_profile.get("styles") if isinstance(raw_profile, dict) else None
-                )
-                log.info("Profile stylesheet path: %s", styles_path)
-                if styles_path and isinstance(styles_path, str):
-                    css_path = self._resolve_stylesheet_path(styles_path)
-                    if css_path and css_path.exists():
-                        self._apply_profile_stylesheet(css_path)
-                        log.info("✓ Applied profile stylesheet: %s", css_path)
-                    else:
-                        log.warning("✗ Profile stylesheet not found: %s", styles_path)
-                else:
-                    log.info("Profile %s has no stylesheet defined", profile_name)
-
+            self._update_profile_path(profile_name, profile_info)
+            self._update_profile_stylesheet(profile_name)
             self._editor_session.active_profile_name = profile_name
         self._save_editor_session()
+
+    def _update_profile_path(
+        self, profile_name: str, profile_info: dict[str, Any]
+    ) -> None:
+        default_path = profile_info.get("default_documents_path")
+        log.debug(
+            "Profile '%s' default_documents_path: %r", profile_name, default_path
+        )
+        if default_path and default_path != "":
+            self._default_documents_path = default_path
+            self._editor_session.active_profile_default_path = default_path
+            log.info("Updated editor default path to: %s", default_path)
+        else:
+            default_docs_path = self._get_default_documents_path()
+            self._default_documents_path = default_docs_path
+            self._editor_session.active_profile_default_path = default_docs_path
+            log.info(
+                "Profile has no default_documents_path; using system default: %s",
+                default_docs_path,
+            )
+
+    def _update_profile_stylesheet(self, profile_name: str) -> None:
+        self._clear_profile_stylesheet()
+
+        if not (hasattr(self, "_config_data") and profile_name in self._config_data):
+            return
+
+        raw_profile = self._config_data[profile_name]
+        styles_path = (
+            raw_profile.get("styles") if isinstance(raw_profile, dict) else None
+        )
+        log.info("Profile stylesheet path: %s", styles_path)
+        if not (styles_path and isinstance(styles_path, str)):
+            log.info("Profile %s has no stylesheet defined", profile_name)
+            return
+
+        css_path = self._resolve_stylesheet_path(styles_path)
+        if css_path and css_path.exists():
+            self._apply_profile_stylesheet(css_path)
+            log.info("✓ Applied profile stylesheet: %s", css_path)
+        else:
+            log.warning("✗ Profile stylesheet not found: %s", styles_path)
 
     def _load_editor_session(self) -> None:
         """Load active profile and document state from session file."""

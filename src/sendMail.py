@@ -1228,30 +1228,28 @@ def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
 
 def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
     """Helper to evaluate string operations."""
-    if op in ("in", "one of", _OP_ONE_OF):
-        return bool(field_value in test_value)
-    if op in ("not in", "none of", _OP_NOT_ONE_OF):
-        return bool(field_value not in test_value)
-    if op in ("is", _OP_IS_EQUAL_TO, _OP_IS):
-        return bool(field_value == test_value)
-    if op in ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT):
-        return bool(field_value != test_value)
-    if op in (_OP_IS_NOT_EMPTY,):
-        return field_value != "" and field_value is not None
-    if op in ("is empty",):
-        return field_value == "" or field_value is None
-    if op in ("contains", _OP_CONTAINS):
-        return bool(test_value in field_value) if test_value else False
-    if op in ("does not contain", _OP_DOES_NOT_CONTAIN):
-        return bool(test_value not in field_value) if test_value else True
-    if op in ("starts with", _OP_STARTS_WITH):
-        return bool(field_value.startswith(test_value)) if test_value else False
-    if op in ("ends with", _OP_ENDS_WITH):
-        return bool(field_value.endswith(test_value)) if test_value else False
-    if op in ("matches", _OP_MATCHES):
-        return _eval_regex(test_value, field_value, negate=False)
-    if op in ("does not match", _OP_DOES_NOT_MATCH):
-        return _eval_regex(test_value, field_value, negate=True)
+    handlers = {
+        ("in", "one of", _OP_ONE_OF): lambda: field_value in test_value,
+        ("not in", "none of", _OP_NOT_ONE_OF): lambda: field_value not in test_value,
+        ("is", _OP_IS_EQUAL_TO, _OP_IS): lambda: field_value == test_value,
+        ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT): lambda: field_value != test_value,
+        (_OP_IS_NOT_EMPTY,): lambda: field_value != "" and field_value is not None,
+        ("is empty",): lambda: field_value == "" or field_value is None,
+        ("contains", _OP_CONTAINS): lambda: (bool(test_value in field_value)
+                                              if test_value else False),
+        ("does not contain", _OP_DOES_NOT_CONTAIN): lambda: (bool(test_value not in field_value)
+                                                               if test_value else True),
+        ("starts with", _OP_STARTS_WITH): lambda: (bool(field_value.startswith(test_value))
+                                                      if test_value else False),
+        ("ends with", _OP_ENDS_WITH): lambda: (bool(field_value.endswith(test_value))
+                                                 if test_value else False),
+        ("matches", _OP_MATCHES): lambda: _eval_regex(test_value, field_value, negate=False),
+        ("does not match", _OP_DOES_NOT_MATCH): lambda: _eval_regex(test_value, field_value, negate=True),
+    }
+
+    for ops, handler in handlers.items():
+        if op in ops:
+            return handler()
     return True
 
 
