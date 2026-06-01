@@ -181,4 +181,3 @@ jobs:
           git commit -m "ci: Update coverage badge to $COVERAGE% (pytest)"
           git push origin master
         fi
-
