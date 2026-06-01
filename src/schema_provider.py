@@ -82,6 +82,19 @@ class DatabaseSchemaProvider:
             return []
 
     @staticmethod
+    def _get_worksheet(service: Any, sheet_name: str | None = None) -> Any:
+        """Get worksheet by name or first if None."""
+        worksheets = service.worksheets()
+        if not worksheets:
+            return None
+        if not sheet_name:
+            return worksheets[0]
+        for worksheet in worksheets:
+            if worksheet.title == sheet_name:
+                return worksheet
+        return None
+
+    @staticmethod
     def from_google_sheets(
         service: Any, spreadsheet_id: str, sheet_name: str | None = None  # noqa: ARG004
     ) -> list[str]:
@@ -96,24 +109,15 @@ class DatabaseSchemaProvider:
             List of field names from first row
         """
         try:
-            # Assume service is gspread Spreadsheet object
-            if hasattr(service, "worksheets"):
-                ws = None
-                if not sheet_name:
-                    ws = service.worksheets()[0] if service.worksheets() else None
-                else:
-                    for worksheet in service.worksheets():
-                        if worksheet.title == sheet_name:
-                            ws = worksheet
-                            break
-                if ws is None:
-                    log.debug("Sheet %s not found", sheet_name)
-                    return []
-                headers = ws.row_values(1)
-                return [h.strip() for h in headers if h.strip()]
-            else:
+            if not hasattr(service, "worksheets"):
                 log.debug("Service object is not a gspread Spreadsheet")
                 return []
+            ws = DatabaseSchemaProvider._get_worksheet(service, sheet_name)
+            if ws is None:
+                log.debug("Sheet %s not found", sheet_name)
+                return []
+            headers = ws.row_values(1)
+            return [h.strip() for h in headers if h.strip()]
         except Exception as e:
             log.debug("Could not read Google Sheets headers: %s", e)
             return []
