@@ -614,9 +614,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self._validation_timer = QTimer(self)
         self._validation_timer.setSingleShot(True)
         self._validation_timer.timeout.connect(self._run_filter_validation)
-        if self._filter_builder:
-            pass
-        else:
+        if not self._filter_builder:
             self.filter_text_edit.textChanged.connect(self._on_filter_text_changed)
 
     def _setup_parameter_fields(self, form: QFormLayout) -> None:
