@@ -15,7 +15,6 @@ sys.modules["gspread"] = MagicMock()
 # Note: do NOT mock "yaml" globally — it's a real installed dependency and
 # replacing it in sys.modules pollutes other test modules that import yaml
 # (e.g. tests/test_editor.py uses `import yaml as real_yaml`).
-# sys.modules['bs4'] = MagicMock()
 sys.modules["certifi"] = MagicMock()
 sys.modules["getSecrets"] = MagicMock()
 sys.modules["getSecrets"].get_secret = mock_get_secret  # type: ignore[attr-defined]
@@ -60,7 +59,7 @@ class TestCoverageGap:
         soup.find_all.return_value = [img1, img2]
         mock_bs.return_value = soup
 
-        html, paths = sendMail.prepare_html_for_cid("test.html")
+        _html, paths = sendMail.prepare_html_for_cid("test.html")
         assert len(paths) == 0
 
     @patch("sendMail.open_google_db_members_sheet")
@@ -162,7 +161,7 @@ class TestCoverageGap:
         soup.find_all.return_value = [img1, img2]
         mock_bs.return_value = soup
 
-        html, images, tdir = sendMail.prepare_html_and_get_images("test.html")
+        _html, images, _tdir = sendMail.prepare_html_and_get_images("test.html")
         assert len(images) == 0
 
     @patch("sendMail.Image.open")
@@ -204,7 +203,7 @@ class TestCoverageGap:
         mock_img_open.side_effect = open_side_effect
 
         with patch("sendMail.log") as mock_log:
-            html, images, tdir = sendMail.prepare_html_and_get_images(
+            _html, images, _tdir = sendMail.prepare_html_and_get_images(
                 "test.html", max_width=800
             )
             assert len(images) == 1
@@ -219,7 +218,7 @@ class TestCoverageGap:
         param.max_addr_per_mail = 1
         param.domain = "artscroises.be"
 
-        msg, recipients = sendMail.build_email(
+        msg, _recipients = sendMail.build_email(
             param,
             to="to@example.com",
             cc="cc@example.com",
@@ -241,7 +240,7 @@ class TestCoverageGap:
         param.profile = "other"
 
         # Test images and attachments
-        msg, recipients = sendMail.build_email(
+        msg, _recipients = sendMail.build_email(
             param,
             message="<html></html>",
             images=["img.png"],
