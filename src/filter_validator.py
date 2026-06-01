@@ -20,7 +20,7 @@ class FilterValidator:
     """Validates YAML filter syntax and field names."""
 
     def __init__(self) -> None:
-        pass
+        """No initialization required; all methods operate on passed arguments."""
 
     def parse_yaml_filter(self, text: str) -> dict[str, Any] | None:
         """Parse YAML filter text into dict.
