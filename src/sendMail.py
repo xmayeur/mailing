@@ -465,7 +465,9 @@ def get_smtp_connection(param: Any) -> SMTP | None:
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.check_hostname = False  # noqa: S5527 disabled for provider compatibility
-    context.verify_mode = ssl.CERT_NONE  # noqa: S4830,S303 disabled for provider compatibility
+    context.verify_mode = (
+        ssl.CERT_NONE
+    )  # noqa: S4830,S303 disabled for provider compatibility
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -725,7 +727,9 @@ def process_attachments(
     if files:
         return files, None, []
 
-    files, service, google_drive_files = _process_google_drive_attachments(config, folder)
+    files, service, google_drive_files = _process_google_drive_attachments(
+        config, folder
+    )
     return files, service, google_drive_files
 
 
@@ -1236,16 +1240,24 @@ def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
         ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT): lambda: field_value != test_value,
         (_OP_IS_NOT_EMPTY,): lambda: field_value != "" and field_value is not None,
         ("is empty",): lambda: field_value == "" or field_value is None,
-        ("contains", _OP_CONTAINS): lambda: (bool(test_value in field_value)
-                                              if test_value else False),
-        ("does not contain", _OP_DOES_NOT_CONTAIN): lambda: (bool(test_value not in field_value)
-                                                               if test_value else True),
-        ("starts with", _OP_STARTS_WITH): lambda: (bool(field_value.startswith(test_value))
-                                                      if test_value else False),
-        ("ends with", _OP_ENDS_WITH): lambda: (bool(field_value.endswith(test_value))
-                                                 if test_value else False),
-        ("matches", _OP_MATCHES): lambda: _eval_regex(test_value, field_value, negate=False),
-        ("does not match", _OP_DOES_NOT_MATCH): lambda: _eval_regex(test_value, field_value, negate=True),
+        ("contains", _OP_CONTAINS): lambda: (
+            bool(test_value in field_value) if test_value else False
+        ),
+        ("does not contain", _OP_DOES_NOT_CONTAIN): lambda: (
+            bool(test_value not in field_value) if test_value else True
+        ),
+        ("starts with", _OP_STARTS_WITH): lambda: (
+            bool(field_value.startswith(test_value)) if test_value else False
+        ),
+        ("ends with", _OP_ENDS_WITH): lambda: (
+            bool(field_value.endswith(test_value)) if test_value else False
+        ),
+        ("matches", _OP_MATCHES): lambda: _eval_regex(
+            test_value, field_value, negate=False
+        ),
+        ("does not match", _OP_DOES_NOT_MATCH): lambda: _eval_regex(
+            test_value, field_value, negate=True
+        ),
     }
 
     for ops, handler in handlers.items():

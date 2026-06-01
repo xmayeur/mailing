@@ -509,9 +509,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         attachment_layout.addWidget(help_label)
         form.addRow("Attachments", attachment_widget)
 
-    def _setup_message_fields(
-        self, form: QFormLayout, attachment_path: str
-    ) -> None:
+    def _setup_message_fields(self, form: QFormLayout, attachment_path: str) -> None:
         self.subject_input = QLineEdit(self)
         extracted_subject = self._extract_subject_from_html(attachment_path)
         self.subject_input.setText(extracted_subject)
@@ -547,7 +545,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _setup_filter_builder(self, form: QFormLayout, initial_profile: str) -> None:
         initial_filter_dict: dict[str, str] = {}
         try:
-            if self._initial_config_data and initial_profile in cast(Any, self._initial_config_data):
+            if self._initial_config_data and initial_profile in cast(
+                Any, self._initial_config_data
+            ):
                 profile_cfg = cast(Any, self._initial_config_data)[initial_profile]
                 filter_obj = (
                     cast(Any, profile_cfg).get("filter")
@@ -570,6 +570,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
 
         from PyQt6.QtWidgets import QScrollArea
+
         filter_widget = QWidget(self)
         filter_layout = QVBoxLayout(filter_widget)
         filter_layout.setContentsMargins(0, 0, 0, 0)
@@ -1229,8 +1230,10 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         try:
             import sendMail as sm  # noqa: N813
 
-            if not (hasattr(sm, "open_google_db_members_sheet")
-                    and hasattr(sm, "read_all_sheet")):
+            if not (
+                hasattr(sm, "open_google_db_members_sheet")
+                and hasattr(sm, "read_all_sheet")
+            ):
                 return self._set_cache_and_return([], [], db_path)
 
             wb = sm.open_google_db_members_sheet(str(sa_val), str(sheet_id_val))
@@ -1238,7 +1241,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             if data and len(data) > 0:
                 headers = [h.strip() for h in data[0] if h.strip()]
                 rows = data[1:]
-                log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id_val}")
+                log.debug(
+                    f"Loaded {len(rows)} records from Google Sheet {sheet_id_val}"
+                )
                 return self._set_cache_and_return(rows, headers, db_path)
         except Exception as e:
             log.debug("Could not load Google Sheets records: %s", e)
@@ -2838,8 +2843,12 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             log.error(f"Failed to create QWebEngineView: {e}")
             # Fallback to text editor
             from PyQt6.QtWidgets import QTextEdit
+
             text_edit = QTextEdit(self)
-            text_edit.setPlainText("WebEngine failed to initialize. This is a fallback text editor.\n\nError: " + str(e))
+            text_edit.setPlainText(
+                "WebEngine failed to initialize. This is a fallback text editor.\n\nError: "
+                + str(e)
+            )
             text_edit.setReadOnly(True)
             self.setCentralWidget(text_edit)
 
@@ -2878,10 +2887,13 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         """Load deferred content after window is shown."""
         super().showEvent(event)
         # Load content after window is visible
-        if hasattr(self, '_deferred_file_path') and self._deferred_file_path is not None:
+        if (
+            hasattr(self, "_deferred_file_path")
+            and self._deferred_file_path is not None
+        ):
             self.open_file(self._deferred_file_path)
             self._deferred_file_path = None
-        elif hasattr(self, '_deferred_file_path'):
+        elif hasattr(self, "_deferred_file_path"):
             self._load_editor_page("")
             self._deferred_file_path = None
 
@@ -3076,7 +3088,9 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
         editor_html_path = ASSETS_DIR / "editor.html"
         if not editor_html_path.exists():
-            log.error(f"editor.html not found at {editor_html_path} (ASSETS_DIR={ASSETS_DIR})")
+            log.error(
+                f"editor.html not found at {editor_html_path} (ASSETS_DIR={ASSETS_DIR})"
+            )
             return
         editor_url = QUrl.fromLocalFile(str(editor_html_path))
         view = self._view  # Capture for nested function
@@ -3771,9 +3785,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         log.info("Available profiles: %s", list(profiles.keys()))
         if profile_name in profiles:
             profile_info = profiles[profile_name]
-            log.debug(
-                "Profile keys in config: %s", list(profile_info.keys())[:10]
-            )
+            log.debug("Profile keys in config: %s", list(profile_info.keys())[:10])
             self._update_profile_path(profile_name, profile_info)
             self._update_profile_stylesheet(profile_name)
             self._editor_session.active_profile_name = profile_name
@@ -3783,9 +3795,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self, profile_name: str, profile_info: dict[str, Any]
     ) -> None:
         default_path = profile_info.get("default_documents_path")
-        log.debug(
-            "Profile '%s' default_documents_path: %r", profile_name, default_path
-        )
+        log.debug("Profile '%s' default_documents_path: %r", profile_name, default_path)
         if default_path and default_path != "":
             self._default_documents_path = default_path
             self._editor_session.active_profile_default_path = default_path
@@ -4297,7 +4307,9 @@ def main() -> None:
         light_palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 255, 255))
         light_palette.setColor(QPalette.ColorRole.Link, QColor(0, 0, 255))
         light_palette.setColor(QPalette.ColorRole.Highlight, QColor(76, 163, 224))
-        light_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+        light_palette.setColor(
+            QPalette.ColorRole.HighlightedText, QColor(255, 255, 255)
+        )
         app.setPalette(light_palette)
 
         file_arg = sys.argv[1] if len(sys.argv) > 1 else None
@@ -4326,6 +4338,7 @@ if __name__ == "__main__":
         if _IS_FROZEN:
             with open("/tmp/sendMailEditor_startup.log", "a") as f:
                 import traceback
+
                 f.write(f"ERROR in main: {e}\n")
                 f.write(traceback.format_exc())
                 f.flush()
