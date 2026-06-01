@@ -30,7 +30,6 @@ from __future__ import annotations
 import argparse
 import base64
 import csv
-import email.mime.application
 import email.utils
 import imaplib
 import logging
@@ -94,8 +93,6 @@ _OP_STARTS_WITH = "starts with"
 _OP_ENDS_WITH = "ends with"
 _OP_IS = "is"
 _OP_IS_NOT = "is not"
-_OP_IS_BOUNCED = "is bounced"
-_OP_IS_NOT_BOUNCED = "is not bounced"
 
 
 def get_default_config_path() -> str | int:
@@ -499,13 +496,15 @@ def get_gmail_service(param: Any) -> Any:
     :return: A Google API client service object for accessing the Gmail API.
     :rtype: googleapiclient.discovery.Resource
     """
-    if os.path.exists(param.token_file):
-        creds = cast(Credentials, Credentials.from_authorized_user_file(param.token_file, param.scopes))  # type: ignore[no-untyped-call]
+    token_file = os.path.expanduser(param.token_file)
+    token_dir = os.path.dirname(token_file)
+    if token_dir and not os.path.exists(token_dir):
+        os.makedirs(token_dir, exist_ok=True)
+
+    if os.path.exists(token_file):
+        creds = cast(Credentials, Credentials.from_authorized_user_file(token_file, param.scopes))  # type: ignore[no-untyped-call]
     else:
         creds = None
-    # else:
-    #     token = get_secret(param.token_id)
-    #     creds = Credentials.from_authorized_user_info(token, param.scopes)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -514,7 +513,7 @@ def get_gmail_service(param: Any) -> Any:
             credentials = get_secret(param.credentials_id)
             flow = InstalledAppFlow.from_client_config(credentials, param.scopes)
             creds = flow.run_local_server(port=0)
-        with open(param.token_file, "w") as token:
+        with open(token_file, "w") as token:
             token.write(creds.to_json())
 
     return build("gmail", "v1", credentials=creds)
@@ -1109,27 +1108,26 @@ def generate_mailing(param: Any) -> str:
 
 _FILTER_OPS = [
     # Longer operators first to avoid substring matches
-    # E.g., "is equal to" before "is", "is not equal to" before "is not"
-    "does not contain",
-    "does not match",
+    _OP_DOES_NOT_CONTAIN,
+    _OP_DOES_NOT_MATCH,
     "does not",
-    "is not empty",
-    _OP_IS_NOT_EQUAL_TO,  # "is not equal to"
-    "is not",
-    "greater or equal to",
-    "less or equal to",
-    _OP_IS_EQUAL_TO,  # "is equal to"
-    "greater than",
-    "less than",
+    _OP_IS_NOT_EMPTY,
+    _OP_IS_NOT_EQUAL_TO,
+    _OP_IS_NOT,
+    _OP_GREATER_THAN_OR_EQUAL,
+    _OP_LESS_THAN_OR_EQUAL,
+    _OP_IS_EQUAL_TO,
+    _OP_GREATER_THAN,
+    _OP_LESS_THAN,
     "is empty",
-    _OP_IS_NOT_EMPTY,  # "is not empty"
-    "starts with",
-    "ends with",
-    "matches",
-    "one of",
-    "none of",
+    _OP_CONTAINS,
+    _OP_STARTS_WITH,
+    _OP_ENDS_WITH,
+    _OP_MATCHES,
+    _OP_ONE_OF,
+    _OP_NOT_ONE_OF,
     "not in",
-    "is",
+    _OP_IS,
     "in",
     "gt",
     "lt",
@@ -1137,7 +1135,6 @@ _FILTER_OPS = [
     "le",
     "eq",
     "ne",
-    "contains",
 ]
 
 
@@ -1218,7 +1215,7 @@ def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
         return bool(field_value == test_value)
     if op in ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT):
         return bool(field_value != test_value)
-    if op in (_OP_IS_NOT_EMPTY, "is not empty"):
+    if op in (_OP_IS_NOT_EMPTY,):
         return field_value != "" and field_value is not None
     if op in ("is empty",):
         return field_value == "" or field_value is None

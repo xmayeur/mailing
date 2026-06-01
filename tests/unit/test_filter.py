@@ -9,7 +9,6 @@ import yaml as _real_yaml
 mock_get_secret = MagicMock(return_value={"key": "value"})
 sys.modules["gspread"] = MagicMock()
 sys.modules["yaml"] = MagicMock()
-# sys.modules['bs4'] = MagicMock()
 sys.modules["certifi"] = MagicMock()
 sys.modules["getSecrets"] = MagicMock()
 sys.modules["getSecrets"].get_secret = mock_get_secret  # type: ignore[attr-defined]

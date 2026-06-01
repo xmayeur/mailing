@@ -1979,14 +1979,7 @@ def test_process_profile_test_nosubject():
     ):
         result = sendMail.process_profile(args)
 
-        # Verify line 1200: param.filter was set to param.filter_test
-        # We check the call to generate_mailing to see what 'param' looked like
-        # param is a Dict2Class instance
-        # called_param = mock_generate.call_args[0][0]
-        # assert called_param.test is True
-
         # When args.test is True, process_profile returns "Error"
-        # because of "and not args.test" in "if generate_mailing(param) == "OK" and not args.test:"
         assert result == "Error"
 
 
