@@ -502,7 +502,7 @@ Module {
     }
     Component {
         file: "private/qquickscreencapture_p.h"
-        lineNumber: 25
+        lineNumber: 26
         name: "QQuickScreenCatpure"
         accessSemantics: "reference"
         prototype: "QScreenCapture"
@@ -512,15 +512,15 @@ Module {
             name: "screen"
             type: "QQuickScreenInfo"
             isPointer: true
-            read: "qmlScreen"
+            read: "ensureQmlScreen"
             write: "qmlSetScreen"
-            notify: "screenChanged"
+            notify: "qmlScreenChanged"
             index: 0
-            lineNumber: 28
+            lineNumber: 29
         }
         Signal {
-            name: "screenChanged"
-            lineNumber: 39
+            name: "qmlScreenChanged"
+            lineNumber: 40
             Parameter { type: "QQuickScreenInfo"; isPointer: true }
         }
     }

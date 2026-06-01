@@ -92,8 +92,8 @@ exe = EXE(
     a.binaries,
     a.zipfiles,
     a.datas,
-    exclude_binaries=(sys.platform == "darwin"),
-    name="sendMailEditor",
+    exclude_binaries=False,
+    name="sendMailEditor_bin",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -106,28 +106,12 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon="images/mail.png" if sys.platform != "linux" else None,
-    onefile=(sys.platform != "darwin"),  # single file for Windows/Linux, bundle for macOS
+    onefile=True,  # Always onefile - easiest to bundle
 )
 
-# macOS: bundle as .app (required for Chromium helper processes)
+# macOS: create wrapper .app bundle
 if sys.platform == "darwin":
-    coll = COLLECT(
-        exe,
-        a.binaries,
-        a.zipfiles,
-        a.datas,
-        strip=False,
-        upx=True,
-        upx_exclude=[],
-        name="sendMailEditor",
-    )
-    app = BUNDLE(
-        coll,
-        name="sendMailEditor.app",
-        icon="images/mail.png",
-        bundle_identifier="be.sendmail.editor",
-        info_plist={
-            "NSHighResolutionCapable": True,
-            "NSRequiresAquaSystemAppearance": True,  # force light mode
-        },
-    )
+    # Just use the onefile exe directly (no COLLECT/BUNDLE complexity)
+    app = exe
+else:
+    app = exe

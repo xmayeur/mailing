@@ -464,7 +464,7 @@ def get_smtp_connection(param: Any) -> SMTP | None:
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
+    context.verify_mode = ssl.CERT_NONE  # noqa: S303 disabled for provider compatibility
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -665,6 +665,42 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
         return template
 
 
+def _process_file_attachments(args: Any) -> list[str]:
+    """Validate and return file attachments from args."""
+    files = []
+    if args.file:
+        for f in args.file:
+            if not os.path.isfile(f):
+                log.critical(f"File not found: {f}")
+                sys.exit(-1)
+        files = args.file
+    return files
+
+
+def _process_google_drive_attachments(
+    config: dict[str, Any], folder: str = "input"
+) -> tuple[list[str], Any, list[Any]]:
+    """Download and process attachments from Google Drive."""
+    service = None
+    google_drive_files: list[Any] = []
+    files: list[str] = []
+
+    if "SA" not in config or "mailing_folder" not in config:
+        return files, service, google_drive_files
+
+    for f in glob(f"{folder}/*.*"):
+        os.remove(f)
+    service = gd.connect_google_driver(config["SA"])
+
+    result = gd.get_files(service, folder_id=config["mailing_folder"])
+    if result and "files" in result:
+        google_drive_files = result["files"]
+        gd.download_file(service, google_drive_files, folder)
+
+    files = [f for f in glob(f"{folder}/*.*") if "published" not in f]
+    return files, service, google_drive_files
+
+
 def process_attachments(
     args: Any, config: dict[str, Any], folder: str = "input"
 ) -> tuple[list[str], Any, list[Any]]:
@@ -684,26 +720,11 @@ def process_attachments(
         object (or None if unused), and metadata about files fetched from Google Drive.
     :rtype: tuple[list[str], Union[Resource, None], list[dict]]
     """
-    service, google_drive_files, files = None, [], []
-    if args.file:
-        for f in args.file:
-            if not os.path.isfile(f):
-                log.critical(f"File not found: {f}")
-                sys.exit(-1)
-        files = args.file
-    elif "SA" in config and "mailing_folder" in config:
-        # Nettoyage et téléchargement depuis Google Drive
-        for f in glob(f"{folder}/*.*"):
-            os.remove(f)
-        service = gd.connect_google_driver(config["SA"])
-        if "mailing_folder" not in config:
-            return [], service, []
-        result = gd.get_files(service, folder_id=config["mailing_folder"])
-        if result and "files" in result:
-            google_drive_files = result["files"]
-            gd.download_file(service, google_drive_files, folder)
-        files = [f for f in glob(f"{folder}/*.*") if "published" not in f]
+    files = _process_file_attachments(args)
+    if files:
+        return files, None, []
 
+    files, service, google_drive_files = _process_google_drive_attachments(config, folder)
     return files, service, google_drive_files
 
 

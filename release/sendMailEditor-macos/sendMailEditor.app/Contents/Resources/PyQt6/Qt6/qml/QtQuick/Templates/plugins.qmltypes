@@ -4572,7 +4572,7 @@ Module {
     }
     Component {
         file: "private/qquickoverlay_p.h"
-        lineNumber: 80
+        lineNumber: 87
         name: "QQuickOverlayAttached"
         accessSemantics: "reference"
         prototype: "QObject"
@@ -4583,7 +4583,7 @@ Module {
             read: "overlay"
             notify: "overlayChanged"
             index: 0
-            lineNumber: 83
+            lineNumber: 90
             isReadonly: true
             isFinal: true
         }
@@ -4595,7 +4595,7 @@ Module {
             write: "setModal"
             notify: "modalChanged"
             index: 1
-            lineNumber: 84
+            lineNumber: 91
             isFinal: true
         }
         Property {
@@ -4606,14 +4606,14 @@ Module {
             write: "setModeless"
             notify: "modelessChanged"
             index: 2
-            lineNumber: 85
+            lineNumber: 92
             isFinal: true
         }
-        Signal { name: "overlayChanged"; lineNumber: 99 }
-        Signal { name: "modalChanged"; lineNumber: 100 }
-        Signal { name: "modelessChanged"; lineNumber: 101 }
-        Signal { name: "pressed"; lineNumber: 102 }
-        Signal { name: "released"; lineNumber: 103 }
+        Signal { name: "overlayChanged"; lineNumber: 106 }
+        Signal { name: "modalChanged"; lineNumber: 107 }
+        Signal { name: "modelessChanged"; lineNumber: 108 }
+        Signal { name: "pressed"; lineNumber: 109 }
+        Signal { name: "released"; lineNumber: 110 }
     }
     Component {
         file: "private/qquickpage_p.h"

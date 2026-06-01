@@ -7,6 +7,29 @@ import QtQuick.tooling 1.2
 
 Module {
     Component {
+        file: "private/qquickforeignutils_p.h"
+        lineNumber: 42
+        name: "QAccessibilityHints"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        Property {
+            name: "contrastPreference"
+            revision: 1546
+            type: "Qt::ContrastPreference"
+            read: "contrastPreference"
+            notify: "contrastPreferenceChanged"
+            index: 0
+            lineNumber: 18
+            isReadonly: true
+            isFinal: true
+        }
+        Signal {
+            name: "contrastPreferenceChanged"
+            lineNumber: 27
+            Parameter { name: "contrastPreference"; type: "Qt::ContrastPreference" }
+        }
+    }
+    Component {
         file: "qaccessible_base.h"
         lineNumber: 25
         name: "QAccessible"
@@ -257,7 +280,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 99
+        lineNumber: 108
         name: "QEventPoint"
         accessSemantics: "value"
         exports: ["QtQuick/eventPoint 6.5"]
@@ -506,7 +529,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 115
+        lineNumber: 124
         name: "QEventPointDerived"
         accessSemantics: "none"
         prototype: "QEventPoint"
@@ -516,7 +539,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 123
+        lineNumber: 132
         name: "QFontVariableAxis"
         accessSemantics: "value"
         Property {
@@ -773,7 +796,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 49
+        lineNumber: 58
         name: "QImage"
         accessSemantics: "value"
         prototype: "QPaintDevice"
@@ -942,7 +965,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 78
+        lineNumber: 87
         name: "QInputMethod"
         accessSemantics: "reference"
         prototype: "QObject"
@@ -1091,7 +1114,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 90
+        lineNumber: 99
         name: "QKeySequence"
         accessSemantics: "none"
         exports: ["QtQuick/StandardKey 2.2", "QtQuick/StandardKey 6.0"]
@@ -3801,7 +3824,6 @@ Module {
         lineNumber: 550
         name: "QQuickColorSpaceValueType"
         accessSemantics: "value"
-        prototype: "QColorSpace"
         Property {
             name: "namedColorSpace"
             type: "QQuickColorSpaceEnums::NamedColorSpace"
@@ -3854,7 +3876,6 @@ Module {
         lineNumber: 34
         name: "QQuickColorValueType"
         accessSemantics: "value"
-        prototype: "QColor"
         Property {
             name: "r"
             type: "double"
@@ -6216,7 +6237,6 @@ Module {
         lineNumber: 416
         name: "QQuickFontValueType"
         accessSemantics: "value"
-        prototype: "QFont"
         Property {
             name: "family"
             type: "QString"
@@ -10133,7 +10153,6 @@ Module {
         lineNumber: 258
         name: "QQuickMatrix4x4ValueType"
         accessSemantics: "value"
-        prototype: "QMatrix4x4"
         Property {
             name: "m11"
             type: "double"
@@ -13895,7 +13914,6 @@ Module {
         lineNumber: 210
         name: "QQuickQuaternionValueType"
         accessSemantics: "value"
-        prototype: "QQuaternion"
         Property {
             name: "scalar"
             type: "double"
@@ -16596,7 +16614,7 @@ Module {
             name: "positionViewAtCell"
             lineNumber: 182
             Parameter { name: "cell"; type: "QPoint" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "QPointF" }
             Parameter { name: "subRect"; type: "QRectF" }
         }
@@ -16605,7 +16623,7 @@ Module {
             isCloned: true
             lineNumber: 182
             Parameter { name: "cell"; type: "QPoint" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "QPointF" }
         }
         Method {
@@ -16613,13 +16631,13 @@ Module {
             isCloned: true
             lineNumber: 182
             Parameter { name: "cell"; type: "QPoint" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
         }
         Method {
             name: "positionViewAtIndex"
             lineNumber: 183
             Parameter { name: "index"; type: "QModelIndex" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "QPointF" }
             Parameter { name: "subRect"; type: "QRectF" }
         }
@@ -16628,7 +16646,7 @@ Module {
             isCloned: true
             lineNumber: 183
             Parameter { name: "index"; type: "QModelIndex" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "QPointF" }
         }
         Method {
@@ -16636,13 +16654,13 @@ Module {
             isCloned: true
             lineNumber: 183
             Parameter { name: "index"; type: "QModelIndex" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
         }
         Method {
             name: "positionViewAtRow"
             lineNumber: 184
             Parameter { name: "row"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "double" }
             Parameter { name: "subRect"; type: "QRectF" }
         }
@@ -16651,7 +16669,7 @@ Module {
             isCloned: true
             lineNumber: 184
             Parameter { name: "row"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "double" }
         }
         Method {
@@ -16659,13 +16677,13 @@ Module {
             isCloned: true
             lineNumber: 184
             Parameter { name: "row"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
         }
         Method {
             name: "positionViewAtColumn"
             lineNumber: 185
             Parameter { name: "column"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "double" }
             Parameter { name: "subRect"; type: "QRectF" }
         }
@@ -16674,7 +16692,7 @@ Module {
             isCloned: true
             lineNumber: 185
             Parameter { name: "column"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "double" }
         }
         Method {
@@ -16682,7 +16700,7 @@ Module {
             isCloned: true
             lineNumber: 185
             Parameter { name: "column"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
         }
         Method {
             name: "itemAtCell"
@@ -16924,7 +16942,7 @@ Module {
             lineNumber: 229
             Parameter { name: "column"; type: "int" }
             Parameter { name: "row"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "QPointF" }
             Parameter { name: "subRect"; type: "QRectF" }
         }
@@ -16934,7 +16952,7 @@ Module {
             lineNumber: 229
             Parameter { name: "column"; type: "int" }
             Parameter { name: "row"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
             Parameter { name: "offset"; type: "QPointF" }
         }
         Method {
@@ -16943,7 +16961,7 @@ Module {
             lineNumber: 229
             Parameter { name: "column"; type: "int" }
             Parameter { name: "row"; type: "int" }
-            Parameter { name: "mode"; type: "QQuickTableView::PositionMode" }
+            Parameter { name: "mode"; type: "QQuickFlickable::PositionMode" }
         }
         Method {
             name: "moveColumn"
@@ -20050,7 +20068,6 @@ Module {
         lineNumber: 90
         name: "QQuickVector2DValueType"
         accessSemantics: "value"
-        prototype: "QVector2D"
         Property {
             name: "x"
             type: "double"
@@ -20147,7 +20164,6 @@ Module {
         lineNumber: 126
         name: "QQuickVector3DValueType"
         accessSemantics: "value"
-        prototype: "QVector3D"
         Property {
             name: "x"
             type: "double"
@@ -20300,7 +20316,6 @@ Module {
         lineNumber: 167
         name: "QQuickVector4DValueType"
         accessSemantics: "value"
-        prototype: "QVector4D"
         Property {
             name: "x"
             type: "double"
@@ -21147,7 +21162,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 66
+        lineNumber: 75
         name: "QRegularExpressionValidator"
         accessSemantics: "reference"
         prototype: "QValidator"
@@ -21178,7 +21193,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 131
+        lineNumber: 140
         name: "QScreen"
         accessSemantics: "reference"
         prototype: "QObject"
@@ -21454,7 +21469,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 41
+        lineNumber: 50
         name: "QStyleHints"
         accessSemantics: "reference"
         prototype: "QObject"
@@ -21835,7 +21850,7 @@ Module {
     }
     Component {
         file: "private/qquickforeignutils_p.h"
-        lineNumber: 57
+        lineNumber: 66
         name: "QValidator"
         accessSemantics: "reference"
         prototype: "QObject"

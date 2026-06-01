@@ -793,6 +793,7 @@ Module {
             notify: "rotationChanged"
             index: 13
             lineNumber: 173
+            isOverride: true
         }
         Property {
             name: "rotationVariation"
@@ -1271,6 +1272,7 @@ Module {
             notify: "enabledChanged"
             index: 3
             lineNumber: 32
+            isOverride: true
         }
         Property {
             name: "once"
@@ -1420,6 +1422,7 @@ Module {
             notify: "enabledChanged"
             index: 3
             lineNumber: 37
+            isOverride: true
         }
         Property {
             name: "startTime"

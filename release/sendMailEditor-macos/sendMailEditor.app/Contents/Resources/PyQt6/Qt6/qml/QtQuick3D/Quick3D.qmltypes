@@ -5431,8 +5431,17 @@ Module {
             write: "setFrom"
             index: 0
             lineNumber: 33
+            isOverride: true
         }
-        Property { name: "to"; type: "QQuaternion"; read: "to"; write: "setTo"; index: 1; lineNumber: 34 }
+        Property {
+            name: "to"
+            type: "QQuaternion"
+            read: "to"
+            write: "setTo"
+            index: 1
+            lineNumber: 34
+            isOverride: true
+        }
         Property {
             name: "type"
             type: "Type"
@@ -6229,6 +6238,55 @@ Module {
         Method { name: "releaseCachedResources"; lineNumber: 105 }
     }
     Component {
+        file: "private/qquick3dshaderutils_p.h"
+        lineNumber: 313
+        name: "QQuick3DRenderPassTargetBlend"
+        accessSemantics: "none"
+        exports: ["QtQuick3D/RenderTargetBlend 6.11"]
+        isCreatable: false
+        exportMetaObjectRevisions: [1547]
+        Enum {
+            name: "BlendFactor"
+            isScoped: true
+            lineNumber: 232
+            values: [
+                "Zero",
+                "One",
+                "SrcColor",
+                "OneMinusSrcColor",
+                "DstColor",
+                "OneMinusDstColor",
+                "SrcAlpha",
+                "OneMinusSrcAlpha",
+                "DstAlpha",
+                "OneMinusDstAlpha",
+                "ConstantColor",
+                "OneMinusConstantColor",
+                "ConstantAlpha",
+                "OneMinusConstantAlpha",
+                "SrcAlphaSaturate",
+                "Src1Color",
+                "OneMinusSrc1Color",
+                "Src1Alpha",
+                "OneMinusSrc1Alpha"
+            ]
+        }
+        Enum {
+            name: "BlendOperation"
+            isScoped: true
+            lineNumber: 255
+            values: ["Add", "Subtract", "ReverseSubtract", "Min", "Max"]
+        }
+        Property { name: "enable"; type: "bool"; index: 0; lineNumber: 212 }
+        Property { name: "colorWrite"; type: "ColorMask"; index: 1; lineNumber: 213 }
+        Property { name: "srcColor"; type: "BlendFactor"; index: 2; lineNumber: 214 }
+        Property { name: "dstColor"; type: "BlendFactor"; index: 3; lineNumber: 215 }
+        Property { name: "opColor"; type: "BlendOperation"; index: 4; lineNumber: 216 }
+        Property { name: "srcAlpha"; type: "BlendFactor"; index: 5; lineNumber: 217 }
+        Property { name: "dstAlpha"; type: "BlendFactor"; index: 6; lineNumber: 218 }
+        Property { name: "opAlpha"; type: "BlendOperation"; index: 7; lineNumber: 219 }
+    }
+    Component {
         file: "private/qquick3drepeater_p.h"
         lineNumber: 33
         name: "QQuick3DRepeater"
@@ -6907,14 +6965,14 @@ Module {
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 475
+        lineNumber: 483
         name: "QQuick3DShaderUtilsApplyValue"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
         exports: ["QtQuick3D/SetUniformValue 6.0"]
         exportMetaObjectRevisions: [1536]
-        Property { name: "target"; type: "QByteArray"; index: 0; lineNumber: 478 }
-        Property { name: "value"; type: "QVariant"; index: 1; lineNumber: 479 }
+        Property { name: "target"; type: "QByteArray"; index: 0; lineNumber: 486 }
+        Property { name: "value"; type: "QVariant"; index: 1; lineNumber: 487 }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
@@ -7019,7 +7077,7 @@ Module {
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 313
+        lineNumber: 321
         name: "QQuick3DShaderUtilsPipelineStateOverride"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
@@ -7028,7 +7086,7 @@ Module {
         Enum {
             name: "CompareOperation"
             isScoped: true
-            lineNumber: 340
+            lineNumber: 348
             values: [
                 "Never",
                 "Less",
@@ -7043,13 +7101,13 @@ Module {
         Enum {
             name: "CullMode"
             isScoped: true
-            lineNumber: 352
+            lineNumber: 360
             values: ["None", "Front", "Back"]
         }
         Enum {
             name: "PolygonMode"
             isScoped: true
-            lineNumber: 359
+            lineNumber: 367
             values: ["Fill", "Line"]
         }
         Property {
@@ -7060,7 +7118,7 @@ Module {
             reset: "resetDepthTestEnabled"
             notify: "depthTestEnabledChanged"
             index: 0
-            lineNumber: 316
+            lineNumber: 324
         }
         Property {
             name: "depthWriteEnabled"
@@ -7070,7 +7128,7 @@ Module {
             reset: "resetDepthWriteEnabled"
             notify: "depthWriteEnabledChanged"
             index: 1
-            lineNumber: 317
+            lineNumber: 325
         }
         Property {
             name: "blendEnabled"
@@ -7080,7 +7138,7 @@ Module {
             reset: "resetBlendEnabled"
             notify: "blendEnabledChanged"
             index: 2
-            lineNumber: 318
+            lineNumber: 326
             isFinal: true
         }
         Property {
@@ -7091,7 +7149,7 @@ Module {
             reset: "resetUsesStencilReference"
             notify: "usesStencilReferenceChanged"
             index: 3
-            lineNumber: 319
+            lineNumber: 327
         }
         Property {
             name: "usesScissor"
@@ -7101,7 +7159,7 @@ Module {
             reset: "resetUsesScissor"
             notify: "usesScissorChanged"
             index: 4
-            lineNumber: 320
+            lineNumber: 328
         }
         Property {
             name: "depthFunction"
@@ -7111,7 +7169,7 @@ Module {
             reset: "resetDepthFunction"
             notify: "depthFunctionChanged"
             index: 5
-            lineNumber: 321
+            lineNumber: 329
         }
         Property {
             name: "cullMode"
@@ -7121,7 +7179,7 @@ Module {
             reset: "resetCullMode"
             notify: "cullModeChanged"
             index: 6
-            lineNumber: 322
+            lineNumber: 330
         }
         Property {
             name: "polygonMode"
@@ -7131,7 +7189,7 @@ Module {
             reset: "resetPolygonMode"
             notify: "polygonModeChanged"
             index: 7
-            lineNumber: 323
+            lineNumber: 331
         }
         Property {
             name: "stencilWriteMask"
@@ -7141,7 +7199,7 @@ Module {
             reset: "resetStencilWriteMask"
             notify: "stencilWriteMaskChanged"
             index: 8
-            lineNumber: 324
+            lineNumber: 332
         }
         Property {
             name: "stencilReference"
@@ -7151,7 +7209,7 @@ Module {
             reset: "resetStencilReference"
             notify: "stencilReferenceChanged"
             index: 9
-            lineNumber: 325
+            lineNumber: 333
         }
         Property {
             name: "viewport"
@@ -7161,7 +7219,7 @@ Module {
             reset: "resetViewport"
             notify: "viewportChanged"
             index: 10
-            lineNumber: 326
+            lineNumber: 334
         }
         Property {
             name: "scissor"
@@ -7171,7 +7229,7 @@ Module {
             reset: "resetScissor"
             notify: "scissorChanged"
             index: 11
-            lineNumber: 327
+            lineNumber: 335
         }
         Property {
             name: "targetBlend0"
@@ -7181,7 +7239,7 @@ Module {
             reset: "resetTargetBlend0"
             notify: "targetBlend0Changed"
             index: 12
-            lineNumber: 328
+            lineNumber: 336
         }
         Property {
             name: "targetBlend1"
@@ -7191,7 +7249,7 @@ Module {
             reset: "resetTargetBlend1"
             notify: "targetBlend1Changed"
             index: 13
-            lineNumber: 329
+            lineNumber: 337
         }
         Property {
             name: "targetBlend2"
@@ -7201,7 +7259,7 @@ Module {
             reset: "resetTargetBlend2"
             notify: "targetBlend2Changed"
             index: 14
-            lineNumber: 330
+            lineNumber: 338
         }
         Property {
             name: "targetBlend3"
@@ -7211,7 +7269,7 @@ Module {
             reset: "resetTargetBlend3"
             notify: "targetBlend3Changed"
             index: 15
-            lineNumber: 331
+            lineNumber: 339
         }
         Property {
             name: "targetBlend4"
@@ -7221,7 +7279,7 @@ Module {
             reset: "resetTargetBlend4"
             notify: "targetBlend4Changed"
             index: 16
-            lineNumber: 332
+            lineNumber: 340
         }
         Property {
             name: "targetBlend5"
@@ -7231,7 +7289,7 @@ Module {
             reset: "resetTargetBlend5"
             notify: "targetBlend5Changed"
             index: 17
-            lineNumber: 333
+            lineNumber: 341
         }
         Property {
             name: "targetBlend6"
@@ -7241,7 +7299,7 @@ Module {
             reset: "resetTargetBlend6"
             notify: "targetBlend6Changed"
             index: 18
-            lineNumber: 334
+            lineNumber: 342
         }
         Property {
             name: "targetBlend7"
@@ -7251,28 +7309,28 @@ Module {
             reset: "resetTargetBlend7"
             notify: "targetBlend7Changed"
             index: 19
-            lineNumber: 335
+            lineNumber: 343
         }
-        Signal { name: "depthTestEnabledChanged"; lineNumber: 448 }
-        Signal { name: "depthWriteEnabledChanged"; lineNumber: 449 }
-        Signal { name: "blendEnabledChanged"; lineNumber: 450 }
-        Signal { name: "usesStencilReferenceChanged"; lineNumber: 451 }
-        Signal { name: "usesScissorChanged"; lineNumber: 452 }
-        Signal { name: "depthFunctionChanged"; lineNumber: 453 }
-        Signal { name: "cullModeChanged"; lineNumber: 454 }
-        Signal { name: "polygonModeChanged"; lineNumber: 455 }
-        Signal { name: "stencilWriteMaskChanged"; lineNumber: 456 }
-        Signal { name: "stencilReferenceChanged"; lineNumber: 457 }
-        Signal { name: "viewportChanged"; lineNumber: 458 }
-        Signal { name: "scissorChanged"; lineNumber: 459 }
-        Signal { name: "targetBlend0Changed"; lineNumber: 460 }
-        Signal { name: "targetBlend1Changed"; lineNumber: 461 }
-        Signal { name: "targetBlend2Changed"; lineNumber: 462 }
-        Signal { name: "targetBlend3Changed"; lineNumber: 463 }
-        Signal { name: "targetBlend4Changed"; lineNumber: 464 }
-        Signal { name: "targetBlend5Changed"; lineNumber: 465 }
-        Signal { name: "targetBlend6Changed"; lineNumber: 466 }
-        Signal { name: "targetBlend7Changed"; lineNumber: 467 }
+        Signal { name: "depthTestEnabledChanged"; lineNumber: 456 }
+        Signal { name: "depthWriteEnabledChanged"; lineNumber: 457 }
+        Signal { name: "blendEnabledChanged"; lineNumber: 458 }
+        Signal { name: "usesStencilReferenceChanged"; lineNumber: 459 }
+        Signal { name: "usesScissorChanged"; lineNumber: 460 }
+        Signal { name: "depthFunctionChanged"; lineNumber: 461 }
+        Signal { name: "cullModeChanged"; lineNumber: 462 }
+        Signal { name: "polygonModeChanged"; lineNumber: 463 }
+        Signal { name: "stencilWriteMaskChanged"; lineNumber: 464 }
+        Signal { name: "stencilReferenceChanged"; lineNumber: 465 }
+        Signal { name: "viewportChanged"; lineNumber: 466 }
+        Signal { name: "scissorChanged"; lineNumber: 467 }
+        Signal { name: "targetBlend0Changed"; lineNumber: 468 }
+        Signal { name: "targetBlend1Changed"; lineNumber: 469 }
+        Signal { name: "targetBlend2Changed"; lineNumber: 470 }
+        Signal { name: "targetBlend3Changed"; lineNumber: 471 }
+        Signal { name: "targetBlend4Changed"; lineNumber: 472 }
+        Signal { name: "targetBlend5Changed"; lineNumber: 473 }
+        Signal { name: "targetBlend6Changed"; lineNumber: 474 }
+        Signal { name: "targetBlend7Changed"; lineNumber: 475 }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
@@ -7286,7 +7344,7 @@ Module {
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 666
+        lineNumber: 674
         name: "QQuick3DShaderUtilsRenderPass"
         accessSemantics: "reference"
         defaultProperty: "data"
@@ -7299,7 +7357,7 @@ Module {
             isList: true
             read: "commands"
             index: 0
-            lineNumber: 669
+            lineNumber: 677
             isReadonly: true
         }
         Property {
@@ -7307,7 +7365,7 @@ Module {
             type: "QQuick3DShaderUtilsBuffer"
             isPointer: true
             index: 1
-            lineNumber: 670
+            lineNumber: 678
         }
         Property {
             name: "shaders"
@@ -7315,25 +7373,25 @@ Module {
             isList: true
             read: "shaders"
             index: 2
-            lineNumber: 671
+            lineNumber: 679
             isReadonly: true
         }
-        Signal { name: "changed"; lineNumber: 696 }
+        Signal { name: "changed"; lineNumber: 704 }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 617
+        lineNumber: 625
         name: "QQuick3DShaderUtilsRenderPassAddDefine"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
         exports: ["QtQuick3D/AddDefine 6.11"]
         exportMetaObjectRevisions: [1547]
-        Property { name: "name"; type: "QByteArray"; index: 0; lineNumber: 620 }
-        Property { name: "value"; type: "int"; index: 1; lineNumber: 621 }
+        Property { name: "name"; type: "QByteArray"; index: 0; lineNumber: 628 }
+        Property { name: "value"; type: "int"; index: 1; lineNumber: 629 }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 565
+        lineNumber: 573
         name: "QQuick3DShaderUtilsRenderPassColorAttachment"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
@@ -7344,7 +7402,7 @@ Module {
             type: "QQuick3DShaderUtilsRenderPassTexture"
             isPointer: true
             index: 0
-            lineNumber: 568
+            lineNumber: 576
         }
         Property {
             name: "name"
@@ -7352,13 +7410,13 @@ Module {
             read: "name"
             write: "setName"
             index: 1
-            lineNumber: 569
+            lineNumber: 577
             isFinal: true
         }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 603
+        lineNumber: 611
         name: "QQuick3DShaderUtilsRenderPassDepthStencilAttachment"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
@@ -7367,7 +7425,7 @@ Module {
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 587
+        lineNumber: 595
         name: "QQuick3DShaderUtilsRenderPassDepthTextureAttachment"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
@@ -7378,12 +7436,12 @@ Module {
             type: "QQuick3DShaderUtilsRenderPassTexture"
             isPointer: true
             index: 0
-            lineNumber: 590
+            lineNumber: 598
         }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 522
+        lineNumber: 530
         name: "QQuick3DShaderUtilsRenderPassTexture"
         accessSemantics: "reference"
         defaultProperty: "data"
@@ -7393,7 +7451,7 @@ Module {
         Enum {
             name: "TextureFormat"
             isScoped: true
-            lineNumber: 530
+            lineNumber: 538
             values: [
                 "Unknown",
                 "RGBA8",
@@ -7415,13 +7473,13 @@ Module {
             read: "format"
             write: "setFormat"
             index: 0
-            lineNumber: 525
+            lineNumber: 533
             isFinal: true
         }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 492
+        lineNumber: 500
         name: "QQuick3DShaderUtilsRenderablesFilter"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
@@ -7433,22 +7491,22 @@ Module {
             isFlag: true
             isScoped: true
             type: "uint"
-            lineNumber: 502
+            lineNumber: 510
             values: ["None", "Opaque", "Transparent"]
         }
-        Property { name: "layerMask"; type: "uint"; index: 0; lineNumber: 496 }
+        Property { name: "layerMask"; type: "uint"; index: 0; lineNumber: 504 }
         Property {
             name: "renderableTypes"
             type: "RenderableTypes"
             read: "renderableTypes"
             write: "setRenderableTypes"
             index: 1
-            lineNumber: 497
+            lineNumber: 505
         }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 699
+        lineNumber: 707
         name: "QQuick3DShaderUtilsShader"
         accessSemantics: "reference"
         defaultProperty: "data"
@@ -7459,17 +7517,17 @@ Module {
             name: "Stage"
             isScoped: true
             type: "quint8"
-            lineNumber: 710
+            lineNumber: 718
             values: ["Vertex", "Fragment"]
         }
-        Property { name: "shader"; type: "QUrl"; notify: "shaderChanged"; index: 0; lineNumber: 702 }
-        Property { name: "stage"; type: "Stage"; notify: "stageChanged"; index: 1; lineNumber: 703 }
-        Signal { name: "shaderChanged"; lineNumber: 721 }
-        Signal { name: "stageChanged"; lineNumber: 722 }
+        Property { name: "shader"; type: "QUrl"; notify: "shaderChanged"; index: 0; lineNumber: 710 }
+        Property { name: "stage"; type: "Stage"; notify: "stageChanged"; index: 1; lineNumber: 711 }
+        Signal { name: "shaderChanged"; lineNumber: 729 }
+        Signal { name: "stageChanged"; lineNumber: 730 }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"
-        lineNumber: 636
+        lineNumber: 644
         name: "QQuick3DShaderUtilsSubRenderPass"
         accessSemantics: "reference"
         prototype: "QQuick3DShaderUtilsRenderCommand"
@@ -7483,10 +7541,10 @@ Module {
             write: "setRenderPass"
             notify: "renderPassChanged"
             index: 0
-            lineNumber: 639
+            lineNumber: 647
             isFinal: true
         }
-        Signal { name: "renderPassChanged"; lineNumber: 653 }
+        Signal { name: "renderPassChanged"; lineNumber: 661 }
     }
     Component {
         file: "private/qquick3dshaderutils_p.h"

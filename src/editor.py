@@ -45,11 +45,8 @@ if _IS_FROZEN:
     else:
         _BASE = _MEIPASS
 
-    # In bundled macOS app, modules/assets are in Contents/Resources/ and Contents/Frameworks/
-    _MODULES_PATH = [
-        _BASE / "Resources",
-        _BASE / "Frameworks",
-    ]
+    # In bundled macOS app, modules/assets are in _MEIPASS/ (onefile extraction)
+    _MODULES_PATH = [_BASE]
 else:
     _BASE = Path(__file__).parent
     _MODULES_PATH = [_BASE]
@@ -60,14 +57,17 @@ for mod_path in _MODULES_PATH:
         sys.path.insert(0, str(mod_path))
 
 if _IS_FROZEN:
-    # macOS .app bundle: _BASE is Contents/, assets in Contents/Resources/
-    # Windows/Linux onefile: _BASE is _MEIPASS/, assets in _MEIPASS/editor_assets/
-    if sys.platform == "darwin":
-        ASSETS_DIR = _BASE / "Resources" / "editor_assets"
-    else:
-        ASSETS_DIR = _BASE / "editor_assets"
+    # onefile extracts to _MEIPASS/, assets are at _MEIPASS/editor_assets/ (not in Resources/)
+    # (.app bundle approach would have Resources/, but we're using onefile now)
+    ASSETS_DIR = _BASE / "editor_assets"
 else:
     ASSETS_DIR = _BASE / "editor_assets"
+
+# Verify assets directory exists, fallback to src/editor_assets if needed
+if not ASSETS_DIR.exists() and not _IS_FROZEN:
+    alt_assets = Path(__file__).parent / "editor_assets"
+    if alt_assets.exists():
+        ASSETS_DIR = alt_assets
 
 FONT_CHOICES = [
     "Arial",
@@ -2817,8 +2817,18 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self._load_editor_session()
 
         # Web engine view
-        self._view = QWebEngineView(self)
-        self.setCentralWidget(self._view)
+        try:
+            self._view = QWebEngineView(self)
+            self.setCentralWidget(self._view)
+        except Exception as e:
+            log.error(f"Failed to create QWebEngineView: {e}")
+            # Fallback to text editor
+            from PyQt6.QtWidgets import QTextEdit
+            self._view = None
+            text_edit = QTextEdit(self)
+            text_edit.setPlainText("WebEngine failed to initialize. This is a fallback text editor.\n\nError: " + str(e))
+            text_edit.setReadOnly(True)
+            self.setCentralWidget(text_edit)
 
         # Web channel + bridge
         self._channel = QWebChannel(self)
@@ -2846,11 +2856,19 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self.setMinimumSize(960, 720)
         self._update_title()
 
-        # Open file or blank editor
-        if file_path:
-            self.open_file(file_path)
-        else:
+        # Store file_path for deferred loading (after window shows)
+        self._deferred_file_path = file_path
+
+    def showEvent(self, event: Any) -> None:
+        """Load deferred content after window is shown."""
+        super().showEvent(event)
+        # Load content after window is visible
+        if hasattr(self, '_deferred_file_path') and self._deferred_file_path is not None:
+            self.open_file(self._deferred_file_path)
+            self._deferred_file_path = None
+        elif hasattr(self, '_deferred_file_path'):
             self._load_editor_page("")
+            self._deferred_file_path = None
 
     # ------------------------------------------------------------------
     # Configuration & Path Handling
@@ -3036,7 +3054,15 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
     def _load_editor_page(self, initial_html: str) -> None:
         """Load editor.html into the WebEngineView, then inject initial content."""
-        editor_url = QUrl.fromLocalFile(str(ASSETS_DIR / "editor.html"))
+        if self._view is None:
+            log.warning("WebEngineView not available, skipping page load")
+            return
+
+        editor_html_path = ASSETS_DIR / "editor.html"
+        if not editor_html_path.exists():
+            log.error(f"editor.html not found at {editor_html_path} (ASSETS_DIR={ASSETS_DIR})")
+            return
+        editor_url = QUrl.fromLocalFile(str(editor_html_path))
 
         # Disconnect any previously connected loadFinished handler
         if self._load_finished_connected:
@@ -3055,7 +3081,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             if ok:
                 self._inject_initial_content(initial_html)
             else:
-                log.error("Failed to load editor page")
+                log.error(f"Failed to load editor page from {editor_url.toLocalFile()}")
 
         self._view.loadFinished.connect(_on_load_finished)
         self._load_finished_connected = True
@@ -3236,7 +3262,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                 "span",
                 **{
                     "class": "editor-anchor",
-                    "data-anchor-id": anchor_id,  # type: ignore[arg-type]
+                    "id": anchor_id,  # type: ignore[arg-type]
                     "title": f"Anchor: {anchor_id}",
                 },
             )
@@ -3256,7 +3282,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return f'<a id="{aid}" name="{aid}"></a>'
 
         return re.sub(
-            r'<span(?:(?!class="editor-anchor")[^>])*class="editor-anchor"(?:(?!data-anchor-id=)[^>])*data-anchor-id="([^"]+)"[^>]*>⚓</span>',
+            r'<span(?:(?!class="editor-anchor")[^>])*class="editor-anchor"(?:(?!id=)[^>])*id="([^"]+)"[^>]*>⚓</span>',
             _replace,
             html,
         )
@@ -4223,34 +4249,57 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
 
 def main() -> None:
-    app = QApplication(sys.argv)
-    app.setApplicationName("sendMail Editor")
-    app.setOrganizationName("sendMail")
+    try:
+        app = QApplication(sys.argv)
+        app.setApplicationName("sendMail Editor")
+        app.setOrganizationName("sendMail")
 
-    # Force light theme by setting explicit light palette
-    from PyQt6.QtGui import QColor, QPalette
+        # Force light theme by setting explicit light palette
+        from PyQt6.QtGui import QColor, QPalette
 
-    light_palette = QPalette()
-    light_palette.setColor(QPalette.ColorRole.Window, QColor(240, 240, 240))
-    light_palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
-    light_palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))
-    light_palette.setColor(QPalette.ColorRole.AlternateBase, QColor(240, 240, 240))
-    light_palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(255, 255, 255))
-    light_palette.setColor(QPalette.ColorRole.ToolTipText, QColor(0, 0, 0))
-    light_palette.setColor(QPalette.ColorRole.Text, QColor(0, 0, 0))
-    light_palette.setColor(QPalette.ColorRole.Button, QColor(240, 240, 240))
-    light_palette.setColor(QPalette.ColorRole.ButtonText, QColor(0, 0, 0))
-    light_palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 255, 255))
-    light_palette.setColor(QPalette.ColorRole.Link, QColor(0, 0, 255))
-    light_palette.setColor(QPalette.ColorRole.Highlight, QColor(76, 163, 224))
-    light_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
-    app.setPalette(light_palette)
+        light_palette = QPalette()
+        light_palette.setColor(QPalette.ColorRole.Window, QColor(240, 240, 240))
+        light_palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
+        light_palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))
+        light_palette.setColor(QPalette.ColorRole.AlternateBase, QColor(240, 240, 240))
+        light_palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(255, 255, 255))
+        light_palette.setColor(QPalette.ColorRole.ToolTipText, QColor(0, 0, 0))
+        light_palette.setColor(QPalette.ColorRole.Text, QColor(0, 0, 0))
+        light_palette.setColor(QPalette.ColorRole.Button, QColor(240, 240, 240))
+        light_palette.setColor(QPalette.ColorRole.ButtonText, QColor(0, 0, 0))
+        light_palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 255, 255))
+        light_palette.setColor(QPalette.ColorRole.Link, QColor(0, 0, 255))
+        light_palette.setColor(QPalette.ColorRole.Highlight, QColor(76, 163, 224))
+        light_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+        app.setPalette(light_palette)
 
-    file_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    window = EditorWindow(file_path=file_arg)
-    window.show()
-    sys.exit(app.exec())
+        file_arg = sys.argv[1] if len(sys.argv) > 1 else None
+        window = EditorWindow(file_path=file_arg)
+        window.show()
+        sys.exit(app.exec())
+    except Exception as e:
+        log.exception(f"Fatal error in main: {e}")
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    # Write startup log for debugging frozen app issues
+    if _IS_FROZEN:
+        with open("/tmp/sendMailEditor_startup.log", "w") as f:
+            f.write(f"Frozen: {_IS_FROZEN}\n")
+            f.write(f"Platform: {sys.platform}\n")
+            f.write(f"_MEIPASS: {getattr(sys, '_MEIPASS', 'N/A')}\n")
+            f.write(f"ASSETS_DIR: {ASSETS_DIR}\n")
+            f.write(f"ASSETS_DIR exists: {ASSETS_DIR.exists()}\n")
+            f.flush()
+
+    try:
+        main()
+    except Exception as e:
+        if _IS_FROZEN:
+            with open("/tmp/sendMailEditor_startup.log", "a") as f:
+                import traceback
+                f.write(f"ERROR in main: {e}\n")
+                f.write(traceback.format_exc())
+                f.flush()
+        raise
