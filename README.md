@@ -9,6 +9,9 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Build and Release Executables](https://github.com/xmayeur/mailing/actions/workflows/main.yml/badge.svg)](https://github.com/xmayeur/mailing/actions/workflows/main.yml)
 [![Docs](https://readthedocs.org/projects/mailing/badge/?version=latest)](https://mailing.readthedocs.io)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=xmayeur_mailing&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=xmayeur_mailing)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=xmayeur_mailing&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=xmayeur_mailing)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=xmayeur_mailing&metric=bugs)](https://sonarcloud.io/summary/new_code?id=xmayeur_mailing)
 
 A comprehensive email campaign management system for organizations managing mailing lists, newsletters, and membership communications.
 
