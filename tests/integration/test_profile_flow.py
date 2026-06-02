@@ -29,7 +29,7 @@ class TestProfileFlow:
             "smtp_host": "smtp.artscroises.com",
             "smtp_port": 587,
             "username": "artscroises_user",
-            "password": "artscroises_pass",
+            "password": "artscroises_pass",  # NOSONAR
             "sender": "sender@artscroises.com",
             "sendername": "Arts Croisés",
         }
@@ -53,7 +53,7 @@ class TestProfileFlow:
             "smtp_host": "smtp1.com",
             "smtp_port": 587,
             "username": "user1",
-            "password": "pass1",
+            "password": "pass1",  # NOSONAR
             "sender": "user1@test.com",
             "sendername": "User1",
         }
@@ -61,7 +61,7 @@ class TestProfileFlow:
             "smtp_host": "smtp2.com",
             "smtp_port": 587,
             "username": "user2",
-            "password": "pass2",
+            "password": "pass2",  # NOSONAR
             "sender": "user2@test.com",
             "sendername": "User2",
         }
@@ -81,7 +81,7 @@ class TestProfileFlow:
     @pytest.mark.skip(reason="US5 (Filter Persistence) not yet implemented")
     def test_profile_with_saved_filters(self):
         """Profile loads and applies saved filters."""
-        # TODO: Implement after FilterPersistence class created in US5
+        # TODO: Implement after FilterPersistence class created in US5  # NOSONAR
         pass
 
     def test_error_handling_vault_unreachable(self):
@@ -101,5 +101,5 @@ class TestProfileFlow:
     @pytest.mark.skip(reason="EditorProfileStyler class not yet implemented")
     def test_profile_with_missing_template(self):
         """Profile with missing template handles gracefully."""
-        # TODO: Implement after EditorProfileStyler class created
+        # TODO: Implement after EditorProfileStyler class created  # NOSONAR
         pass

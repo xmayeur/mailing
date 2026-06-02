@@ -34,7 +34,7 @@ class DatabaseSchemaProvider:
                 reader = csv.reader(f)
                 headers = next(reader, [])
                 return [h.strip() for h in headers if h.strip()]
-        except (OSError, FileNotFoundError, StopIteration) as e:
+        except (OSError, StopIteration) as e:
             log.debug("Could not read CSV headers: %s", e)
             return []
 

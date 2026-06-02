@@ -77,7 +77,7 @@ def connect_google_driver(service_account_id: str = "artscroisesServiceAccount")
         )
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
-        _log.error(e)
+        _log.exception(e)
         return None
 
 
@@ -109,7 +109,7 @@ def get_files(
         )
         return result  # type: ignore[no-any-return]
     except HttpError as e:
-        _log.error(e)
+        _log.exception(e)
         return None
 
 
@@ -163,7 +163,7 @@ def download_file(
                 fd.write(file_retrieved)
 
         except HttpError as error:
-            _log.error(f"An error occurred: {error} with file {f['name']}")
+            _log.exception(f"An error occurred: {error} with file {f['name']}")
 
 
 def upload_file(service: Any, file: str, mimetype: str = "text/csv") -> None:

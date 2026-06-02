@@ -56,6 +56,30 @@ __all__ = [
     "FilterRowWidget",
 ]
 
+# --- String constants (S1192) ---
+_OP_IS_EMPTY = "is empty"
+_OP_IS_NOT_EMPTY = "is not empty"
+_OP_ONE_OF = "one of"
+_OP_NONE_OF = "none of"
+
+_LABEL_IS_EQUAL_TO = "Is equal to"
+_LABEL_IS_NOT_EQUAL_TO = "Is not equal to"
+_LABEL_GREATER_THAN = "Greater than"
+_LABEL_LESS_THAN = "Less than"
+_LABEL_GREATER_OR_EQUAL = "Greater or equal"
+_LABEL_LESS_OR_EQUAL = "Less or equal"
+_LABEL_IS_EMPTY = "Is empty"
+_LABEL_IS_NOT_EMPTY = "Is not empty"
+_LABEL_IN_LIST = "In list"
+_LABEL_NOT_IN_LIST = "Not in list"
+_LABEL_DOES_NOT_CONTAIN = "Does not contain"
+_LABEL_STARTS_WITH = "Starts with"
+_LABEL_ENDS_WITH = "Ends with"
+_LABEL_MATCHES_REGEX = "Matches regex"
+_LABEL_DOES_NOT_MATCH = "Does not match"
+
+_PLACEHOLDER_LOAD_DB = "(Load database first)"
+
 
 @dataclass
 class FilterRow:
@@ -281,7 +305,7 @@ def _split_operator_value(expr: str) -> tuple[str, str | None]:
     Returns:
         Tuple of (operator, value). value is None if operator takes no value.
     """
-    no_value_ops = ["is empty", "is not empty"]
+    no_value_ops = [_OP_IS_EMPTY, _OP_IS_NOT_EMPTY]
     operators = [
         "is not",
         "is equal to",
@@ -296,8 +320,8 @@ def _split_operator_value(expr: str) -> tuple[str, str | None]:
         "ends with",
         "contains",
         "matches",
-        "one of",
-        "none of",
+        _OP_ONE_OF,
+        _OP_NONE_OF,
         "not in",
         "in",
         "is",
@@ -381,79 +405,79 @@ class DatabaseSchemaInfo:
         """
         if field_type == "numeric":
             return [
-                "Is equal to",
-                "Is not equal to",
-                "Greater than",
-                "Less than",
-                "Greater or equal",
-                "Less or equal",
-                "Is empty",
-                "Is not empty",
-                "In list",
-                "Not in list",
+                _LABEL_IS_EQUAL_TO,
+                _LABEL_IS_NOT_EQUAL_TO,
+                _LABEL_GREATER_THAN,
+                _LABEL_LESS_THAN,
+                _LABEL_GREATER_OR_EQUAL,
+                _LABEL_LESS_OR_EQUAL,
+                _LABEL_IS_EMPTY,
+                _LABEL_IS_NOT_EMPTY,
+                _LABEL_IN_LIST,
+                _LABEL_NOT_IN_LIST,
             ]
         else:
             return [
-                "Is equal to",
-                "Is not equal to",
+                _LABEL_IS_EQUAL_TO,
+                _LABEL_IS_NOT_EQUAL_TO,
                 "Contains",
-                "Does not contain",
-                "Starts with",
-                "Ends with",
-                "Matches regex",
-                "Does not match",
-                "Is empty",
-                "Is not empty",
-                "In list",
-                "Not in list",
+                _LABEL_DOES_NOT_CONTAIN,
+                _LABEL_STARTS_WITH,
+                _LABEL_ENDS_WITH,
+                _LABEL_MATCHES_REGEX,
+                _LABEL_DOES_NOT_MATCH,
+                _LABEL_IS_EMPTY,
+                _LABEL_IS_NOT_EMPTY,
+                _LABEL_IN_LIST,
+                _LABEL_NOT_IN_LIST,
             ]
 
 
 OPERATOR_LABELS: dict[str, list[str]] = {
-    "Is equal to": ["is", "eq", "is equal to"],
-    "Is not equal to": ["is not", "ne", "is not equal to"],
-    "Greater than": ["gt", "greater than"],
-    "Less than": ["lt", "less than"],
-    "Greater or equal": ["ge", "greater or equal to"],
-    "Less or equal": ["le", "less or equal to"],
+    _LABEL_IS_EQUAL_TO: ["is", "eq", "is equal to"],
+    _LABEL_IS_NOT_EQUAL_TO: ["is not", "ne", "is not equal to"],
+    _LABEL_GREATER_THAN: ["gt", "greater than"],
+    _LABEL_LESS_THAN: ["lt", "less than"],
+    _LABEL_GREATER_OR_EQUAL: ["ge", "greater or equal to"],
+    _LABEL_LESS_OR_EQUAL: ["le", "less or equal to"],
     "Contains": ["contains"],
-    "Does not contain": ["does not contain"],
-    "Starts with": ["starts with"],
-    "Ends with": ["ends with"],
-    "Is empty": ["is empty"],
-    "Is not empty": ["is not empty"],
-    "In list": ["one of", "in"],
-    "Not in list": ["none of", "not in"],
-    "Matches regex": ["matches"],
-    "Does not match": ["does not match"],
+    _LABEL_DOES_NOT_CONTAIN: ["does not contain"],
+    _LABEL_STARTS_WITH: ["starts with"],
+    _LABEL_ENDS_WITH: ["ends with"],
+    _LABEL_IS_EMPTY: [_OP_IS_EMPTY],
+    _LABEL_IS_NOT_EMPTY: [_OP_IS_NOT_EMPTY],
+    _LABEL_IN_LIST: [_OP_ONE_OF, "in"],
+    _LABEL_NOT_IN_LIST: [_OP_NONE_OF, "not in"],
+    _LABEL_MATCHES_REGEX: ["matches"],
+    _LABEL_DOES_NOT_MATCH: ["does not match"],
 }
 
 OPERATORS_FOR_TYPE: dict[str, list[str]] = {
     "text": [
-        "Is equal to",
-        "Is not equal to",
+        _LABEL_IS_EQUAL_TO,
+        _LABEL_IS_NOT_EQUAL_TO,
         "Contains",
-        "Does not contain",
-        "Starts with",
-        "Ends with",
-        "Matches regex",
-        "Does not match",
-        "Is empty",
-        "Is not empty",
-        "In list",
-        "Not in list",
+        _LABEL_DOES_NOT_CONTAIN,
+        _LABEL_STARTS_WITH,
+        _LABEL_ENDS_WITH,
+        _LABEL_MATCHES_REGEX,
+        _LABEL_DOES_NOT_MATCH,
+        _LABEL_IS_EMPTY,
+        _LABEL_IS_NOT_EMPTY,
+        _LABEL_IN_LIST,
+        _LABEL_NOT_IN_LIST,
     ],
     "numeric": [
-        "Is equal to",
-        "Is not equal to",
-        "Greater than",
-        "Less than",
-        "Greater or equal",
-        "Less or equal",
-        "Is empty",
-        "Is not empty",
-        "In list",
-        "Not in list",
+        _LABEL_IS_EQUAL_TO,
+        _LABEL_IS_NOT_EQUAL_TO,
+        _LABEL_GREATER_THAN,
+        _LABEL_LESS_THAN,
+        _LABEL_GREATER_OR_EQUAL,
+        _LABEL_LESS_OR_EQUAL,
+        _LABEL_IS_EMPTY,
+        _LABEL_IS_NOT_EMPTY,
+        _LABEL_IN_LIST,
+        _LABEL_NOT_IN_LIST,
     ],
 }
 
@@ -1073,7 +1097,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             # B028: Only restore selection if it's a real field (not placeholder)
             if (
                 current_field
-                and current_field != "(Load database first)"
+                and current_field != _PLACEHOLDER_LOAD_DB
                 and current_field in schema_info.field_names
             ):
                 self._field_combo.setCurrentText(current_field)
@@ -1112,7 +1136,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             # B017: Keep combo enabled to allow user interaction even when no database
             # Show placeholder so user knows they need to load a database first
             log.debug("FilterRowWidget: No schema fields, showing placeholder")
-            self._field_combo.addItem("(Load database first)")
+            self._field_combo.addItem(_PLACEHOLDER_LOAD_DB)
             self._field_combo.setEnabled(True)
         # B049: Force visual update when items populated
         self._field_combo.setStyleSheet("")
@@ -1124,7 +1148,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             return
         self._operator_combo.clear()
         field = self._field_combo.currentText()
-        if field and field != "(Load database first)":
+        if field and field != _PLACEHOLDER_LOAD_DB:
             operators = self.schema_info.get_operators_for_field(field)
             self._operator_combo.addItems(operators)
         # B017: Keep operator combo enabled to match field combo behavior
@@ -1142,7 +1166,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         Returns:
             True if operator needs value, False if operator is no-value type
         """
-        no_value_ops = ["is empty", "is not empty"]
+        no_value_ops = [_OP_IS_EMPTY, _OP_IS_NOT_EMPTY]
         op_lower = operator.lower().strip()
         return op_lower not in no_value_ops
 
@@ -1155,7 +1179,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         Returns:
             True if operator supports list (e.g., 'one of'), False otherwise
         """
-        multiline_ops = ["one of", "none of", "in list", "not in list"]
+        multiline_ops = [_OP_ONE_OF, _OP_NONE_OF, "in list", "not in list"]
         op_lower = operator.lower().strip()
         return op_lower in multiline_ops
 

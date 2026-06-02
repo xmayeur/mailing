@@ -65,7 +65,7 @@ echo ""
 
 # Report results
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ ${#FAILED_CHECKS[@]} -eq 0 ]; then
+if [[ ${#FAILED_CHECKS[@]} -eq 0 ]]; then
     echo "✅ All checks passed! Ready to commit."
     exit 0
 else

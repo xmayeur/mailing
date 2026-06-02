@@ -12,8 +12,8 @@ BUNDLE_ID="${5:-be.sendmail.editor}"
 EXEC_PATH="$DIST_DIR/$EXEC_NAME"
 APP_PATH="$DIST_DIR/$APP_NAME.app"
 
-if [ ! -f "$EXEC_PATH" ]; then
-    echo "Error: Executable not found: $EXEC_PATH"
+if [[ ! -f "$EXEC_PATH" ]]; then
+    echo "Error: Executable not found: $EXEC_PATH" >&2
     exit 1
 fi
 
@@ -59,7 +59,7 @@ cat > "$APP_PATH/Contents/Info.plist" << EOF
 EOF
 
 # Copy icon if provided
-if [ -f "$ICON_PATH" ]; then
+if [[ -f "$ICON_PATH" ]]; then
     cp "$ICON_PATH" "$APP_PATH/Contents/Resources/"
     # Update plist with icon reference
     sed -i '' -e "s|</dict>|    <key>CFBundleIconFile</key>\\n    <string>$(basename "$ICON_PATH")</string>\\n</dict>|" "$APP_PATH/Contents/Info.plist"

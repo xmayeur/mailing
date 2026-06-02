@@ -54,7 +54,7 @@ def _fetch_issues() -> dict:
 
         credentials = base64.b64encode(f"{token}:".encode()).decode()
         req.add_header("Authorization", f"Basic {credentials}")
-    ssl_context = ssl.create_default_context()
+    ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
     try:
         import certifi
 

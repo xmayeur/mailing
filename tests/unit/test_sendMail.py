@@ -1448,7 +1448,7 @@ def test_process_artscroises_wait_and_no_config():
         "pause": 1,
         "SA": "sa.json",
         "username": "u",
-        "password": "p",
+        "password": "p",  # NOSONAR
         "MAILCONFIG": "secret",
     }
 
@@ -1636,7 +1636,7 @@ def test_process_artscroises_wait_and_cleanup():
         "pause": 0,
         "SA": "sa.json",
         "username": "u",
-        "password": "p",
+        "password": "p",  # NOSONAR
         "MAILCONFIG": "secret",
     }
 
@@ -1671,7 +1671,7 @@ def test_process_artscroises():
             "pause": 0,
             "SA": "sa.json",
             "username": "u",
-            "password": "p",
+            "password": "p",  # NOSONAR
             "MAILCONFIG": "secret",
         }
         with patch(
@@ -1778,7 +1778,7 @@ def test_main_missing_args():
             "pause": 0,
             "SA": "sa.json",
             "username": "u",
-            "password": "p",
+            "password": "p",  # NOSONAR
             "MAILCONFIG": "secret",
         }
 
@@ -1931,7 +1931,7 @@ def test_process_profile_test_filter():
     args.subject = "Test Subject"
     args.test = True  # To trigger line 1200
 
-    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
+    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}  # NOSONAR
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),
@@ -1969,7 +1969,7 @@ def test_process_profile_test_nosubject():
     args.subject = None
     args.test = True  # To trigger line 1200
 
-    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
+    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}  # NOSONAR
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),
