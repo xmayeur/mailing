@@ -914,7 +914,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             from bs4 import BeautifulSoup
 
             with open(html_path, encoding="utf-8") as f:
-                soup = BeautifulSoup(f, "html.parser")
+                soup = BeautifulSoup(f, _HTML_PARSER)
                 h1 = soup.find("h1")
                 if h1:
                     text = h1.get_text(strip=True)
@@ -3288,7 +3288,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         """
         from bs4 import BeautifulSoup
 
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, _HTML_PARSER)
         for a in soup.find_all("a"):
             if a.get("href"):
                 continue
@@ -3393,7 +3393,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
         def _replace(m: re.Match[str]) -> str:
             src = m.group(1)
-            if src.startswith("data:") or src.startswith("http"):
+            if src.startswith(("data:", "http")):
                 return m.group(0)
             img_path = os.path.join(base_dir, src) if not os.path.isabs(src) else src
             try:

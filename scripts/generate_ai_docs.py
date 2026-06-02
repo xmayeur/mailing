@@ -103,12 +103,14 @@ def run_claude(prompt: str) -> str:
     key = get_api_key()
     if key:
         env["ANTHROPIC_API_KEY"] = key
-    result = subprocess.run(
-        ["claude", "-p", prompt],
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=CLAUDE_TIMEOUT,
+    result = (
+        subprocess.run(  # NOSONAR - prompt is internally constructed, not user input
+            ["claude", "-p", prompt],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=CLAUDE_TIMEOUT,
+        )
     )
     if result.returncode != 0:
         raise RuntimeError(
