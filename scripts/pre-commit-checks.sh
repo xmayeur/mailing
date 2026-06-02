@@ -27,7 +27,7 @@ run_check() {
     echo ""
 }
 
-run_check "pymarkdown lint"  pymarkdownlnt fix *.md specs/*.md
+run_check "pymarkdown lint"  pymarkdownlnt fix ./*.md ./specs/*.md
 
 run_check "black"            black --check . --target-version py312 \
                                --exclude='(venv|env|\.venv|release|\.git)'

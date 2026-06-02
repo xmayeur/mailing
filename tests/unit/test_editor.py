@@ -127,8 +127,8 @@ class _FakeQDialog(_FakeQObject):
     """Stand-in for QDialog."""
 
     class DialogCode:
-        Accepted = 1
-        Rejected = 0
+        Accepted = 1  # NOSONAR
+        Rejected = 0  # NOSONAR
 
     def exec(self):
         return self.DialogCode.Accepted

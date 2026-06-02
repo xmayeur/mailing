@@ -1933,8 +1933,8 @@ def test_process_profile_test_filter():
 
     secret_config = {
         "MAILCONFIG": "dummy_config",
-        "password": "existing_pass",
-    }  # NOSONAR
+        "password": "existing_pass",  # NOSONAR
+    }
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),
@@ -1974,8 +1974,8 @@ def test_process_profile_test_nosubject():
 
     secret_config = {
         "MAILCONFIG": "dummy_config",
-        "password": "existing_pass",
-    }  # NOSONAR
+        "password": "existing_pass",  # NOSONAR
+    }
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),
