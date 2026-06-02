@@ -2576,11 +2576,11 @@ class ClipboardProcessor:
 
     def _check_existing_links(self, html: str) -> bool:
         """Check if HTML contains link markup."""
-        return bool(re.search(r"<a\s+[^>]*href\s*=", html))
+        return bool(re.search(r"<a\s[^>]*href\s*=", html))
 
     def _is_markdown_link(self, text: str) -> bool:
         """Check if text is already in markdown link format [text](url)."""
-        return bool(re.search(r"\[.+\]\(.+\)", text))
+        return bool(re.search(r"\[[^\]]+\]\([^)]+\)", text))
 
     def detect_html_links(self, html: str) -> list[str]:
         """Extract URLs from HTML link attributes."""

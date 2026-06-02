@@ -53,7 +53,7 @@ class TestCoverageGap:
         """Cover line 198: continue on http or data: images"""
         soup = MagicMock()
         img1 = MagicMock()
-        img1.attrs = {"src": "http://example.com/img.png"}
+        img1.attrs = {"src": "https://example.com/img.png"}
         img2 = MagicMock()
         img2.attrs = {"src": "data:image/png;base64,abc"}
         soup.find_all.return_value = [img1, img2]
@@ -157,7 +157,7 @@ class TestCoverageGap:
         img1 = MagicMock()
         img1.attrs = {"src": ""}
         img2 = MagicMock()
-        img2.attrs = {"src": "http://example.com"}
+        img2.attrs = {"src": "https://example.com"}
         soup.find_all.return_value = [img1, img2]
         mock_bs.return_value = soup
 
