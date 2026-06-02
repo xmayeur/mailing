@@ -39,10 +39,11 @@ jobs:
 
     - name: Run unit tests with pytest
       run: |
+        mkdir -p build
         if [ "$RUNNER_OS" = "Linux" ]; then
-          xvfb-run -a pytest tests/unit --cov=. --cov-fail-under=80 --cov-report=xml --cov-report=term-missing
+          xvfb-run -a pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml:build/coverage.xml --cov-report=term-missing
         else
-          pytest tests/unit --cov=. --cov-fail-under=80 --cov-report=xml --cov-report=term-missing
+          pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml:build/coverage.xml --cov-report=term-missing
         fi
       shell: bash
 
@@ -83,7 +84,9 @@ jobs:
         pip install --only-binary :all: -r requirements-ci.txt
 
     - name: Run tests with coverage
-      run: pytest tests/unit --cov=. --cov-report=xml --cov-report=term-missing
+      run: |
+        mkdir -p build
+        pytest tests/unit --cov=src --cov-report=xml:build/coverage.xml --cov-report=term-missing
 
     - name: SonarCloud Scan
       uses: SonarSource/sonarcloud-github-action@ba3875ecf642b2129de2b589510c81a8b53dbf4e # master
