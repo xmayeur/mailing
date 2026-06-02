@@ -44,7 +44,8 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install --only-binary :all: -r requirements.txt
+        run: |
+          pip install --only-binary :all: -r requirements.txt
 
       - name: Build executable
         run: pyinstaller editor.spec
