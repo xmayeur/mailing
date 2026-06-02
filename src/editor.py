@@ -1123,7 +1123,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     ) -> list[str]:
         """Fetch Google Sheets schema via cache (helper for _get_database_schema)."""
         log.debug(
-            "DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa_val, sheet_id_val
+            "DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s",
+            sa_val,
+            sheet_id_val,
         )
         if not (sa_val and sheet_id_val):
             return []
@@ -1412,9 +1414,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
                     filter_dict = yaml.safe_load(filter_text) or {}
                 except Exception as e:
                     self.filter_status_label.setText(f"Parse error: {e}")
-                    self.filter_status_label.setStyleSheet(
-                        _STYLE_ERROR_RED
-                    )
+                    self.filter_status_label.setStyleSheet(_STYLE_ERROR_RED)
                     return
 
         if not filter_dict:

@@ -464,7 +464,9 @@ def get_smtp_connection(param: Any) -> SMTP | None:
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.check_hostname = False  # noqa: S5527 NOSONAR - disabled for provider compatibility (OVH)
+    context.check_hostname = (
+        False  # noqa: S5527 NOSONAR - disabled for provider compatibility (OVH)
+    )
     context.verify_mode = (
         ssl.CERT_NONE  # noqa: S4830 NOSONAR - disabled for provider compatibility (OVH)
     )
@@ -1340,9 +1342,7 @@ def send_gmail(service: Any, message: Any = None) -> Any:
         return None
 
 
-def _attempt_smtp_send(
-    param: Any, message: Any, recipients: Any, attempt: int
-) -> bool:
+def _attempt_smtp_send(param: Any, message: Any, recipients: Any, attempt: int) -> bool:
     """Single SMTP send attempt; returns True on success."""
     conn = get_smtp_connection(param)
     if not conn:
