@@ -1931,7 +1931,10 @@ def test_process_profile_test_filter():
     args.subject = "Test Subject"
     args.test = True  # To trigger line 1200
 
-    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}  # NOSONAR
+    secret_config = {
+        "MAILCONFIG": "dummy_config",
+        "password": "existing_pass",
+    }  # NOSONAR
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),
@@ -1969,7 +1972,10 @@ def test_process_profile_test_nosubject():
     args.subject = None
     args.test = True  # To trigger line 1200
 
-    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}  # NOSONAR
+    secret_config = {
+        "MAILCONFIG": "dummy_config",
+        "password": "existing_pass",
+    }  # NOSONAR
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),

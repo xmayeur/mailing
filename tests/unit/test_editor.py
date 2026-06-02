@@ -255,7 +255,8 @@ class TestEditorBridgeImageInsert:
         bridge = _make_bridge()
         with (
             patch(
-                "editor.QFileDialog.getOpenFileName", return_value=("/tmp/img.png", "")  # NOSONAR
+                "editor.QFileDialog.getOpenFileName",
+                return_value=("/tmp/img.png", ""),  # NOSONAR
             ),
             patch("editor.sm") as mock_sm,
         ):
