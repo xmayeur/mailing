@@ -1,7 +1,9 @@
 """Tests for src/editor_profile.py and src/filter_persistence.py."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from editor_profile import EditorProfileStyler
 from filter_persistence import FilterPersistence
 
