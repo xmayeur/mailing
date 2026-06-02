@@ -130,7 +130,7 @@ class TestCoverageGap:
         param.imap_host = "host"
         param.imap_port = 993
         param.username = "user"
-        param.password = "pass"
+        param.password = "pass"  # NOSONAR
         param.sent_folder = "Sent"
         msg = Mock()
         msg.as_string.return_value = "msg"
@@ -143,7 +143,7 @@ class TestCoverageGap:
             mock_log.info.assert_called_with("stored in sent folder")
 
     @patch("sendMail.BeautifulSoup")
-    @patch("sendMail.tempfile.mkdtemp", return_value="/tmp/dir")
+    @patch("sendMail.tempfile.mkdtemp", return_value="/tmp/dir")  # NOSONAR
     @patch(
         "builtins.open",
         new_callable=mock_open,
@@ -167,7 +167,7 @@ class TestCoverageGap:
     @patch("sendMail.Image.open")
     @patch("sendMail.os.path.exists", return_value=True)
     @patch("sendMail.BeautifulSoup")
-    @patch("sendMail.tempfile.mkdtemp", return_value="/tmp/dir")
+    @patch("sendMail.tempfile.mkdtemp", return_value="/tmp/dir")  # NOSONAR
     @patch(
         "builtins.open",
         new_callable=mock_open,
@@ -434,7 +434,7 @@ class TestCoverageGap2:
             patch("sendMail.glob", return_value=[]),
             patch("sendMail.os.remove"),
         ):
-            files, service, gd_files = sendMail.process_attachments(args, config)
+            _, service, gd_files = sendMail.process_attachments(args, config)
 
         assert service is mock_service
         assert gd_files == mock_files
@@ -720,7 +720,7 @@ class TestCoverageGap2:
         param.imap_host = "imap.test.com"
         param.imap_port = 993
         param.username = "user"
-        param.password = "pass"
+        param.password = "pass"  # NOSONAR
         param.sent_folder = "Sent"
         result = sendMail._check_smtp_imap_params(param)
         assert result is True

@@ -47,7 +47,7 @@ sys.modules["filter_validator"] = _validator_mock
 
 
 # pyqtSlot: use inspect.isfunction to distinguish @pyqtSlot(str) from @pyqtSlot
-def _make_pyqtSlot(*args, **kwargs):  # noqa: N802, ARG001
+def _make_pyqtSlot(*args, **kwargs):  # noqa: N802, ARG001  # NOSONAR
     """Fake @pyqtSlot that is a no-op decorator."""
     if len(args) == 1 and _inspect.isfunction(args[0]) and not kwargs:
         # Bare @pyqtSlot — args[0] is the function being decorated
@@ -60,7 +60,7 @@ def _make_pyqtSlot(*args, **kwargs):  # noqa: N802, ARG001
     return _decorator
 
 
-def _make_pyqtSignal(*args, **kwargs):  # noqa: N802, ARG001
+def _make_pyqtSignal(*args, **kwargs):  # noqa: N802, ARG001  # NOSONAR
     """Fake pyqtSignal instance with connect/disconnect/emit."""
     sig = MagicMock()
     sig.connect = MagicMock()
@@ -117,10 +117,10 @@ class _FakeQMainWindow(_FakeQObject):
         pass
 
     def show(self):
-        pass
+        pass  # empty mock method — no implementation needed
 
     def close(self):
-        pass
+        pass  # empty mock method — no implementation needed
 
 
 class _FakeQDialog(_FakeQObject):
@@ -134,10 +134,10 @@ class _FakeQDialog(_FakeQObject):
         return self.DialogCode.Accepted
 
     def accept(self):
-        pass
+        pass  # empty mock method — no implementation needed
 
     def reject(self):
-        pass
+        pass  # empty mock method — no implementation needed
 
     def setWindowTitle(self, t):  # noqa: N802
         pass
@@ -255,7 +255,7 @@ class TestEditorBridgeImageInsert:
         bridge = _make_bridge()
         with (
             patch(
-                "editor.QFileDialog.getOpenFileName", return_value=("/tmp/img.png", "")
+                "editor.QFileDialog.getOpenFileName", return_value=("/tmp/img.png", "")  # NOSONAR
             ),
             patch("editor.sm") as mock_sm,
         ):
@@ -299,9 +299,7 @@ class TestEditorBridgeImageInsert:
                     result = bridge.request_image_insert()
                 finally:
                     editor._SM_AVAILABLE = orig
-            assert result.startswith("data:image/png;base64,") or result.startswith(
-                "data:"
-            )
+            assert result.startswith(("data:image/png;base64,", "data:"))
         finally:
             os.unlink(tmp_path)
 
@@ -824,7 +822,7 @@ class _LineEditLike:
     def text(self):
         return self._text
 
-    def setText(self, value):  # noqa: N802
+    def setText(self, value):  # noqa: N802  # NOSONAR
         self._text = value
 
 
@@ -835,7 +833,7 @@ class _SpinBoxLike:
     def value(self):
         return self._value
 
-    def setValue(self, value):  # noqa: N802
+    def setValue(self, value):  # noqa: N802  # NOSONAR
         self._value = value
 
 
@@ -843,10 +841,10 @@ class _CheckBoxLike:
     def __init__(self, checked=False):
         self._checked = checked
 
-    def isChecked(self):  # noqa: N802
+    def isChecked(self):  # noqa: N802  # NOSONAR
         return self._checked
 
-    def setChecked(self, value):  # noqa: N802
+    def setChecked(self, value):  # noqa: N802  # NOSONAR
         self._checked = bool(value)
 
 
@@ -854,19 +852,19 @@ class _PlainTextLike:
     def __init__(self, text=""):
         self._text = text
 
-    def toPlainText(self):  # noqa: N802
+    def toPlainText(self):  # noqa: N802  # NOSONAR
         return self._text
 
-    def setPlainText(self, value):  # noqa: N802
+    def setPlainText(self, value):  # noqa: N802  # NOSONAR
         self._text = value
 
-    def setStyleSheet(self, s):  # noqa: N802
-        pass
+    def setStyleSheet(self, s):  # noqa: N802  # NOSONAR
+        pass  # empty mock method — no implementation needed
 
 
 class _FakePage:
     def __init__(self):
-        self.runJavaScript = MagicMock()
+        self.runJavaScript = MagicMock()  # NOSONAR
 
 
 class _FakeView:
@@ -879,7 +877,7 @@ class _FakeView:
 
 class _FakeStatusBar:
     def __init__(self):
-        self.showMessage = MagicMock()
+        self.showMessage = MagicMock()  # NOSONAR
 
 
 class _FakeBridge:
@@ -905,27 +903,27 @@ class _FakeCombo:
         self.blocked = False
         self.index = -1
 
-    def blockSignals(self, value):  # noqa: N802
+    def blockSignals(self, value):  # noqa: N802  # NOSONAR
         self.blocked = value
 
     def clear(self):
         self.items = []
 
-    def addItems(self, items):  # noqa: N802
+    def addItems(self, items):  # noqa: N802  # NOSONAR
         self.items.extend(items)
 
-    def findText(self, text):  # noqa: N802
+    def findText(self, text):  # noqa: N802  # NOSONAR
         try:
             return self.items.index(text)
         except ValueError:
             return -1
 
-    def setCurrentIndex(self, index):  # noqa: N802
+    def setCurrentIndex(self, index):  # noqa: N802  # NOSONAR
         self.index = index
         if 0 <= index < len(self.items):
             self.current = self.items[index]
 
-    def currentText(self):  # noqa: N802
+    def currentText(self):  # noqa: N802  # NOSONAR
         return self.current
 
     def count(self):
@@ -937,10 +935,10 @@ class _FakeTabs:
         self._title = title
         self._index = 0
 
-    def currentIndex(self):  # noqa: N802
+    def currentIndex(self):  # noqa: N802  # NOSONAR
         return self._index
 
-    def tabText(self, index):  # noqa: N802
+    def tabText(self, index):  # noqa: N802  # NOSONAR
         return self._title
 
 
@@ -952,7 +950,7 @@ def _make_config_dialog_stub():
             "sender": "alpha@example.com",
             "sendername": "Alpha",
             "username": "alpha-user",
-            "password": "pw",
+            "password": "pw",  # NOSONAR
             "domain": "alpha.test",
             "smtp_host": "smtp.alpha.test",
             "imap_host": "imap.alpha.test",
@@ -1766,7 +1764,7 @@ class TestConfigDialogTabBuilders:
 
 
 def _make_send_dialog_stub(
-    *, config_data=None, attachment="/tmp/test.html", profile="default"
+    *, config_data=None, attachment="/tmp/test.html", profile="default"  # NOSONAR
 ):
     """Return a _SendDialog bypassing __init__, with all widgets as testable stubs."""
     dlg = object.__new__(editor._SendDialog)
@@ -2006,7 +2004,7 @@ class TestSendDialogLoadDatabaseRecords:
         csv_file.write_bytes(b"name,email\nAndr\xe9,a@test.com\n")
         dlg = _make_send_dialog_stub()
         dlg.database_input = _LineEditLike(str(csv_file))
-        rows, headers = dlg.load_database_records()
+        _, headers = dlg.load_database_records()
         assert headers == ["name", "email"]
 
     def test_gsheet_profile_loads_via_sendmail(self):
@@ -2111,7 +2109,7 @@ class TestSendDialogFilterAndDisplayRecords:
 
 class TestSendDialogBuildArgs:
     def test_build_args_captures_all_fields(self):
-        dlg = _make_send_dialog_stub(attachment="/tmp/newsletter.html")
+        dlg = _make_send_dialog_stub(attachment="/tmp/newsletter.html")  # NOSONAR
         dlg.profile_combo.currentText.return_value = "myprofile"
         dlg.config_input = _LineEditLike("/etc/sendMail.yml")
         dlg.subject_input = _LineEditLike("Test Subject")
@@ -2141,7 +2139,7 @@ class TestSendDialogBuildArgs:
         assert args.test is True
         assert args.verbose is True
         assert args.session_filter == {"status": "is active"}
-        assert args.file == ["/tmp/newsletter.html"]
+        assert args.file == ["/tmp/newsletter.html"]  # NOSONAR
 
     def test_build_args_zero_index_is_none(self):
         dlg = _make_send_dialog_stub()

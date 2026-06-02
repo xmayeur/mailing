@@ -46,25 +46,30 @@ done
 
 # Helper functions
 log_section() {
+  local title="$1"
   echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${BLUE}$1${NC}"
+  echo -e "${BLUE}${title}${NC}"
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 }
 
 log_success() {
-  echo -e "${GREEN}✓${NC} $1"
+  local msg="$1"
+  echo -e "${GREEN}✓${NC} ${msg}"
 }
 
 log_error() {
-  echo -e "${RED}✗${NC} $1"
+  local msg="$1"
+  echo -e "${RED}✗${NC} ${msg}"
 }
 
 log_warning() {
-  echo -e "${YELLOW}⚠${NC} $1"
+  local msg="$1"
+  echo -e "${YELLOW}⚠${NC} ${msg}"
 }
 
 log_info() {
-  echo -e "${BLUE}ℹ${NC} $1"
+  local msg="$1"
+  echo -e "${BLUE}ℹ${NC} ${msg}"
 }
 
 # Check prerequisites
@@ -79,14 +84,14 @@ check_prerequisites() {
   log_success "Poetry found"
 
   # Check if docs directory exists
-  if [ ! -d "${DOCS_DIR}" ]; then
+  if [[ ! -d "${DOCS_DIR}" ]]; then
     log_error "Documentation directory not found: ${DOCS_DIR}"
     exit 1
   fi
   log_success "Documentation directory found"
 
   # Check if conf.py exists
-  if [ ! -f "${DOCS_DIR}/conf.py" ]; then
+  if [[ ! -f "${DOCS_DIR}/conf.py" ]]; then
     log_error "Sphinx configuration not found: ${DOCS_DIR}/conf.py"
     exit 1
   fi
@@ -97,7 +102,7 @@ check_prerequisites() {
 clean_build() {
   log_section "Cleaning Previous Builds"
 
-  if [ -d "${BUILD_DIR}" ]; then
+  if [[ -d "${BUILD_DIR}" ]]; then
     rm -rf "${BUILD_DIR}"
     log_success "Removed old build directory"
   else
@@ -161,7 +166,7 @@ validate_build() {
   fi
 
   # Check if HTML was generated
-  if [ ! -f "${HTML_DIR}/index.html" ]; then
+  if [[ ! -f "${HTML_DIR}/index.html" ]]; then
     log_error "index.html not generated"
     has_errors=true
   else
@@ -170,7 +175,7 @@ validate_build() {
 
   # Count warnings (informational only)
   warning_count=$(grep -c "WARNING:" "${LOG_FILE}" || true)
-  if [ "$warning_count" -gt 0 ]; then
+  if [[ "$warning_count" -gt 0 ]]; then
     log_warning "Build completed with ${warning_count} warning(s)"
     log_info "Run the following to review warnings:"
     echo "    grep WARNING ${LOG_FILE} | head -20"
@@ -203,7 +208,7 @@ show_next_steps() {
   echo "  • Click through pages: Test cross-references and links"
   echo ""
 
-  if [ "$DEPLOY" = true ]; then
+  if [[ "$DEPLOY" = true ]]; then
     echo "Deployment (manual):"
     echo "  • Review warnings: grep WARNING ${LOG_FILE}"
     echo "  • Upload to server: rsync -avz ${HTML_DIR}/ user@server:/path/to/docs/"

@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 import yaml as _real_yaml
 
+TEST_EMAIL = "test@example.com"
+
 # Add project root and src directory to Python path for imports
 project_root = Path(__file__).parent.parent
 src_dir = project_root / "src"
@@ -84,7 +86,7 @@ def _auto_patch_profile_manager_get_secret(monkeypatch):
             "smtp_port": 587,
             "username": "test_user",
             "password": "test_password",
-            "sender": "test@example.com",
+            "sender": TEST_EMAIL,
         }
     )
 
@@ -99,7 +101,7 @@ def tmp_yaml_file(tmp_path):
     """Create a temporary YAML config file for testing."""
     yaml_file = tmp_path / "config.yml"
     yaml_file.write_text(
-        "default:\n  sender: test@example.com\ntest:\n  sender: test2@example.com\n",
+        f"default:\n  sender: {TEST_EMAIL}\ntest:\n  sender: test2@example.com\n",
         encoding="utf-8",
     )
     return yaml_file
@@ -130,7 +132,7 @@ def tmp_html_file(tmp_path):
 @pytest.fixture
 def sample_email_config():
     """Provide sample email configuration for testing."""
-    return {"sender": "test@example.com", "smtp_server": "localhost", "smtp_port": 25}
+    return {"sender": TEST_EMAIL, "smtp_server": "localhost", "smtp_port": 25}
 
 
 @pytest.fixture
@@ -141,7 +143,7 @@ def mock_vault_smtp_response():
         "smtp_port": 587,
         "username": "test_user",
         "password": "test_password",
-        "sender": "test@example.com",
+        "sender": TEST_EMAIL,
         "sendername": "Test Sender",
     }
 

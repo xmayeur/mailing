@@ -47,7 +47,7 @@ done
 
 echo -e "${BLUE}Building documentation...${NC}"
 
-if [ "$CLEAN" = true ]; then
+if [[ "$CLEAN" = true ]]; then
   rm -rf "${DOCS_DIR}/build"
   echo -e "${GREEN}✓${NC} Cleaned build directory"
 fi
@@ -58,7 +58,7 @@ poetry run sphinx-build -b html "${DOCS_DIR}" "${HTML_DIR}"
 echo -e "\n${GREEN}✓ Build complete!${NC}"
 echo -e "${BLUE}📁 Documentation: ${HTML_DIR}${NC}"
 
-if [ "$OPEN" = true ]; then
+if [[ "$OPEN" = true ]]; then
   if command -v open &> /dev/null; then
     open "${HTML_DIR}/index.html"
   elif command -v xdg-open &> /dev/null; then

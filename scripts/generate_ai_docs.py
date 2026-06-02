@@ -42,20 +42,23 @@ def get_api_key() -> str:
     return os.environ.get("ANTHROPIC_API_KEY", "")
 
 
+def _collect_doc_files(docs_dir: Path, parts: list[str]) -> None:
+    """Fill parts with doc file contents, trying .md then .rst (T006)."""
+    for ext in ["*.md", "**/*.md", "*.rst", "**/*.rst"]:
+        if parts:
+            break
+        for doc_file in sorted(docs_dir.glob(ext)):
+            if doc_file.is_file() and doc_file.name not in [".DS_Store"]:
+                parts.append(
+                    f"## {doc_file.name}\n\n{doc_file.read_text(encoding='utf-8')}"
+                )
+
+
 def build_context() -> str:
     """Collect docs/ markdown files as context string for claude (T006)."""
     parts: list[str] = []
     if DOCS_DIR.exists():
-        # Try .md files first, then .rst files
-        for ext in ["*.md", "**/*.md", "*.rst", "**/*.rst"]:
-            if parts:
-                break
-            for doc_file in sorted(DOCS_DIR.glob(ext)):
-                if doc_file.is_file() and doc_file.name not in [".DS_Store"]:
-                    parts.append(
-                        f"## {doc_file.name}\n\n{doc_file.read_text(encoding='utf-8')}"
-                    )
-    # Fallback: use CLAUDE.md if available
+        _collect_doc_files(DOCS_DIR, parts)
     if not parts:
         claude_md = REPO_ROOT / "CLAUDE.md"
         if claude_md.exists():

@@ -56,12 +56,9 @@ for mod_path in _MODULES_PATH:
     if str(mod_path) not in sys.path:
         sys.path.insert(0, str(mod_path))
 
-if _IS_FROZEN:
-    # onefile extracts to _MEIPASS/, assets are at _MEIPASS/editor_assets/ (not in Resources/)
-    # (.app bundle approach would have Resources/, but we're using onefile now)
-    ASSETS_DIR = _BASE / "editor_assets"
-else:
-    ASSETS_DIR = _BASE / "editor_assets"
+# onefile extracts to _MEIPASS/, assets are at _MEIPASS/editor_assets/ (not in Resources/)
+# (.app bundle approach would have Resources/, but we're using onefile now)
+ASSETS_DIR = _BASE / "editor_assets"
 
 # Verify assets directory exists, fallback to src/editor_assets if needed
 if not ASSETS_DIR.exists() and not _IS_FROZEN:
@@ -159,7 +156,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
 # ---------------------------------------------------------------------------
 _SM_AVAILABLE = False
 try:
-    import sendMail as sm  # noqa: E402,N813  (import after path setup, camelCase module name)
+    import sendMail as sm  # noqa: E402,N813
 
     _SM_AVAILABLE = True
 except Exception as exc:  # pragma: no cover
@@ -200,6 +197,9 @@ _CONFIG_ERROR = "Config Error"
 _DEFAULT_MIME_TYPE = "image/png"
 _HTML_EXT = ".html"
 _HTML_PARSER = "html.parser"
+_STYLE_LABEL_GRAY = "color: #666; font-size: 11px;"
+_STYLE_ERROR_RED = "color: #f44336; font-size: 11px;"
+_STYLES_CSS = "styles.css"
 
 # ---------------------------------------------------------------------------
 # Table-operation SVG icons (16×16, Excel / LibreOffice style)
@@ -567,7 +567,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         )
         self._filter_builder.filter_changed.connect(self._on_filter_changed)
         self.filter_status_label = QLabel("", self)
-        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
 
         from PyQt6.QtWidgets import QScrollArea
 
@@ -594,7 +594,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         )
         self.filter_text_edit.setMinimumHeight(60)
         self.filter_status_label = QLabel("", self)
-        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
         filter_widget = QWidget(self)
         filter_layout = QVBoxLayout(filter_widget)
         filter_layout.setContentsMargins(0, 0, 0, 0)
@@ -788,7 +788,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         # Ensures Google Sheets and CSV profiles refresh when switching
         cache = self._get_schema_cache()
         # Clear all cache entries for this profile
-        for key in list(cache._cache.keys()):
+        for key in cache._cache.keys():
             if key.startswith(f"{profile}_"):
                 cache.invalidate(key)
 
@@ -1057,6 +1057,34 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             self._schema_cache = SchemaCacheProvider()
         return self._schema_cache
 
+    def _load_gsheet_schema_from_api(self, sa: Any, sheet_id: Any) -> list[str]:
+        """Load Google Sheets schema via API call (helper for _get_database_schema)."""
+        try:
+            from sendMail import get_google_sheets_schema  # Import directly
+
+            log.debug(
+                "DEBUG: Calling get_google_sheets_schema(%s, %s)",
+                str(sa),
+                str(sheet_id),
+            )
+            result = get_google_sheets_schema(str(sa), str(sheet_id))
+            log.debug("DEBUG: get_google_sheets_schema returned: %s", result)
+            if isinstance(result, list):
+                return result
+        except Exception as e:
+            log.exception("ERROR: Could not load Google Sheets schema: %s", e)
+        return []
+
+    def _load_csv_schema_from_path(self, db_path: str) -> list[str]:
+        """Load CSV/Excel schema from file path (helper for _get_database_schema)."""
+        try:
+            from schema_provider import DatabaseSchemaProvider
+
+            return DatabaseSchemaProvider.detect_and_extract(db_path)
+        except Exception as e:
+            log.debug("Could not extract database schema: %s", e)
+            return []
+
     def _get_database_schema(self) -> list[str]:
         """Get database schema (field names) from active database or Google Sheets."""
         cache = self._get_schema_cache()
@@ -1077,59 +1105,37 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             sa_val,
         )
         if not db_path and sheet_id_val:
-            # Google Sheets profile - try to load schema from Google Sheets
-            sa = sa_val
-            sheet_id = sheet_id_val
-            log.debug(
-                "DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa, sheet_id
-            )
-            if sa and sheet_id:
-
-                def _load_gsheet_schema() -> list[str]:
-                    try:
-                        from sendMail import get_google_sheets_schema  # Import directly
-
-                        log.debug(
-                            "DEBUG: Calling get_google_sheets_schema(%s, %s)",
-                            str(sa),
-                            str(sheet_id),
-                        )
-                        result = get_google_sheets_schema(str(sa), str(sheet_id))
-                        log.debug(
-                            "DEBUG: get_google_sheets_schema returned: %s", result
-                        )
-                        if isinstance(result, list):
-                            return result
-                    except Exception as e:
-                        log.error(
-                            "ERROR: Could not load Google Sheets schema: %s",
-                            e,
-                            exc_info=True,
-                        )
-                    return []
-
-                schema = cast(
-                    list[str], cache.get(f"{profile_name}_gsheet", _load_gsheet_schema)
-                )
-                log.debug("DEBUG: Final schema from cache: %s", schema)
-                return schema
-            return []
+            return self._get_gsheet_schema(cache, profile_name, sa_val, sheet_id_val)
 
         if not db_path:
             return []
 
-        def _load_csv_schema() -> list[str]:
-            try:
-                from schema_provider import DatabaseSchemaProvider
-
-                return DatabaseSchemaProvider.detect_and_extract(db_path)
-            except Exception as e:
-                log.debug("Could not extract database schema: %s", e)
-                return []
-
         return cast(
-            list[str], cache.get(f"{profile_name}_csv_{db_path}", _load_csv_schema)
+            list[str],
+            cache.get(
+                f"{profile_name}_csv_{db_path}",
+                lambda: self._load_csv_schema_from_path(db_path),
+            ),
         )
+
+    def _get_gsheet_schema(
+        self, cache: Any, profile_name: str, sa_val: Any, sheet_id_val: Any
+    ) -> list[str]:
+        """Fetch Google Sheets schema via cache (helper for _get_database_schema)."""
+        log.debug(
+            "DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s", sa_val, sheet_id_val
+        )
+        if not (sa_val and sheet_id_val):
+            return []
+        schema = cast(
+            list[str],
+            cache.get(
+                f"{profile_name}_gsheet",
+                lambda: self._load_gsheet_schema_from_api(sa_val, sheet_id_val),
+            ),
+        )
+        log.debug("DEBUG: Final schema from cache: %s", schema)
+        return schema
 
     def _update_validation_ui(self, status: dict[str, Any]) -> None:
         """Update filter field UI based on validation status (T019, T020, T021, T041)."""
@@ -1165,7 +1171,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         if is_valid:
             self.filter_status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
         else:
-            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            self.filter_status_label.setStyleSheet(_STYLE_ERROR_RED)
 
         # T027, T028: Update record preview on validation change
         if is_valid:
@@ -1262,7 +1268,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
                         f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})"
                     )
                     return self._set_cache_and_return(rows, headers, db_path)
-            except (UnicodeDecodeError, UnicodeError):
+            except UnicodeError:
                 continue
             except Exception as e:
                 log.debug("Could not load CSV: %s", e)
@@ -1407,7 +1413,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
                 except Exception as e:
                     self.filter_status_label.setText(f"Parse error: {e}")
                     self.filter_status_label.setStyleSheet(
-                        "color: #f44336; font-size: 11px;"
+                        _STYLE_ERROR_RED
                     )
                     return
 
@@ -1416,13 +1422,13 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             self.filter_status_label.setText(
                 "(Filter cleared - will use profile default)"
             )
-            self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+            self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
             self.filter_and_display_records()
             return
 
         if not self._filter_validator:
             self.filter_status_label.setText("Filter validator not available")
-            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            self.filter_status_label.setStyleSheet(_STYLE_ERROR_RED)
             return
 
         # Reconstruct YAML string for validator (expects text format)
@@ -1435,7 +1441,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         if not status.get("is_valid"):
             errors = status.get("syntax_errors", []) + status.get("missing_fields", [])
             self.filter_status_label.setText(f"Cannot apply: {', '.join(errors)}")
-            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            self.filter_status_label.setStyleSheet(_STYLE_ERROR_RED)
             return
 
         try:
@@ -1445,7 +1451,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             self.filter_and_display_records()
         except Exception as e:
             self.filter_status_label.setText(f"Error: {e}")
-            self.filter_status_label.setStyleSheet("color: #f44336; font-size: 11px;")
+            self.filter_status_label.setStyleSheet(_STYLE_ERROR_RED)
 
     def _reset_filter(self) -> None:
         """Reset filter to original from profile config."""
@@ -1470,7 +1476,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         # B013: Set _session_filter to None AFTER loading filter (filter_changed signal already fired)
         self._session_filter = None
         self.filter_status_label.setText("(Filter reset to profile default)")
-        self.filter_status_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
 
     def build_args(
         self, config_data: dict[str, dict[str, str | int]]
@@ -2718,7 +2724,7 @@ class EditorBridge(QObject):
                 mimetype = mimetypes.guess_type(path)[0] or _DEFAULT_MIME_TYPE
             return f"data:{mimetype};base64,{b64}"
         except Exception as exc:
-            log.error("Image insert failed: %s", exc)
+            log.exception("Image insert failed: %s", exc)
             return ""
 
     @pyqtSlot(str, result=str)  # type: ignore
@@ -2838,7 +2844,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             self._view = QWebEngineView(self)
             self.setCentralWidget(self._view)
         except Exception as e:
-            log.error(f"Failed to create QWebEngineView: {e}")
+            log.exception("Failed to create QWebEngineView: %s", e)
             # Fallback to text editor
             from PyQt6.QtWidgets import QTextEdit
 
@@ -2943,18 +2949,18 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                     return styles_path
 
         # Try HOME/css/styles.css
-        home_css = Path.home() / "css" / "styles.css"
+        home_css = Path.home() / "css" / _STYLES_CSS
         if home_css.exists():
             return home_css
 
         # Fall back to project default
         if _IS_FROZEN:
             if sys.platform == "darwin":
-                default_css = _BASE / "Resources" / "css" / "styles.css"
+                default_css = _BASE / "Resources" / "css" / _STYLES_CSS
             else:
-                default_css = _BASE / "css" / "styles.css"
+                default_css = _BASE / "css" / _STYLES_CSS
         else:
-            default_css = _BASE / "css" / "styles.css"
+            default_css = _BASE / "css" / _STYLES_CSS
         return default_css
 
     def _get_css_directory(self) -> Path:
@@ -3042,7 +3048,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                     "Deferred stylesheet application (UI not ready yet): %s", css_path
                 )
         except Exception as exc:
-            log.error("Failed to apply profile stylesheet %s: %s", css_path, exc)
+            log.exception("Failed to apply profile stylesheet %s: %s", css_path, exc)
 
     def _save_documents_path(self, path: str) -> None:
         """Save documents folder path to config for current profile (atomic write)."""
@@ -3066,7 +3072,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             if hasattr(self, "_default_documents_path"):
                 self._default_documents_path = path
         except Exception as exc:
-            log.error("Failed to save documents path: %s", exc)
+            log.exception("Failed to save documents path: %s", exc)
 
     def _is_template_file(self, file_path: str) -> bool:
         """Check if file is a template (contains .template or matches template.* pattern)."""
@@ -3194,7 +3200,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                 return ""
             return self._html_to_body_html(html_path)
         except Exception as exc:
-            log.error("sendMail MD conversion failed: %s", exc)
+            log.exception("sendMail MD conversion failed: %s", exc)
             return ""
         finally:
             if html_path and os.path.exists(html_path) and html_path != md_path:
@@ -3216,7 +3222,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
             def _inline_images(m: re.Match[str]) -> str:
                 src = m.group(1)
-                if src.startswith("data:") or src.startswith("http"):
+                if src.startswith(("data:", "http")):
                     return m.group(0)
                 img_path = (
                     os.path.join(base_dir, src) if not os.path.isabs(src) else src
@@ -3238,7 +3244,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             result = self._anchors_to_spans(result)
             return result
         except Exception as exc:
-            log.error("markdown2 conversion failed: %s", exc)
+            log.exception("markdown2 conversion failed: %s", exc)
             return ""
 
     def _html_to_body_html(self, html_path: str) -> str:
@@ -3258,7 +3264,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             result = self._anchors_to_spans(result)
             return result
         except Exception as exc:
-            log.error("HTML read failed: %s", exc)
+            log.exception("HTML read failed: %s", exc)
             return ""
 
     @staticmethod
@@ -3443,7 +3449,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return True
         except Exception as exc:
             QMessageBox.critical(self, "Save Error", f"Failed to save:\n{exc}")
-            log.error("Save failed: %s", exc)
+            log.exception("Save failed: %s", exc)
             return False
 
     def _save_as(self) -> bool:
@@ -4024,7 +4030,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             result = self._send_with_sendmail(dialog)
         except Exception as exc:
             QMessageBox.critical(self, "Send Error", f"Failed to send:\n{exc}")
-            log.error("Send failed: %s", exc)
+            log.exception("Send failed: %s", exc)
             dialog.send_button.setEnabled(True)
             dialog.spinner_label.hide()
             return
@@ -4153,7 +4159,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             self._css_status_label.setText(f"CSS: {Path(css_path).name}")
             log.info("Applied CSS: %s", css_path)
         except Exception as exc:
-            log.error("CSS apply failed: %s", exc)
+            log.exception("CSS apply failed: %s", exc)
             QMessageBox.warning(self, "CSS Error", f"Could not read CSS file:\n{exc}")
 
     def _run_js(self, script: str) -> None:
@@ -4322,7 +4328,7 @@ def main() -> None:
 if __name__ == "__main__":
     # Write startup log for debugging frozen app issues
     if _IS_FROZEN:
-        with open("/tmp/sendMailEditor_startup.log", "w") as f:
+        with open("/tmp/sendMailEditor_startup.log", "w") as f:  # NOSONAR
             f.write(f"Frozen: {_IS_FROZEN}\n")
             f.write(f"Platform: {sys.platform}\n")
             f.write(f"_MEIPASS: {getattr(sys, '_MEIPASS', 'N/A')}\n")
@@ -4334,7 +4340,7 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         if _IS_FROZEN:
-            with open("/tmp/sendMailEditor_startup.log", "a") as f:
+            with open("/tmp/sendMailEditor_startup.log", "a") as f:  # NOSONAR
                 import traceback
 
                 f.write(f"ERROR in main: {e}\n")

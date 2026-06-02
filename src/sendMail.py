@@ -283,7 +283,7 @@ def guess_type(filepath: str) -> str | None:
 
         result: str | None = magic.from_file(filepath, mime=True)
         return result
-    except (ImportError, ModuleNotFoundError):
+    except ImportError:
         import mimetypes
 
         # Initialize Office file MIME types (not registered on all platforms)
@@ -464,10 +464,10 @@ def get_smtp_connection(param: Any) -> SMTP | None:
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.check_hostname = False  # noqa: S5527 disabled for provider compatibility
+    context.check_hostname = False  # noqa: S5527 NOSONAR - disabled for provider compatibility (OVH)
     context.verify_mode = (
-        ssl.CERT_NONE
-    )  # noqa: S4830,S303 disabled for provider compatibility
+        ssl.CERT_NONE  # noqa: S4830 NOSONAR - disabled for provider compatibility (OVH)
+    )
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -1340,6 +1340,28 @@ def send_gmail(service: Any, message: Any = None) -> Any:
         return None
 
 
+def _attempt_smtp_send(
+    param: Any, message: Any, recipients: Any, attempt: int
+) -> bool:
+    """Single SMTP send attempt; returns True on success."""
+    conn = get_smtp_connection(param)
+    if not conn:
+        return False
+    try:
+        conn.sendmail(
+            message["From"], recipients, message.as_string()
+        )  # pyright: ignore
+        conn.quit()
+        if param.verbose:  # pyright: ignore
+            log.info("sent")
+        return True
+    except SMTPException:
+        log.exception(f"SMTP error on attempt {attempt + 1}")
+        if attempt == 0:
+            sleep(10)
+        return False
+
+
 def send_mail(param: Any = None, message: Any = None, recipients: Any = None) -> bool:
     """
     Send an email message to specified recipients using SMTP.
@@ -1362,22 +1384,9 @@ def send_mail(param: Any = None, message: Any = None, recipients: Any = None) ->
         log.info(f"Sending email to {recipients}")
     success = False
     for attempt in range(2):
-        conn = get_smtp_connection(param)
-        if conn:
-            try:
-                conn.sendmail(
-                    message["From"], recipients, message.as_string()
-                )  # pyright: ignore
-                conn.quit()
-                success = True
-                if param.verbose:  # pyright: ignore
-                    log.info("sent")
-                break
-            except SMTPException:
-                log.exception(f"SMTP error on attempt {attempt + 1}")
-                if attempt == 0:
-                    sleep(10)
-
+        if _attempt_smtp_send(param, message, recipients, attempt):
+            success = True
+            break
     if success and message:
         save_to_sent(param, message)
     return success

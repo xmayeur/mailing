@@ -76,7 +76,7 @@ class TestConfigValidation:
     def test_invalid_port_number(self) -> None:
         """Validate port number is valid."""
         port = 99999  # Invalid
-        assert port > 65535 or port < 1
+        assert not (1 <= port <= 65535)
 
     def test_validate_email_address(self) -> None:
         """Validate email address format."""
@@ -141,8 +141,8 @@ class TestConfigDefaults:
 
     def test_default_database(self) -> None:
         """Default database is None (use inline list)."""
-        database = None
-        assert database is None or isinstance(database, str)
+        database: None | str = None
+        assert database is None
 
 
 class TestConfigEnvironmentVariables:
