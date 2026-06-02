@@ -55,12 +55,11 @@ jobs:
         run: |
           cd dist
           if [ "$RUNNER_OS" = "Windows" ]; then
-            # Windows: single exe file
+            mv sendMailEditor_bin.exe sendMailEditor.exe
             7z a sendMailEditor-windows.zip sendMailEditor.exe
           else
-            # Linux: single executable file
+            mv sendMailEditor_bin sendMailEditor
             tar czf sendMailEditor-linux.tar.gz sendMailEditor
-            # Also create zip for consistency
             zip -j sendMailEditor-linux.zip sendMailEditor
           fi
 
