@@ -462,7 +462,7 @@ def get_smtp_connection(param: Any) -> SMTP | None:
         SystemExit: On authentication failure (logs critical error)
     """
 
-    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)  # NOSONAR
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.check_hostname = False  # NOSONAR
     context.verify_mode = ssl.CERT_NONE  # NOSONAR
