@@ -663,10 +663,10 @@ class TestAnchorHandling:
         html = '<a id="intro" name="intro"></a><p>text</p>'
         result = editor.EditorWindow._anchors_to_spans(html)
         assert "editor-anchor" in result
-        assert 'data-anchor-id="intro"' in result
+        assert 'id="intro"' in result
         assert "⚓" in result
-        # Original <a> should be gone
-        assert '<a id="intro"' not in result
+        # Original <a> should be gone (span has id="intro" but no <a> tag)
+        assert "<a " not in result
 
     def test_anchor_with_href_not_converted(self):
         html = '<a href="https://example.com">link</a>'
@@ -675,16 +675,16 @@ class TestAnchorHandling:
         assert 'href="https://example.com"' in result
 
     def test_spans_converted_to_anchor_tags_on_save(self):
-        html = '<span class="editor-anchor" data-anchor-id="section1" title="Anchor: section1">⚓</span>'
+        html = '<span class="editor-anchor" id="section1" title="Anchor: section1">⚓</span>'
         result = editor.EditorWindow._spans_to_anchors(html)
         assert '<a id="section1" name="section1"></a>' in result
         assert "editor-anchor" not in result
 
     def test_multiple_anchors_converted(self):
         html = (
-            '<span class="editor-anchor" data-anchor-id="a1" title="Anchor: a1">⚓</span>'
+            '<span class="editor-anchor" id="a1" title="Anchor: a1">⚓</span>'
             "<p>text</p>"
-            '<span class="editor-anchor" data-anchor-id="a2" title="Anchor: a2">⚓</span>'
+            '<span class="editor-anchor" id="a2" title="Anchor: a2">⚓</span>'
         )
         result = editor.EditorWindow._spans_to_anchors(html)
         assert '<a id="a1" name="a1"></a>' in result
