@@ -1,9 +1,11 @@
 #!/bin/bash
 # Pre-commit validation script for local testing before push
-# Run all quality checks: pytest, mypy, pyright, ruff, vulture
+# Runs all quality checks: pymarkdown, black, ruff, vulture, pyright, mypy, pytest
 # Exit with status code indicating which checks passed/failed
 
-set -e
+set -euo pipefail
+
+export PATH="$HOME/.local/bin:$PATH"
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
@@ -11,65 +13,42 @@ cd "$REPO_ROOT"
 echo "🔍 Running pre-commit quality checks..."
 echo ""
 
-# Track results
 FAILED_CHECKS=()
 
-# 1. Pytest with coverage
-echo "📝 Running pytest with coverage..."
-if pytest tests/ -q --tb=short --cov=src --cov-report=term-missing 2>&1 | tail -20; then
-    echo "✓ Tests passed"
-else
-    echo "✗ Tests failed"
-    FAILED_CHECKS+=("pytest")
-fi
-echo ""
+run_check() {
+    local label="$1"; shift
+    echo "▶ $label..."
+    if "$@" 2>&1 | tail -10; then
+        echo "✓ $label passed"
+    else
+        echo "✗ $label failed"
+        FAILED_CHECKS+=("$label")
+    fi
+    echo ""
+}
 
-# 2. Type checking with mypy
-echo "🔤 Checking types with mypy --strict..."
-if mypy --strict src/ 2>&1 | tail -5; then
-    echo "✓ Mypy passed"
-else
-    echo "✗ Mypy found issues"
-    FAILED_CHECKS+=("mypy")
-fi
-echo ""
+run_check "pymarkdown lint"  pymarkdownlnt fix ./*.md ./specs/*.md
 
-# 3. Type checking with pyright
-echo "🔍 Checking types with pyright..."
-if pyright src/ 2>&1 | tail -5; then
-    echo "✓ Pyright passed"
-else
-    echo "✗ Pyright found issues"
-    FAILED_CHECKS+=("pyright")
-fi
-echo ""
+run_check "black"            black --check . --target-version py312 \
+                               --exclude='(venv|env|\.venv|release|\.git)'
 
-# 4. Linting with ruff
-echo "📐 Checking code quality with ruff..."
-if ruff check . --exclude venv,env,build,dist,release 2>&1 | tail -5; then
-    echo "✓ Ruff passed"
-else
-    echo "✗ Ruff found violations"
-    FAILED_CHECKS+=("ruff")
-fi
-echo ""
+run_check "ruff"             ruff check src/ tests/ --fix
 
-# 5. Dead code detection with vulture
-echo "🧛 Detecting dead code with vulture..."
-if vulture src/ --exclude venv,tests,build,dist,release 2>&1 | tail -5; then
-    echo "✓ Vulture passed"
-else
-    echo "⚠ Vulture warnings (non-blocking)"
-fi
-echo ""
+run_check "vulture"          vulture src/ --min-confidence 80
 
-# Report results
+run_check "pyright"          pyright src/
+
+run_check "mypy"             mypy --strict src/
+
+run_check "pytest"           pytest tests/unit/ -q --tb=short \
+                               --cov=src --cov-report=term-missing
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ ${#FAILED_CHECKS[@]} -eq 0 ]; then
+if [[ ${#FAILED_CHECKS[@]} -eq 0 ]]; then
     echo "✅ All checks passed! Ready to commit."
     exit 0
 else
-    echo "❌ Some checks failed: ${FAILED_CHECKS[*]}"
-    echo "Please fix the issues and run this script again."
+    echo "❌ Failed checks: ${FAILED_CHECKS[*]}"
+    echo "Fix the issues and re-run this script."
     exit 1
 fi

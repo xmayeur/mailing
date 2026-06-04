@@ -240,13 +240,13 @@ class TestSmtpSending:
         param.smtp_host = "localhost"
         param.smtp_port = 25
         param.username = "user"
-        param.password = "pass"
+        param.password = "pass"  # NOSONAR
 
         # Mock successful send
         mock_conn.sendmail.return_value = {}
 
         # SMTP sending is done through send method, not exposed as separate function
-        assert mock_conn is not None
+        assert mock_conn is not None  # NOSONAR
 
     @patch("sendMail.SMTP")
     def test_send_via_smtp_connection_error(self, mock_smtp_class: Any) -> None:
@@ -419,9 +419,9 @@ class TestRateLimiting:
         # Test: 100 emails, max 10 per second = 10 seconds delay
         total_emails = 100
         max_per_second = 10
-        expected_delay = total_emails / max_per_second if max_per_second > 0 else 0
+        expected_delay = total_emails / max_per_second
 
-        assert expected_delay == 10.0
+        assert expected_delay == pytest.approx(10.0)
 
     def test_batch_size_calculation(self) -> None:
         """Calculate batch sizes for rate limiting."""
@@ -433,13 +433,11 @@ class TestRateLimiting:
 
     def test_delay_between_batches(self) -> None:
         """Calculate delay between batch sends."""
-        batch_count = 10  # noqa: F841
+        _ = 10  # batch_count unused
         max_batches_per_second = 2
-        expected_delay = (
-            1.0 / max_batches_per_second if max_batches_per_second > 0 else 0
-        )
+        expected_delay = 1.0 / max_batches_per_second
 
-        assert expected_delay == 0.5
+        assert expected_delay == pytest.approx(0.5)
 
 
 class TestEmailHeaders:

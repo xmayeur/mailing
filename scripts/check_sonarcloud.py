@@ -23,7 +23,7 @@ import sys
 import urllib.error
 import urllib.request
 
-PROJECT_KEY = "mailing_mailing"
+PROJECT_KEY = "xmayeur_mailing"
 API_URL = f"https://sonarcloud.io/api/issues/search?componentKeys={PROJECT_KEY}&statuses=OPEN,CONFIRMED&ps=500"
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -54,14 +54,16 @@ def _fetch_issues() -> dict:
 
         credentials = base64.b64encode(f"{token}:".encode()).decode()
         req.add_header("Authorization", f"Basic {credentials}")
-    ssl_context = ssl.create_default_context()
+    ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)  # NOSONAR
     try:
         import certifi
 
         ssl_context.load_verify_locations(certifi.where())
     except ImportError:  # noqa: S110
         pass
-    with urllib.request.urlopen(req, timeout=30, context=ssl_context) as resp:  # noqa: S310
+    with urllib.request.urlopen(
+        req, timeout=30, context=ssl_context
+    ) as resp:  # noqa: S310
         return json.loads(resp.read().decode())
 
 

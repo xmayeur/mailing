@@ -29,7 +29,7 @@ class TestSendMailFullWorkflow:
         param.smtp_host = "localhost"
         param.smtp_port = 25
         param.username = "user"
-        param.password = "pass"
+        param.password = "pass"  # NOSONAR
 
         # Simulate full workflow
         template = "Hello ${name}, your email is ${email}"

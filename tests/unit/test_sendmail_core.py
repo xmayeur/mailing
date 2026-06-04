@@ -208,7 +208,7 @@ class TestGetSmtpConnection:
         param.smtp_host = "localhost"
         param.smtp_port = 25
         param.username = "user"
-        param.password = "pass"
+        param.password = "pass"  # NOSONAR
 
         conn = sm.get_smtp_connection(param)
         assert conn is not None
@@ -229,7 +229,7 @@ class TestGetSmtpConnection:
         param.smtp_host = "localhost"
         param.smtp_port = 25
         param.username = "user"
-        param.password = "badpass"
+        param.password = "badpass"  # NOSONAR
 
         with pytest.raises(SystemExit):
             sm.get_smtp_connection(param)
@@ -243,7 +243,7 @@ class TestGetSmtpConnection:
         param.smtp_host = "localhost"
         param.smtp_port = 25
         param.username = "user"
-        param.password = "pass"
+        param.password = "pass"  # NOSONAR
 
         conn = sm.get_smtp_connection(param)
         assert conn is None
