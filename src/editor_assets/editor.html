@@ -403,6 +403,14 @@
             }
             return super.sanitize(value);
           }
+          static create(value) {
+            const node = super.create(value);
+            if (typeof value === 'string' && value.trim().startsWith('#')) {
+              node.removeAttribute('target');
+              node.removeAttribute('rel');
+            }
+            return node;
+          }
         }
         Quill.register(LocalLink, true);
       } catch (e) {
@@ -442,14 +450,14 @@
             const node = super.create(value);
             const id = typeof value === 'string' && value ? value : '';
             if (id) {
-              node.setAttribute('data-anchor-id', id);
+              node.setAttribute('id', id);
               node.setAttribute('title', 'Anchor: ' + id);
             }
             node.textContent = '⚓';  // ⚓
             return node;
           }
           static value(node) {
-            return node.getAttribute('data-anchor-id') || '';
+            return node.getAttribute('id') || '';
           }
         }
         AnchorBlot.blotName  = 'anchor';
@@ -856,6 +864,7 @@
           }
         });
       }
+      window.handleLinkInsert = handleLinkInsert;
 
       // ----------------------------------------------------------------
       // Clipboard analysis on paste (T013: paste event handler hook)

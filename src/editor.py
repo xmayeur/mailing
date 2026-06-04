@@ -97,12 +97,15 @@ class _LogCapture(logging.Handler):
     def __init__(self, log_list: list[str]) -> None:
         super().__init__()
         self.log_list = log_list
+        self.emit_signal: Any = None
         self.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
             self.log_list.append(msg)
+            if self.emit_signal is not None:
+                self.emit_signal.emit(msg)
         except Exception:
             self.handleError(record)
 
@@ -115,6 +118,7 @@ from PyQt6.QtCore import (  # noqa: E402
     QObject,
     QSize,
     Qt,
+    QThread,
     QTimer,
     QUrl,
     pyqtSignal,
@@ -122,6 +126,7 @@ from PyQt6.QtCore import (  # noqa: E402
 )
 from PyQt6.QtGui import QIcon, QPixmap  # noqa: E402
 from PyQt6.QtWebChannel import QWebChannel  # noqa: E402
+from PyQt6.QtWebEngineCore import QWebEnginePage  # noqa: E402
 from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
 from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
@@ -230,6 +235,23 @@ def _svg_icon(svg: str) -> QIcon:
 
 
 # ---------------------------------------------------------------------------
+# WebEngine page — blocks link-click navigation so editor stays on editor.html
+# ---------------------------------------------------------------------------
+class _EditorPage(QWebEnginePage):  # pragma: no cover  # type: ignore[misc]
+    """Custom page that intercepts link clicks to prevent navigation away from editor.html."""
+
+    def acceptNavigationRequest(  # noqa: N802, ARG002
+        self, url: Any, nav_type: Any, is_main_frame: bool  # noqa: ARG002
+    ) -> bool:
+        if nav_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked:
+            return False  # block same-frame link navigation
+        return True
+
+    def createWindow(self, _win_type: Any) -> None:  # noqa: N802
+        return None  # block target="_blank" new-window creation
+
+
+# ---------------------------------------------------------------------------
 # Link insertion dialog
 # ---------------------------------------------------------------------------
 class _LinkDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
@@ -279,39 +301,149 @@ class _LinkDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 # Session log viewer dialog
 # ---------------------------------------------------------------------------
 class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
-    """Dialog displaying the session log from a send operation."""
+    """Dialog displaying live log from a send operation.
 
-    def __init__(
-        self, parent: QWidget | None = None, log_entries: list[str] | None = None
-    ) -> None:
+    Opens immediately when send starts; streams log lines via log_line_received
+    signal; blocks close until set_complete() is called after send finishes.
+    """
+
+    log_line_received: pyqtSignal = pyqtSignal(str)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Send Session Log")
         self.setMinimumWidth(800)
         self.setMinimumHeight(600)
+        self._send_complete = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
 
         self.log_view = QPlainTextEdit(self)
         self.log_view.setReadOnly(True)
-        self.log_view.setFont(self.log_view.font())
-        if log_entries:
-            self.log_view.setPlainText("\n".join(log_entries))
         layout.addWidget(self.log_view, 1)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Close,
-            parent=self,
-        )
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self._close_button = QPushButton("Close", self)
+        self._close_button.setEnabled(False)
+        self._close_button.clicked.connect(self.accept)
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(self._close_button)
+        layout.addLayout(btn_layout)
+
+        self.log_line_received.connect(self.append_log)
 
     def append_log(self, text: str) -> None:
-        """Append text to the log view."""
+        """Append a log line; scroll to bottom."""
         cursor = self.log_view.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         self.log_view.setTextCursor(cursor)
         self.log_view.insertPlainText(text + "\n")
+
+    def set_complete(self, success: bool, is_test: bool) -> None:
+        """Called after send finishes. Shows confirmation prompt, enables Close."""
+        self._send_complete = True
+        if is_test:
+            title = "Test Email Sent" if success else "Test Send Failed"
+            msg = (
+                "Test email sent successfully.\n\nHave the test recipients confirmed\n"
+                "the mailing looks good?"
+                if success
+                else "Test send encountered an error. See log above."
+            )
+            buttons = (
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                if success
+                else QMessageBox.StandardButton.Ok
+            )
+            reply = QMessageBox.question(self, title, msg, buttons)
+            self._test_confirmed = success and reply == QMessageBox.StandardButton.Yes
+        else:
+            title = "Send Complete" if success else "Send Failed"
+            msg = "Mailing sent successfully." if success else "Send encountered an error. See log above."
+            QMessageBox.information(self, title, msg)
+            self._test_confirmed = False
+        self._close_button.setEnabled(True)
+
+    def closeEvent(self, event: Any) -> None:  # noqa: N802
+        if not self._send_complete:
+            QMessageBox.warning(
+                self,
+                "Send In Progress",
+                "Send is still running — wait for it to complete.",
+            )
+            event.ignore()
+            return
+        event.accept()
+
+
+# ---------------------------------------------------------------------------
+# Background send worker
+# ---------------------------------------------------------------------------
+class _SendWorker(QThread):  # pragma: no cover  # type: ignore[misc]
+    """Run sendMail in a background thread; emit log lines and final result via signals."""
+
+    log_line: pyqtSignal = pyqtSignal(str)
+    send_result: pyqtSignal = pyqtSignal(str)
+
+    def __init__(self, dialog: Any, send_fn: Any) -> None:
+        super().__init__()
+        self._dialog = dialog
+        self._send_fn = send_fn
+
+    def run(self) -> None:
+        log_entries: list[str] = []
+        handler = _LogCapture(log_entries)
+        handler.emit_signal = self.log_line
+        logging.getLogger().addHandler(handler)
+        try:
+            result = self._send_fn(self._dialog)
+            self.send_result.emit(str(result))
+        except Exception as exc:  # noqa: BLE001
+            self.send_result.emit(f"ERROR: {exc}")
+        finally:
+            logging.getLogger().removeHandler(handler)
+
+
+# ---------------------------------------------------------------------------
+# HTML source view dialog
+# ---------------------------------------------------------------------------
+class _HtmlSourceDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
+    """Read-only dialog showing the current document's HTML source."""
+
+    def __init__(self, parent: QWidget | None = None, html_content: str = "") -> None:
+        super().__init__(parent)
+        self.setWindowTitle("HTML Source")
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(600)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+
+        text_view = QPlainTextEdit(self)
+        text_view.setReadOnly(True)
+        font = text_view.font()
+        font.setFamily("Courier New, Courier, monospace")
+        text_view.setFont(font)
+        text_view.setPlainText(html_content)
+        layout.addWidget(text_view, 1)
+
+        btn_layout = QHBoxLayout()
+        copy_btn = QPushButton("Copy to Clipboard", self)
+        copy_btn.clicked.connect(lambda: self._copy_to_clipboard(html_content))
+        close_btn = QPushButton("Close", self)
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+
+    @staticmethod
+    def _copy_to_clipboard(text: str) -> None:
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(text)
 
 
 # ---------------------------------------------------------------------------
@@ -2819,6 +2951,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         # Web engine view
         try:
             self._view = QWebEngineView(self)
+            self._view.setPage(_EditorPage(self._view))
             self.setCentralWidget(self._view)
         except Exception as e:
             log.error(f"Failed to create QWebEngineView: {e}")
@@ -3478,6 +3611,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self._build_file_menu(menubar)
         self._build_settings_menu(menubar)
         self._build_format_menu(menubar)
+        self._build_view_menu(menubar)
         self._build_table_menu(menubar)
         self._build_insert_menu(menubar)
 
@@ -3608,6 +3742,13 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             "Choose a CSS file to style the editor and saved HTML"
         )
         apply_css_action.triggered.connect(self._menu_apply_css)
+
+    def _build_view_menu(self, menubar: Any) -> None:
+        view_menu = menubar.addMenu("&View")
+        source_action = view_menu.addAction("View &HTML Source")
+        source_action.setShortcut("Ctrl+Shift+U")
+        source_action.setToolTip("View the current document's raw HTML source")
+        source_action.triggered.connect(self._menu_view_source)
 
     def _build_table_menu(self, menubar: Any) -> None:
         tbl_menu = menubar.addMenu("&Table")
@@ -3880,26 +4021,30 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
     def _menu_insert_link(self) -> None:
         """Insert link via bridge (same as toolbar button)."""
-        json_str = self._bridge.request_link_insert("")
-        if not json_str:
-            return
-        data = json.loads(json_str)
-        url = json.dumps(data.get("url", ""))
-        text = json.dumps(data.get("text", "") or data.get("url", ""))
-        self._run_js(
-            f"{{ const r=quill.getSelection(true); "
-            f"if (r && r.length>0) {{ quill.format('link',{url},Quill.sources.USER); }}"
-            f"else {{ quill.insertText(r.index,{text},'link',{url},Quill.sources.USER); }} }}"
-        )
+        self._run_js("handleLinkInsert()")
 
     def _menu_insert_anchor(self) -> None:
         """Open anchor name dialog and insert a bookmark at the cursor."""
         dialog = _AnchorDialog(self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name = dialog.get_name()
+        name = self._sanitize_anchor_name(dialog.get_name())
         if name:
             self._run_js(f"insertAnchor({json.dumps(name)})")
+
+    @staticmethod
+    def _sanitize_anchor_name(name: str) -> str:
+        """Return a valid HTML id from raw anchor name (lowercase, hyphens, alphanumeric only)."""
+        import re as _re
+        sanitized = name.strip().lower().replace(" ", "-")
+        sanitized = _re.sub(r"[^a-z0-9_-]", "", sanitized)
+        return sanitized.lstrip("-_")
+
+    def _menu_view_source(self) -> None:
+        """Open read-only HTML source view of the current document."""
+        html = self._bridge.get_current_html()
+        dialog = _HtmlSourceDialog(self, html_content=html)
+        dialog.exec()
 
     def _resolve_send_config_path(self) -> str:
         """Return the default sendMail config path, falling back to ~/.config/sendMail.yml."""
@@ -3979,60 +4124,40 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return True
         return bool(result)
 
+    def _on_send_finished(
+        self, result: str, dialog: _SendDialog, log_dialog: _SessionLogDialog
+    ) -> None:
+        """Handle send worker completion: show confirmation in log dialog, manage test lock."""
+        self._send_in_progress = False
+        dialog.spinner_label.hide()
+        is_test = result.strip().upper() == "OK_TEST"
+        success = self._send_result_is_success(result)
+        if not success:
+            log.warning("sendMail returned non-success status: %r", result)
+        log_dialog.set_complete(success=success, is_test=is_test)
+        if is_test and getattr(log_dialog, "_test_confirmed", False):
+            dialog._unlock_test_mode()
+            dialog.test_check.blockSignals(True)
+            dialog.test_check.setChecked(False)
+            dialog.test_check.blockSignals(False)
+            dialog.load_current_filter(dialog._current_profile)
+            dialog.filter_and_display_records()
+        dialog.send_button.setEnabled(True)
+
     def _on_send_dialog_send(self, dialog: _SendDialog) -> None:
-        """Handle Send button click in Send Mailing dialog (T023: keep dialog open during send)."""
+        """Handle Send button click: open log dialog immediately, run send in background thread."""
         dialog.send_button.setEnabled(False)
         dialog.spinner_label.show()
         self._send_in_progress = True
-        log_entries: list[str] = []
-        log_handler = _LogCapture(log_entries)
-        logging.getLogger().addHandler(log_handler)
-        try:
-            result = self._send_with_sendmail(dialog)
-        except Exception as exc:
-            QMessageBox.critical(self, "Send Error", f"Failed to send:\n{exc}")
-            log.error("Send failed: %s", exc)
-            dialog.send_button.setEnabled(True)
-            dialog.spinner_label.hide()
-            return
-        finally:
-            self._send_in_progress = False
-            logging.getLogger().removeHandler(log_handler)
 
-        dialog.spinner_label.hide()
-
-        if not self._send_result_is_success(result):
-            log.warning(
-                "sendMail returned non-success status after send attempt: %r", result
-            )
-            dialog.send_button.setEnabled(True)
-        elif result.strip().upper() == "OK_TEST":
-            # Show confirmation dialog for test email (US3)
-            confirm_result = QMessageBox.question(
-                dialog,
-                "Test Email Sent",
-                "Test email sent successfully.\n\nHave the test recipients confirmed\nthe mailing looks good?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if confirm_result == QMessageBox.StandardButton.Yes:
-                dialog._unlock_test_mode()
-                # After confirmation, clear test checkbox and refresh data for bulk send
-                dialog.test_check.blockSignals(True)
-                dialog.test_check.setChecked(False)
-                dialog.test_check.blockSignals(False)
-                # Switch from test filter to regular filter and refresh data
-                dialog.load_current_filter(dialog._current_profile)
-                dialog.filter_and_display_records()
-            dialog.send_button.setEnabled(True)
-            return  # Don't close dialog after test
-
-        log_dialog = _SessionLogDialog(self, log_entries=log_entries)
+        log_dialog = _SessionLogDialog(self)
+        worker = _SendWorker(dialog, self._send_with_sendmail)
+        worker.log_line.connect(log_dialog.log_line_received)
+        worker.send_result.connect(
+            lambda result: self._on_send_finished(result, dialog, log_dialog)
+        )
+        worker.start()
         log_dialog.exec()
-
-        # Close dialog only after successful bulk send (not after test)
-        if result.strip().upper() == "OK" and self._send_result_is_success(result):
-            dialog.accept()
 
     def _menu_send(self) -> None:
         """Open the send dialog and send the current HTML file if confirmed."""

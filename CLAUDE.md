@@ -165,6 +165,8 @@ CI enforces:
 ## Active Technologies
 - Python 3.12+ + google-api-python-client, gspread, beautifulsoup4, markdown2, pillow, pyyaml, get-hc-secrets, PyQt6, PyQt6-WebEngine (008-fix-profile-loading)
 - YAML config files (config.yml), Google Sheets, Google Drive, local filesystem (008-fix-profile-loading)
+- Python 3.12+ + PyQt6 6.7+, PyQt6-WebEngine, Quill.js v2 (in editor_assets/) (009-editor-ui-fixes-send-flow)
+- Local filesystem (.html/.md files) (009-editor-ui-fixes-send-flow)
 
 ## Recent Changes
 - 008-fix-profile-loading: Added Python 3.12+ + google-api-python-client, gspread, beautifulsoup4, markdown2, pillow, pyyaml, get-hc-secrets, PyQt6, PyQt6-WebEngine
