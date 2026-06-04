@@ -1449,13 +1449,17 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
 
     if secret is None:
         # Try legacy get_secret approach for backward compatibility
-        try:
-            secret = get_secret(config.get("MAILCONFIG", ""))
-            if secret is None:
-                log.warning("No secret configuration found")
+        legacy_key = config.get("MAILCONFIG", "")
+        if legacy_key:
+            try:
+                secret = get_secret(legacy_key)
+                if secret is None:
+                    log.warning("No secret configuration found")
+                    secret = {}
+            except Exception as e:  # noqa: BLE001
+                log.debug(f"No secret configuration found, using config file only: {e}")
                 secret = {}
-        except Exception as e:  # noqa: BLE001
-            log.debug(f"No secret configuration found, using config file only: {e}")
+        else:
             secret = {}
 
     config = {**secret, **config}

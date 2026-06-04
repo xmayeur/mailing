@@ -1,0 +1,55 @@
+@startuml Send Workflow Interaction
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor User
+participant EditorWindow
+participant SendDialog
+participant SessionLogDialog
+
+== Test Send Phase ==
+
+User -> EditorWindow : clicks Send
+EditorWindow -> EditorWindow : save if dirty
+EditorWindow -> SendDialog : open (test=True, locked)
+activate SendDialog
+
+User -> SendDialog : sets options
+User -> SendDialog : clicks Send
+
+SendDialog -> SessionLogDialog : open
+activate SessionLogDialog
+SessionLogDialog -> SessionLogDialog : streams log lines
+SessionLogDialog -> SessionLogDialog : send completes
+SessionLogDialog -> User : "Test received? (Yes/No)"
+User -> SessionLogDialog : Yes / No
+deactivate SessionLogDialog
+
+SessionLogDialog --> SendDialog : control returns
+SendDialog -> SendDialog : unlock test mode
+
+== Real Send Phase ==
+
+User -> SendDialog : unchecks Test
+User -> SendDialog : sets options
+User -> SendDialog : clicks Send
+
+SendDialog -> SessionLogDialog : open
+activate SessionLogDialog
+SessionLogDialog -> SessionLogDialog : streams log lines
+SessionLogDialog -> SessionLogDialog : send completes
+SessionLogDialog -> User : "Send complete — OK to close?"
+User -> SessionLogDialog : OK
+deactivate SessionLogDialog
+
+SessionLogDialog --> SendDialog : control returns
+SendDialog -> SendDialog : waits for user interaction
+
+== Exit ==
+
+User -> SendDialog : Cancel / Close
+deactivate SendDialog
+SendDialog --> EditorWindow : SendDialog closed
+
+@enduml
