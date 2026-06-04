@@ -40,6 +40,7 @@ import ssl
 import sys
 import tempfile
 import urllib.parse
+from collections.abc import Callable
 from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -282,7 +283,7 @@ def guess_type(filepath: str) -> str | None:
 
         result: str | None = magic.from_file(filepath, mime=True)
         return result
-    except (ImportError, ModuleNotFoundError):
+    except ImportError:
         import mimetypes
 
         # Initialize Office file MIME types (not registered on all platforms)
@@ -461,10 +462,10 @@ def get_smtp_connection(param: Any) -> SMTP | None:
         SystemExit: On authentication failure (logs critical error)
     """
 
-    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)  # NOSONAR
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE  # noqa: S303 disabled for provider compatibility
+    context.check_hostname = False  # NOSONAR
+    context.verify_mode = ssl.CERT_NONE  # NOSONAR
 
     try:
         conn = SMTP(param.smtp_host, param.smtp_port)
@@ -475,8 +476,8 @@ def get_smtp_connection(param: Any) -> SMTP | None:
     except SMTPAuthenticationError:
         log.critical("Invalid SMTP credentials")
         sys.exit(-1)
-    except (OSError, SMTPException) as e:
-        log.error(f"Failed to connect to SMTP: {e}")
+    except (OSError, SMTPException):
+        log.exception("Failed to connect to SMTP")
         return None
 
 
@@ -550,7 +551,7 @@ def save_to_sent(param: Any, msg: MIMEMultipart) -> None:
                 log.warning(f"Retrying IMAP storage: {e}")
                 sleep(10)
             else:
-                log.error(f"Error copying to sent folder: {e}")
+                log.exception("Error copying to sent folder")  # noqa: BLE001
 
 
 def _decode_base64_image(src: str, temp_dir: str) -> str | None:
@@ -567,8 +568,8 @@ def _decode_base64_image(src: str, temp_dir: str) -> str | None:
         with open(temp_path, "wb") as f:
             f.write(img_data)
         return temp_path
-    except (ValueError, OSError) as e:
-        log.error(f"Impossible de traiter l'image en base64 : {e}")
+    except (ValueError, OSError):
+        log.exception("Impossible de traiter l'image en base64")
         return None
 
 
@@ -588,8 +589,8 @@ def _resize_and_save_image(
             opt_img_path = os.path.join(temp_dir, f"{cid}.jpg")
             im.convert("RGB").save(opt_img_path, "JPEG", quality=75, optimize=True)
         return opt_img_path
-    except OSError as e:
-        log.error(f"Impossible de traiter l'image {img_path}: {e}")
+    except OSError:
+        log.exception(f"Impossible de traiter l'image {img_path}")
         return None
 
 
@@ -724,7 +725,9 @@ def process_attachments(
     if files:
         return files, None, []
 
-    files, service, google_drive_files = _process_google_drive_attachments(config, folder)
+    files, service, google_drive_files = _process_google_drive_attachments(
+        config, folder
+    )
     return files, service, google_drive_files
 
 
@@ -913,8 +916,8 @@ def _attach_body(
                     filename=os.path.basename(img_info["path"]),
                 )
                 msg_related.attach(img_part)
-            except (OSError, TypeError) as e:
-                log.error(f"Error attaching inline image {img_info['path']}: {e}")
+            except (OSError, TypeError):
+                log.exception(f"Error attaching inline image {img_info['path']}")
         msg.attach(msg_related)
     else:
         msg.attach(MIMEText(message, "plain"))
@@ -1014,8 +1017,8 @@ def _build_and_send(
                 shutil.rmtree(d)
                 if param.verbose:
                     log.info(f"Dossier temporaire supprimé : {d}")
-            except OSError as e:
-                log.error(f"Erreur lors du nettoyage de {d}: {e}")
+            except OSError:
+                log.exception(f"Erreur lors du nettoyage de {d}")
 
 
 def _skip_to_index(reader: Any, from_index: int) -> int:
@@ -1228,30 +1231,36 @@ def _eval_string(field_value: str, test_value: Any, op: str) -> bool:
 
 def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
     """Helper to evaluate string operations."""
-    if op in ("in", "one of", _OP_ONE_OF):
-        return bool(field_value in test_value)
-    if op in ("not in", "none of", _OP_NOT_ONE_OF):
-        return bool(field_value not in test_value)
-    if op in ("is", _OP_IS_EQUAL_TO, _OP_IS):
-        return bool(field_value == test_value)
-    if op in ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT):
-        return bool(field_value != test_value)
-    if op in (_OP_IS_NOT_EMPTY,):
-        return field_value != "" and field_value is not None
-    if op in ("is empty",):
-        return field_value == "" or field_value is None
-    if op in ("contains", _OP_CONTAINS):
-        return bool(test_value in field_value) if test_value else False
-    if op in ("does not contain", _OP_DOES_NOT_CONTAIN):
-        return bool(test_value not in field_value) if test_value else True
-    if op in ("starts with", _OP_STARTS_WITH):
-        return bool(field_value.startswith(test_value)) if test_value else False
-    if op in ("ends with", _OP_ENDS_WITH):
-        return bool(field_value.endswith(test_value)) if test_value else False
-    if op in ("matches", _OP_MATCHES):
-        return _eval_regex(test_value, field_value, negate=False)
-    if op in ("does not match", _OP_DOES_NOT_MATCH):
-        return _eval_regex(test_value, field_value, negate=True)
+    handlers: dict[tuple[str, ...], Callable[[], bool]] = {
+        ("in", "one of", _OP_ONE_OF): lambda: field_value in test_value,
+        ("not in", "none of", _OP_NOT_ONE_OF): lambda: field_value not in test_value,
+        ("is", _OP_IS_EQUAL_TO, _OP_IS): lambda: field_value == test_value,
+        ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT): lambda: field_value != test_value,
+        (_OP_IS_NOT_EMPTY,): lambda: field_value != "" and field_value is not None,
+        ("is empty",): lambda: field_value == "" or field_value is None,
+        ("contains", _OP_CONTAINS): lambda: (
+            bool(test_value in field_value) if test_value else False
+        ),
+        ("does not contain", _OP_DOES_NOT_CONTAIN): lambda: (
+            bool(test_value not in field_value) if test_value else True
+        ),
+        ("starts with", _OP_STARTS_WITH): lambda: (
+            bool(field_value.startswith(test_value)) if test_value else False
+        ),
+        ("ends with", _OP_ENDS_WITH): lambda: (
+            bool(field_value.endswith(test_value)) if test_value else False
+        ),
+        ("matches", _OP_MATCHES): lambda: _eval_regex(
+            test_value, field_value, negate=False
+        ),
+        ("does not match", _OP_DOES_NOT_MATCH): lambda: _eval_regex(
+            test_value, field_value, negate=True
+        ),
+    }
+
+    for ops, handler in handlers.items():
+        if op in ops:
+            return handler()
     return True
 
 
@@ -1324,9 +1333,29 @@ def send_gmail(service: Any, message: Any = None) -> Any:
     body = {"raw": encoded_message}
     try:
         return service.users().messages().send(userId="me", body=body).execute()
-    except errors.HttpError as error:
-        log.error(f"Error sending message: {error} to {message['To']}")
+    except errors.HttpError:
+        log.exception(f"Error sending message to {message['To']}")
         return None
+
+
+def _attempt_smtp_send(param: Any, message: Any, recipients: Any, attempt: int) -> bool:
+    """Single SMTP send attempt; returns True on success."""
+    conn = get_smtp_connection(param)
+    if not conn:
+        return False
+    try:
+        conn.sendmail(
+            message["From"], recipients, message.as_string()
+        )  # pyright: ignore
+        conn.quit()
+        if param.verbose:  # pyright: ignore
+            log.info("sent")
+        return True
+    except SMTPException:
+        log.exception(f"SMTP error on attempt {attempt + 1}")
+        if attempt == 0:
+            sleep(10)
+        return False
 
 
 def send_mail(param: Any = None, message: Any = None, recipients: Any = None) -> bool:
@@ -1351,22 +1380,9 @@ def send_mail(param: Any = None, message: Any = None, recipients: Any = None) ->
         log.info(f"Sending email to {recipients}")
     success = False
     for attempt in range(2):
-        conn = get_smtp_connection(param)
-        if conn:
-            try:
-                conn.sendmail(
-                    message["From"], recipients, message.as_string()
-                )  # pyright: ignore
-                conn.quit()
-                success = True
-                if param.verbose:  # pyright: ignore
-                    log.info("sent")
-                break
-            except SMTPException as e:
-                log.error(f"SMTP error on attempt {attempt + 1}: {e}")
-                if attempt == 0:
-                    sleep(10)
-
+        if _attempt_smtp_send(param, message, recipients, attempt):
+            success = True
+            break
     if success and message:
         save_to_sent(param, message)
     return success
@@ -1424,8 +1440,8 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
         else:
             # No vault key configured, use legacy behavior
             secret = None
-    except ProfileLoadError as e:
-        log.error(f"Failed to load profile '{args.profile}': {str(e)}")
+    except ProfileLoadError:
+        log.exception(f"Failed to load profile '{args.profile}'")
         raise
     except Exception as e:  # noqa: BLE001 — get_secret may raise any exception
         log.debug(f"No secret configuration found, using config file only: {e}")

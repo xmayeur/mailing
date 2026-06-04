@@ -8,9 +8,6 @@ on:
     branches:
       - master
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ${{ matrix.os }}
@@ -36,16 +33,17 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install pytest pytest-cov pytest-mock
-        pip install -r requirements.txt || echo "No requirements.txt found"
+        python -m pip install --upgrade "pip==26.1.2"
+        pip install --only-binary :all: "pytest==9.0.3" "pytest-cov==7.1.0" "pytest-mock==3.15.1"
+        pip install --only-binary :all: -r requirements-ci.txt
 
     - name: Run unit tests with pytest
       run: |
+        mkdir -p build
         if [ "$RUNNER_OS" = "Linux" ]; then
-          xvfb-run -a pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml --cov-report=term-missing
+          xvfb-run -a pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml:build/coverage.xml --cov-report=term-missing
         else
-          pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml --cov-report=term-missing
+          pytest tests/unit --cov=src --cov-fail-under=80 --cov-report=xml:build/coverage.xml --cov-report=term-missing
         fi
       shell: bash
 
@@ -67,6 +65,35 @@ jobs:
         name: codecov-umbrella
         fail_ci_if_error: false
 
+  sonarcloud:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade "pip==26.1.2"
+        pip install --only-binary :all: "pytest==9.0.3" "pytest-cov==7.1.0" "pytest-mock==3.15.1"
+        pip install --only-binary :all: -r requirements-ci.txt
+
+    - name: Run tests with coverage
+      run: |
+        mkdir -p build
+        pytest tests/unit --cov=src --cov-report=xml:build/coverage.xml --cov-report=term-missing
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -79,9 +106,9 @@ jobs:
 
     - name: Install linting and type checking tools
       run: |
-        python -m pip install --upgrade pip
-        pip install mypy pyright ruff vulture flake8 pylint 'black>=26.5.1,<26.6'
-        pip install -r requirements.txt || echo "No requirements.txt found"
+        python -m pip install --upgrade "pip==26.1.2"
+        pip install --only-binary :all: "mypy==2.1.0" "pyright==1.1.409" "ruff==0.15.13" "vulture==2.16" "flake8==7.3.0" "pylint==4.0.5" "black==26.5.1"
+        pip install --only-binary :all: -r requirements-ci.txt
 
     - name: Type checking with mypy
       run: mypy --strict src/
@@ -115,6 +142,8 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v4
 
@@ -125,13 +154,13 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install pytest pytest-cov pytest-mock
-        pip install -r requirements.txt || echo "No requirements.txt found"
+        python -m pip install --upgrade "pip==26.1.2"
+        pip install --only-binary :all: "pytest==9.0.3" "pytest-cov==7.1.0" "pytest-mock==3.15.1"
+        pip install --only-binary :all: -r requirements-ci.txt
 
     - name: Run unit tests and extract coverage
       run: |
-        pytest tests/unit --cov=src --cov-report=term --cov-report=json
+        pytest tests/unit --cov=. --cov-report=term --cov-report=json
         # Extract coverage percentage from coverage.json
         COVERAGE=$(python -c "import json; data=json.load(open('coverage.json')); print(int(data['totals']['percent_covered']))")
         echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
@@ -154,4 +183,3 @@ jobs:
           git commit -m "ci: Update coverage badge to $COVERAGE% (pytest)"
           git push origin master
         fi
-

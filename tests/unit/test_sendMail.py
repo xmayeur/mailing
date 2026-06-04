@@ -554,7 +554,7 @@ class TestHTMLProcessing:
 
         # Should skip the image and log error
         assert len(images) == 0
-        mock_log.error.assert_called()
+        mock_log.exception.assert_called()
 
 
 class TestAttachmentProcessing:
@@ -1448,7 +1448,7 @@ def test_process_artscroises_wait_and_no_config():
         "pause": 1,
         "SA": "sa.json",
         "username": "u",
-        "password": "p",
+        "password": "p",  # NOSONAR
         "MAILCONFIG": "secret",
     }
 
@@ -1560,7 +1560,7 @@ def test_send_gmail_error():
         result = sendMail.send_gmail(service, message)
         # Verify result is None because of the exception being caught
         assert result is None
-        assert mock_log.error.called
+        assert mock_log.exception.called
 
 
 def test_build_email_image_error(tmp_path):
@@ -1636,7 +1636,7 @@ def test_process_artscroises_wait_and_cleanup():
         "pause": 0,
         "SA": "sa.json",
         "username": "u",
-        "password": "p",
+        "password": "p",  # NOSONAR
         "MAILCONFIG": "secret",
     }
 
@@ -1671,7 +1671,7 @@ def test_process_artscroises():
             "pause": 0,
             "SA": "sa.json",
             "username": "u",
-            "password": "p",
+            "password": "p",  # NOSONAR
             "MAILCONFIG": "secret",
         }
         with patch(
@@ -1778,7 +1778,7 @@ def test_main_missing_args():
             "pause": 0,
             "SA": "sa.json",
             "username": "u",
-            "password": "p",
+            "password": "p",  # NOSONAR
             "MAILCONFIG": "secret",
         }
 
@@ -1931,7 +1931,10 @@ def test_process_profile_test_filter():
     args.subject = "Test Subject"
     args.test = True  # To trigger line 1200
 
-    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
+    secret_config = {
+        "MAILCONFIG": "dummy_config",
+        "password": "existing_pass",  # NOSONAR
+    }
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),
@@ -1969,7 +1972,10 @@ def test_process_profile_test_nosubject():
     args.subject = None
     args.test = True  # To trigger line 1200
 
-    secret_config = {"MAILCONFIG": "dummy_config", "password": "existing_pass"}
+    secret_config = {
+        "MAILCONFIG": "dummy_config",
+        "password": "existing_pass",  # NOSONAR
+    }
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),

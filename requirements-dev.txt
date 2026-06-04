@@ -1,0 +1,11 @@
+# Pinned CI/dev tool versions — update with: pip install --upgrade <pkg> && pip freeze | grep <pkg>
+pytest==9.0.3
+pytest-cov==7.1.0
+pytest-mock==3.15.1
+mypy==2.1.0
+pyright==1.1.409
+ruff==0.15.13
+vulture==2.16
+black==26.5.1
+flake8==7.3.0
+pylint==4.0.5
