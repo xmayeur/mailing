@@ -126,6 +126,7 @@ from PyQt6.QtCore import (  # noqa: E402
 )
 from PyQt6.QtGui import QIcon, QPixmap  # noqa: E402
 from PyQt6.QtWebChannel import QWebChannel  # noqa: E402
+from PyQt6.QtWebEngineCore import QWebEnginePage  # noqa: E402
 from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
 from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
@@ -231,6 +232,20 @@ def _svg_icon(svg: str) -> QIcon:
     pix = QPixmap()
     pix.loadFromData(QByteArray(svg.encode()), "SVG")
     return QIcon(pix)
+
+
+# ---------------------------------------------------------------------------
+# WebEngine page — blocks link-click navigation so editor stays on editor.html
+# ---------------------------------------------------------------------------
+class _EditorPage(QWebEnginePage):  # pragma: no cover  # type: ignore[misc]
+    """Custom page that intercepts link clicks to prevent navigation away from editor.html."""
+
+    def acceptNavigationRequest(  # noqa: N802, ARG002
+        self, url: Any, nav_type: Any, is_main_frame: bool  # noqa: ARG002
+    ) -> bool:
+        if nav_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked:
+            return False  # block all link-click navigations inside the editor
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -2933,6 +2948,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         # Web engine view
         try:
             self._view = QWebEngineView(self)
+            self._view.setPage(_EditorPage(self._view))
             self.setCentralWidget(self._view)
         except Exception as e:
             log.error(f"Failed to create QWebEngineView: {e}")
