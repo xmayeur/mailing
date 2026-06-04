@@ -244,8 +244,11 @@ class _EditorPage(QWebEnginePage):  # pragma: no cover  # type: ignore[misc]
         self, url: Any, nav_type: Any, is_main_frame: bool  # noqa: ARG002
     ) -> bool:
         if nav_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked:
-            return False  # block all link-click navigations inside the editor
+            return False  # block same-frame link navigation
         return True
+
+    def createWindow(self, _win_type: Any) -> None:  # noqa: N802
+        return None  # block target="_blank" new-window creation
 
 
 # ---------------------------------------------------------------------------

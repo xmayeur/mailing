@@ -403,6 +403,14 @@
             }
             return super.sanitize(value);
           }
+          static create(value) {
+            const node = super.create(value);
+            if (typeof value === 'string' && value.trim().startsWith('#')) {
+              node.removeAttribute('target');
+              node.removeAttribute('rel');
+            }
+            return node;
+          }
         }
         Quill.register(LocalLink, true);
       } catch (e) {
