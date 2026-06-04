@@ -1,3 +1,56 @@
+## v1.11.0 (2026-06-04)
+
+### Feat
+
+- **editor**: fix hyperlink menu, anchor id attr, add source view, live send log
+- Automate builds on push to master with version-based releases
+- Enable single-file executable for Windows/Linux in editor.spec
+
+### Fix
+
+- add PyQt6.QtWebEngineCore to test mocks; fix ruff/vulture/pymarkdown
+- Exclude test files from SonarCloud coverage calculation
+- Fix coverage.xml path and import order for SonarCloud
+- Fix coverage.xml paths for SonarCloud source mapping
+- Pin action SHAs and add missing coverage tests
+- Resolve SonarCloud security hotspots and coverage path
+- Remove sonar.sources=src to fix coverage path mismatch
+- Bump build Python to 3.12 (type statement requires 3.12+, project requires >=3.12)
+- Use PEP 695 'type' statement instead of TypeAlias (S6794, Python 3.12+)
+- Point SonarCloud to coverage.xml for coverage reporting
+- Add NOSONAR to last remaining S8544 pip install in main.yml
+- Add NOSONAR to ssl.create_default_context line (S5527 reported there)
+- Exclude editor_assets from SonarCloud; inline pinned pip versions in CI
+- Add NOSONAR suppressions for remaining SonarCloud issues
+- Use block scalar for pip install in main.yml (YAML colon in :all: broke syntax)
+- Resolve remaining SonarCloud issues
+- Rename sendMailEditor_bin to sendMailEditor before packaging
+- Remove duplicate sonarcloud.properties (sonar-project.properties is canonical)
+- Resolve SonarCloud issues across codebase
+- Reduce SonarCloud issues
+- Resolve ruff linting errors
+- Resolve mypy strict type checking errors
+- Update test assertions to match log.exception calls
+- Remove unused exception variables in exception handlers
+- Add SonarCloud exclusions and fix logging/SSL issues
+- suppress spurious vault 404 error when no MAILCONFIG key configured
+- **editor**: block target=_blank new windows; strip target from anchor links
+- **editor**: expose handleLinkInsert globally; block link-click navigation
+- Refactor high-complexity functions and address SSL security warning
+- Address SonarCloud Python issues
+- Correct PyInstaller asset paths for Linux/Windows onefile
+- Include runtime deps in editor.spec onefile bundle for Windows/Linux
+- Run unit tests only in coverage-badge job
+- Exclude tests, docs, and scripts from CodeCov calculation
+- Specify coverage.xml path in codecov action
+- Exclude visual_filter_builder.py from CodeCov to align with local coverage
+- Update workflow for single-file executables and improve stability
+
+### Refactor
+
+- Merge pre-commit check scripts into single scripts/pre-commit-checks.sh
+- Reduce cognitive complexity in 5 functions for SonarQube
+
 ## v1.10.0 (2026-05-21)
 
 ### Feat
