@@ -199,6 +199,14 @@
       color: #888;
       font-family: sans-serif;
     }
+    #version {
+      position: fixed;
+      bottom: 8px;
+      left: 12px;
+      font-size: 11px;
+      color: #bbb;
+      font-family: sans-serif;
+    }
   </style>
 </head>
 <body>
@@ -361,6 +369,7 @@
   </div>
 
   <div id="status">Ready</div>
+  <div id="version"></div>
 
   <script src="qwebchannel.js"></script>
   <script src="quill.js"></script>
@@ -658,6 +667,11 @@
       // ----------------------------------------------------------------
       // Global functions called from Python via runJavaScript
       // ----------------------------------------------------------------
+
+      // Display version string in the status bar
+      window.setVersion = function(v) {
+        document.getElementById('version').textContent = v ? 'v' + v : '';
+      };
 
       // Load content into the editor
       window.setContent = function(html) {
