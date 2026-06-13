@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -3259,6 +3260,17 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self._load_finished_connected = True
         view.load(editor_url)
 
+    @staticmethod
+    def _read_version() -> str:
+        """Read version from pyproject.toml at project root."""
+        pyproject = Path(__file__).parent.parent / "pyproject.toml"
+        try:
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+            return str(data.get("project", {}).get("version", ""))
+        except Exception:
+            return ""
+
     def _inject_initial_content(self, html: str) -> None:
         """Push HTML into the Quill editor via runJavaScript."""
         # json.dumps produces a valid JS string literal (handles all escaping)
@@ -3268,6 +3280,8 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         page = self._view.page()
         if page:
             page.runJavaScript(f"setContent({safe_js_string})")
+            version = self._read_version()
+            page.runJavaScript(f"setVersion({json.dumps(version)})")
         # Re-apply user CSS after each page load (page reload clears injected styles)
         if self._css_path:
             try:
