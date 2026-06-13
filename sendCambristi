@@ -1,15 +1,22 @@
 #!/bin/sh
 
-FILE="data/20260420"
-SUBJECT="Rappel I CAMBRISTI - avril 2026"
+FILE='/Users/xavier/Documents/I Cambristi/mailing/20260611'
+SUBJECT="I CAMBRISTI - avril 2026"
 
-rm sendMail.log
-python src/sendMail.py --md2html "$FILE.md"
-scp -P 5210 "$FILE.html" contabo:/var/www/html/news/
+# rm sendMail.log
+# python src/sendMail.py --md2html "$FILE.md"
+TMPFILE=$(mktemp /tmp/cambristi_XXXXXX.html)
+sed '/<style/,/<\/style>/{
+  /<\/style>/d
+  /<style/!d
+  s/.*<style.*/<link rel="stylesheet" href=".\/css\/styles.css">/
+}' "$FILE.html" > "$TMPFILE"
+scp -P 5210 "$TMPFILE" contabo:/var/www/html/news/$(basename "$FILE").html
+rm "$TMPFILE"
 
-rm sendMail.log
-python src/sendMail.py -v  \
---profile cambristi \
--s "$SUBJECT" \
--cfg config.yml \
-"$FILE.md"
+#rm sendMail.log
+#python src/sendMail.py -v  \
+#--profile cambristi \
+#-s "$SUBJECT" \
+#-cfg config.yml \
+#"$FILE.md"
