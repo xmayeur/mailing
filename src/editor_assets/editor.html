@@ -484,6 +484,10 @@
         placeholder: 'Start writing your newsletter...'
       });
 
+      // Register header handler after init — init-time handlers option is
+      // ignored for built-in formats in Quill v2's toolbar module.
+      quill.getModule('toolbar').addHandler('header', handleHeaderFormat);
+
       // Ensure clipboard imports preserve images even when they are nested in tables.
       // Quill's default HTML import is more reliable than assigning root.innerHTML directly
       // because it builds the editor model and keeps embed nodes alive through normalization.
@@ -601,6 +605,30 @@
           _syncEditorHtml();
           document.getElementById('status').textContent = 'Modified';
         }, 500);
+      });
+
+      // Track whether cursor is inside a table cell. Updated on every
+      // selection-change while the editor has focus. When selection-change
+      // fires with range===null the editor just lost focus (e.g. toolbar click)
+      // — preserve the last known state so handleHeaderFormat can use it.
+      quill.on('selection-change', function(range) {
+        if (range === null) return; // focus lost — keep _lastCellState
+        _lastCellState = null;
+        try {
+          const leaf = quill.getLeaf(range.index);
+          if (!leaf || !leaf[0]) return;
+          let blot = leaf[0];
+          while (blot && blot !== quill.scroll) {
+            const tag = blot.domNode && blot.domNode.tagName;
+            if (tag === 'TD' || tag === 'TH') {
+              const idx = quill.getIndex(blot);
+              const len = Math.max(0, blot.length() - 1);
+              _lastCellState = { index: idx, length: len };
+              return;
+            }
+            blot = blot.parent;
+          }
+        } catch(e) {}
       });
 
       // ----------------------------------------------------------------
@@ -829,6 +857,57 @@
           _hideImgToolbar();
         }
       });
+
+      // ----------------------------------------------------------------
+      // Header format handler — applies heading style inside table cells
+      // without splitting the table (Quill v2 block formats break tables).
+      // Outside cells: delegates to Quill's built-in header format.
+      // Inside cells: maps heading level to inline size+bold styles.
+      // ----------------------------------------------------------------
+      const _HEADER_STYLES = {
+        '1': { size: '32px', bold: true },
+        '2': { size: '24px', bold: true },
+        '3': { size: '24px', bold: true },
+        '4': { size: '18px', bold: true },
+        '5': { size: '16px', bold: true },
+        '6': { size: '14px', bold: true },
+      };
+
+      // Track last known cell position. Saved while editor has focus so the
+      // header handler can use it after the toolbar click steals focus.
+      let _lastCellState = null; // { index, length } or null
+
+      function handleHeaderFormat(value) {
+        if (!_lastCellState) {
+          quill.format('header', value || false);
+          return;
+        }
+        // Inside a table cell: apply heading as inline size+bold rather than
+        // block-level format (block format would split the table in Quill v2).
+        const { index: startIndex, length: cellLength } = _lastCellState;
+        if (value && _HEADER_STYLES[value]) {
+          const s = _HEADER_STYLES[value];
+          if (cellLength > 0) {
+            quill.formatText(startIndex, cellLength,
+              { size: s.size, bold: s.bold }, Quill.sources.USER);
+          } else {
+            quill.format('size', s.size, Quill.sources.USER);
+            quill.format('bold', s.bold, Quill.sources.USER);
+          }
+        } else {
+          if (cellLength > 0) {
+            quill.formatText(startIndex, cellLength,
+              { size: false, bold: false }, Quill.sources.USER);
+          } else {
+            quill.format('size', false, Quill.sources.USER);
+            quill.format('bold', false, Quill.sources.USER);
+          }
+        }
+        // Update the dropdown to reflect the applied heading level.
+        // Setting .value programmatically does not fire the change event.
+        const headerSelect = document.querySelector('select.ql-header');
+        if (headerSelect) headerSelect.value = value || '';
+      }
 
       // ----------------------------------------------------------------
       // Image insertion handler (custom — bypasses browser file picker)
