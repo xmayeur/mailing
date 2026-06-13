@@ -488,6 +488,30 @@
       // ignored for built-in formats in Quill v2's toolbar module.
       quill.getModule('toolbar').addHandler('header', handleHeaderFormat);
 
+      // Shift+Enter in table cell: intercept at document capture phase (before table module),
+      // detect cell via window.getSelection().anchorNode (e.target is always quill.root),
+      // then use execCommand('insertLineBreak') — Quill API calls trigger table module side effects.
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.shiftKey && quill.root.contains(e.target)) {
+          const nativeSel = window.getSelection();
+          if (!nativeSel || !nativeSel.anchorNode) return;
+          let node = nativeSel.anchorNode;
+          if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+          let inCell = false;
+          while (node && node !== quill.root) {
+            if (node.tagName === 'TD' || node.tagName === 'TH') { inCell = true; break; }
+            node = node.parentElement;
+          }
+          if (inCell) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            // Native execCommand bypasses all Quill/table-module logic entirely.
+            // Quill's MutationObserver picks up the resulting <br> automatically.
+            document.execCommand('insertLineBreak');
+          }
+        }
+      }, true);
+
       // Ensure clipboard imports preserve images even when they are nested in tables.
       // Quill's default HTML import is more reliable than assigning root.innerHTML directly
       // because it builds the editor model and keeps embed nodes alive through normalization.
