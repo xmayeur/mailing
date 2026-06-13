@@ -72,6 +72,7 @@ PYEOF
 
 scp -P 5210 "$TMPHTML" contabo:/var/www/html/news/${BASENAME}.html
 scp -P 5210 "$TMPCSS"  contabo:/var/www/html/css/${BASENAME}.css
+ssh -p 5210 contabo "chmod 644 /var/www/html/news/${BASENAME}.html /var/www/html/css/${BASENAME}.css"
 
 rm "$TMPHTML" "$TMPCSS"
 
