@@ -5,14 +5,75 @@ SUBJECT="I CAMBRISTI - avril 2026"
 
 # rm sendMail.log
 # python src/sendMail.py --md2html "$FILE.md"
-TMPFILE=$(mktemp /tmp/cambristi_XXXXXX.html)
-sed '/<style/,/<\/style>/{
-  /<\/style>/d
-  /<style/!d
-  s/.*<style.*/<link rel="stylesheet" href=".\/css\/styles.css">/
-}' "$FILE.html" > "$TMPFILE"
-scp -P 5210 "$TMPFILE" contabo:/var/www/html/news/$(basename "$FILE").html
-rm "$TMPFILE"
+
+TMPHTML=$(mktemp /tmp/cambristi_XXXXXX.html)
+TMPCSS=$(mktemp /tmp/cambristi_XXXXXX.css)
+
+# Strip inline style="" attrs and <style> blocks (both blocked by CSP).
+# Inline styles become generated classes; all CSS goes to an external file
+# served from /css/styles.css (satisfies 'self' in default-src).
+BASENAME=$(basename "$FILE")
+python3 - "$FILE.html" "$TMPHTML" "$TMPCSS" "$BASENAME" <<'PYEOF'
+import sys, hashlib
+from bs4 import BeautifulSoup
+
+src, dst_html, dst_css = sys.argv[1], sys.argv[2], sys.argv[3]
+
+with open(src, encoding='utf-8') as f:
+    html = f.read()
+
+soup = BeautifulSoup(html, 'html.parser')
+css_parts = []
+
+# 1. Collect and remove <style> blocks
+for style_tag in soup.find_all('style'):
+    text = style_tag.get_text().strip()
+    if text:
+        css_parts.append(text)
+    style_tag.decompose()
+
+# 2. Convert inline style="" attributes to generated classes
+seen = {}  # style_value -> class_name
+for tag in soup.find_all(style=True):
+    style_val = tag.get('style', '').strip().rstrip(';')
+    if not style_val:
+        del tag['style']
+        continue
+    if style_val not in seen:
+        cls = 'is-' + hashlib.md5(style_val.encode()).hexdigest()[:8]
+        seen[style_val] = cls
+        props = [p.strip() for p in style_val.split(';') if p.strip()]
+        rule_body = '; '.join(p + ' !important' for p in props)
+        css_parts.append(f'.{cls} {{ {rule_body}; }}')
+    cls = seen[style_val]
+    existing = tag.get('class', [])
+    if isinstance(existing, str):
+        existing = existing.split()
+    tag['class'] = existing + [cls]
+    del tag['style']
+
+# 3. Insert <link rel="stylesheet"> pointing to per-file CSS
+basename = sys.argv[4]
+link_tag = soup.new_tag('link', rel='stylesheet', href=f'/css/{basename}.css')
+head = soup.find('head')
+if head:
+    head.insert(0, link_tag)
+else:
+    soup.insert(0, link_tag)
+
+with open(dst_html, 'w', encoding='utf-8') as f:
+    f.write(str(soup))
+
+with open(dst_css, 'w', encoding='utf-8') as f:
+    f.write('\n'.join(css_parts) + '\n')
+
+print(f"Extracted {len(css_parts)} CSS rules ({len(seen)} from inline styles)")
+PYEOF
+
+scp -P 5210 "$TMPHTML" contabo:/var/www/html/news/${BASENAME}.html
+scp -P 5210 "$TMPCSS"  contabo:/var/www/html/css/${BASENAME}.css
+
+rm "$TMPHTML" "$TMPCSS"
 
 #rm sendMail.log
 #python src/sendMail.py -v  \
