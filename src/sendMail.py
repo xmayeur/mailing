@@ -41,7 +41,9 @@ import sys
 import tempfile
 import urllib.parse
 from collections.abc import Callable
+from email import encoders as email_encoders
 from email.mime.application import MIMEApplication
+from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -881,17 +883,27 @@ def _process_html_attachment(
 
 
 def _process_binary_attachment(att: str, msg: MIMEMultipart) -> None:
-    """Attach a PDF or TXT file directly to *msg*."""
+    """Attach any file to *msg*; uses MIME subtype derived from extension."""
     with open(att, "rb") as f:
         content = f.read()
     if att.endswith("pdf"):
-        part = MIMEApplication(content, _subtype="pdf")
+        part: MIMEBase = MIMEApplication(content, _subtype="pdf")
         part.add_header(
             "Content-Disposition", "attachment", filename=os.path.basename(att)
         )
-        msg.attach(part)
     elif att.endswith("txt"):
-        msg.attach(MIMEText(content.decode()))
+        part = MIMEText(content.decode())
+        part.add_header(
+            "Content-Disposition", "attachment", filename=os.path.basename(att)
+        )
+    else:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(content)
+        email_encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition", "attachment", filename=os.path.basename(att)
+        )
+    msg.attach(part)
 
 
 def _attach_body(
@@ -1264,11 +1276,70 @@ def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
     return True
 
 
+_NUMERIC_STRIP = str.maketrans("", "", "$€£¥₹₩₽¢₪₫฿₴₦ \xa0 \t")
+
+# Magnitude-only operators: if field is not numeric, exclude the row (no string fallback)
+_MAGNITUDE_OPS = frozenset(
+    [
+        "gt",
+        "greater than",
+        _OP_GREATER_THAN,
+        "lt",
+        "less than",
+        _OP_LESS_THAN,
+        "ge",
+        "greater or equal to",
+        _OP_GREATER_THAN_OR_EQUAL,
+        "le",
+        "less or equal to",
+        _OP_LESS_THAN_OR_EQUAL,
+    ]
+)
+
+# Equality operators: try numeric first, fall back to string when field is not numeric
+_EQUALITY_OPS = frozenset(["eq", "ne", _OP_IS_EQUAL_TO, _OP_IS_NOT_EQUAL_TO])
+
+# All operators that should use numeric path when field parses as number
+_NUMERIC_OPS = _MAGNITUDE_OPS | _EQUALITY_OPS
+
+# Operators that test presence -- always string, never numeric
+_PRESENCE_OPS = frozenset(["is empty", _OP_IS_NOT_EMPTY])
+
+
+def _parse_numeric(s: str) -> float:
+    """Parse numeric value, stripping currency symbols and normalising separators.
+
+    Handles European (1.500,00) and American (1,500.00) thousands separators
+    by detecting which separator comes last (= decimal separator).
+    """
+    cleaned = s.translate(_NUMERIC_STRIP)
+    if cleaned.startswith("(") and cleaned.endswith(")"):
+        cleaned = "-" + cleaned[1:-1]
+    has_dot = "." in cleaned
+    has_comma = "," in cleaned
+    if has_dot and has_comma:
+        if cleaned.rindex(",") > cleaned.rindex("."):
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    elif has_comma:
+        cleaned = cleaned.replace(",", ".")
+    return float(cleaned)
+
+
 def _evaluate_condition(field_value: str, op: str, test_value: Any, _k: str) -> bool:
     """Return True when *field_value* satisfies *op* against *test_value*."""
+    if op in _PRESENCE_OPS:
+        return _eval_string(field_value, test_value, op)
     try:
-        return _eval_numeric(float(field_value), test_value, op, _k)
-    except ValueError:
+        fv = _parse_numeric(str(field_value))
+        if op in _NUMERIC_OPS:
+            return _eval_numeric(fv, test_value, op, _k)
+        return _eval_string(field_value, test_value, op)
+    except (ValueError, AttributeError):
+        if op in _MAGNITUDE_OPS:
+            # Non-parseable field cannot satisfy magnitude comparison
+            return False
         return _eval_string(field_value, test_value, op)
 
 

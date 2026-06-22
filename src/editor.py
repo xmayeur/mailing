@@ -630,7 +630,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         attachment_layout.addWidget(attachment_label)
         self.attachment_list = QListWidget(self)
         self.attachment_list.setMinimumHeight(80)
-        self.attachment_list.setMaximumHeight(120)
+        self.attachment_list.setMaximumHeight(200)
         self.attachment_list.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu
         )
@@ -1100,7 +1100,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         """Update test checkbox lock state based on _test_sent (T020)."""
         if not self._test_sent:
             self.test_check.setChecked(True)
-            self.test_check.setEnabled(False)
+            self.test_check.setEnabled(True)  # XMA
         else:
             self.test_check.setEnabled(True)
 
@@ -1474,6 +1474,23 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             self.records_table.setHorizontalHeaderLabels(headers)
             self.records_table.setRowCount(0)
             return
+
+        # Refresh filter builder schema with inferred field types from actual data.
+        # _syncing guard prevents refresh_schema from emitting filter_changed and
+        # corrupting _session_filter mid-execution.
+        if self._filter_builder:
+            try:
+                new_schema = DatabaseSchemaInfo.with_inferred_types(headers, rows)
+                if new_schema.field_types != self._schema_info.field_types:
+                    self._schema_info = new_schema
+                    self._filter_builder.schema_info = new_schema
+                    self._filter_builder._syncing = True
+                    try:
+                        self._filter_builder._table_widget.refresh_schema(new_schema)
+                    finally:
+                        self._filter_builder._syncing = False
+            except Exception as e:
+                log.debug("Could not infer field types: %s", e)
 
         # T028: Apply filter using FilterMatcher
         try:
