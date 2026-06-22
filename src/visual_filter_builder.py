@@ -378,6 +378,47 @@ class DatabaseSchemaInfo:
         """
         return self.field_types.get(field_name, "text")
 
+    @classmethod
+    def with_inferred_types(
+        cls, field_names: list[str], rows: list[list[str]], sample_size: int = 20
+    ) -> "DatabaseSchemaInfo":
+        """Create DatabaseSchemaInfo with field types inferred from sample data.
+
+        Scans up to sample_size rows per column; marks field "numeric" if every
+        non-empty value parses as float, otherwise "text".
+
+        Args:
+            field_names: Column names
+            rows: Data rows (list of lists, parallel to field_names)
+            sample_size: Max rows to inspect per column
+        """
+        currency_strip = str.maketrans("", "", "$€£¥₹₩₽¢₪₫฿₴₦   \t")
+
+        def _to_float(s: str) -> float:
+            cleaned = s.translate(currency_strip).replace(",", ".")
+            if cleaned.startswith("(") and cleaned.endswith(")"):
+                cleaned = "-" + cleaned[1:-1]
+            return float(cleaned)
+
+        field_types: dict[str, str] = {}
+        for col_idx, name in enumerate(field_names):
+            samples = []
+            for row in rows[:sample_size]:
+                if col_idx < len(row):
+                    val = str(row[col_idx]).strip()
+                    if val:
+                        samples.append(val)
+            if samples:
+                try:
+                    for s in samples:
+                        _to_float(s)
+                    field_types[name] = "numeric"
+                except ValueError:
+                    field_types[name] = "text"
+            else:
+                field_types[name] = "text"
+        return cls(field_names, field_types)
+
     def get_operators_for_field(self, field_name: str) -> list[str]:
         """Get applicable operators for field based on its type.
 
