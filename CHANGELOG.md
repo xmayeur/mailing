@@ -1,3 +1,32 @@
+## v1.13.1 (2026-06-22)
+
+### Fix
+
+- **filter**: numeric field filtering and currency value parsing
+- **readme**: use new-style workflow badge URL
+
+## v1.13.0 (2026-06-13)
+
+### Feat
+
+- **editor**: display version number in status bar
+- **editor**: Shift+Enter inserts soft line break inside table cells
+
+### Fix
+
+- **sendCambristi**: chmod 644 uploaded files so nginx can read them
+
+## v1.12.0 (2026-06-13)
+
+### Feat
+
+- **editor**: apply heading styles inside table cells without splitting
+
+### Fix
+
+- **sendCambristi**: per-file CSS to avoid CSP and stylesheet collision
+- **sendCambristi**: strip inline style block before scp, replace with css link
+
 ## v1.11.0 (2026-06-04)
 
 ### Feat
