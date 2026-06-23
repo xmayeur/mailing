@@ -1,3 +1,9 @@
+## v1.13.2 (2026-06-23)
+
+### Fix
+
+- **editor**: replace hardcoded /tmp paths with cross-platform tempfile.gettempdir()
+
 ## v1.13.1 (2026-06-22)
 
 ### Fix
