@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -4489,7 +4490,8 @@ def main() -> None:
 if __name__ == "__main__":
     # Write startup log for debugging frozen app issues
     if _IS_FROZEN:
-        with open("/tmp/sendMailEditor_startup.log", "w") as f:  # NOSONAR
+        _startup_log = Path(tempfile.gettempdir()) / "sendMailEditor_startup.log"
+        with open(_startup_log, "w") as f:
             f.write(f"Frozen: {_IS_FROZEN}\n")
             f.write(f"Platform: {sys.platform}\n")
             f.write(f"_MEIPASS: {getattr(sys, '_MEIPASS', 'N/A')}\n")
@@ -4501,7 +4503,8 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         if _IS_FROZEN:
-            with open("/tmp/sendMailEditor_startup.log", "a") as f:  # NOSONAR
+            _startup_log = Path(tempfile.gettempdir()) / "sendMailEditor_startup.log"
+            with open(_startup_log, "a") as f:
                 import traceback
 
                 f.write(f"ERROR in main: {e}\n")
