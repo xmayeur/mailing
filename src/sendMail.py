@@ -39,6 +39,7 @@ import shutil
 import ssl
 import sys
 import tempfile
+import threading
 import urllib.parse
 from collections.abc import Callable
 from email import encoders as email_encoders
@@ -1015,6 +1016,12 @@ def _skip_to_index(reader: Any, from_index: int) -> int:
     return idx
 
 
+def _get_cancel_event(param: Any) -> threading.Event | None:
+    """Return param.cancel_event if it is a real threading.Event, else None."""
+    cancel_event = getattr(param, "cancel_event", None)
+    return cancel_event if isinstance(cancel_event, threading.Event) else None
+
+
 def _flush_batch(
     param: Any,
     addressees: list[Any],
@@ -1026,10 +1033,17 @@ def _flush_batch(
 ) -> None:
     """Dispatch the current addressee batch and enforce rate limiting."""
     _build_and_send(param, addressees, row, header)
-    sleep(pause)
-    if recipient_count % max_mail_per_hour == 0:
-        log.info("Limite horaire atteinte. Pause d'une heure...")
-        sleep(3600)
+    cancel_event = _get_cancel_event(param)
+    if cancel_event is not None:
+        cancel_event.wait(pause)
+        if recipient_count % max_mail_per_hour == 0 and not cancel_event.is_set():
+            log.info("Limite horaire atteinte. Pause d'une heure...")
+            cancel_event.wait(3600)
+    else:
+        sleep(pause)
+        if recipient_count % max_mail_per_hour == 0:
+            log.info("Limite horaire atteinte. Pause d'une heure...")
+            sleep(3600)
 
 
 def generate_mailing(param: Any) -> str:
@@ -1075,8 +1089,13 @@ def generate_mailing(param: Any) -> str:
         addressees, recipient_count, mail_batch_count = [], 0, 0
         start_time = time()
         row = None
+        cancel_event = _get_cancel_event(param)
+        cancelled = False
 
         for row in reader:
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = True
+                break
             current_row_idx += 1
             if param.to_index and current_row_idx > int(param.to_index):
                 break
@@ -1097,6 +1116,15 @@ def generate_mailing(param: Any) -> str:
                     max_mail_per_hour,
                 )
                 addressees, mail_batch_count = [], mail_batch_count + 1
+                if cancel_event is not None and cancel_event.is_set():
+                    cancelled = True
+                    break
+
+        if cancelled:
+            log.warning(
+                f"Envoi annulé par l'utilisateur. {recipient_count} adresses traitées en {mail_batch_count} envois."
+            )
+            return "CANCELLED"
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
@@ -1546,7 +1574,14 @@ def process_profile(args: Any) -> str:
     if hasattr(args, "session_filter") and isinstance(args.session_filter, dict):
         param.filter = args.session_filter
 
-    if generate_mailing(param) == "OK":
+    cancel_event = _get_cancel_event(args)
+    if cancel_event is not None:
+        param.cancel_event = cancel_event
+
+    mailing_result = generate_mailing(param)
+    if mailing_result == "CANCELLED":
+        return "CANCELLED"
+    if mailing_result == "OK":
         if param.test:
             log.info("Test mode: mailing sent successfully.")
             return "OK_TEST"
