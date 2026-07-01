@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import tempfile
+import threading
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -307,6 +308,7 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     """
 
     log_line_received: Signal = Signal(str)
+    cancel_requested: Signal = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -322,15 +324,37 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.log_view.setReadOnly(True)
         layout.addWidget(self.log_view, 1)
 
+        self._cancel_button = QPushButton("Cancel Sending", self)
+        self._cancel_button.clicked.connect(self._on_cancel_clicked)
         self._close_button = QPushButton("Close", self)
         self._close_button.setEnabled(False)
         self._close_button.clicked.connect(self.accept)
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
+        btn_layout.addWidget(self._cancel_button)
         btn_layout.addWidget(self._close_button)
         layout.addLayout(btn_layout)
 
         self.log_line_received.connect(self.append_log)
+
+    def _on_cancel_clicked(self) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Cancel Sending",
+            "Are you sure you want to stop sending this mailing?\n\n"
+            "Emails already sent will not be un-sent; remaining recipients will be skipped.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._cancel_button.setEnabled(False)
+        self._cancel_button.setText("Cancelling...")
+        self.append_log("--- Cancel requested by user; stopping after current batch ---")
+        self.cancel_requested.emit()
+
+    def set_cancelled(self) -> None:
+        """Reflect that the send loop honoured the cancel request."""
+        self._cancel_button.setEnabled(False)
 
     def append_log(self, text: str) -> None:
         """Append a log line; scroll to bottom."""
@@ -339,9 +363,15 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.log_view.setTextCursor(cursor)
         self.log_view.insertPlainText(text + "\n")
 
-    def set_complete(self, success: bool, is_test: bool) -> None:
+    def set_complete(self, success: bool, is_test: bool, cancelled: bool = False) -> None:
         """Called after send finishes. Shows confirmation prompt, enables Close."""
         self._send_complete = True
+        self._cancel_button.setEnabled(False)
+        if cancelled:
+            QMessageBox.information(self, "Send Cancelled", "Sending was stopped. See log above for details.")
+            self._test_confirmed = False
+            self._close_button.setEnabled(True)
+            return
         if is_test:
             title = "Test Email Sent" if success else "Test Send Failed"
             msg = (
@@ -536,7 +566,6 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Send Mailing")
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.setMinimumWidth(1150)
 
         self._config_data: dict[str, dict[str, str | int]] = config_data or {}
@@ -547,6 +576,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self._original_filter_text = ""
         self._test_sent: bool = False
         self.attachments: list[str] = []
+        self.cancel_event: threading.Event | None = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -1596,6 +1626,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         namespace.max_addr_per_mail = self.max_addr_input.value()
         namespace.pause = self.pause_input.value()
         namespace.session_filter = self._session_filter  # T036: Pass session-active filter if set
+        namespace.cancel_event = getattr(self, "cancel_event", None)
         return namespace
 
 
@@ -3962,11 +3993,14 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         """Handle send worker completion: show confirmation in log dialog, manage test lock."""
         self._send_in_progress = False
         dialog.spinner_label.hide()
+        cancelled = result.strip().upper() == "CANCELLED"
         is_test = result.strip().upper() == "OK_TEST"
         success = self._send_result_is_success(result)
-        if not success:
+        if cancelled:
+            log.info("Send cancelled by user.")
+        elif not success:
             log.warning("sendMail returned non-success status: %r", result)
-        log_dialog.set_complete(success=success, is_test=is_test)
+        log_dialog.set_complete(success=success, is_test=is_test, cancelled=cancelled)
         if is_test and getattr(log_dialog, "_test_confirmed", False):
             dialog._unlock_test_mode()
             dialog.test_check.blockSignals(True)
@@ -3981,8 +4015,10 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         dialog.send_button.setEnabled(False)
         dialog.spinner_label.show()
         self._send_in_progress = True
+        dialog.cancel_event = threading.Event()
 
         log_dialog = _SessionLogDialog(self)
+        log_dialog.cancel_requested.connect(dialog.cancel_event.set)
         worker = _SendWorker(dialog, self._send_with_sendmail)
         worker.log_line.connect(log_dialog.log_line_received)
         worker.send_result.connect(lambda result: self._on_send_finished(result, dialog, log_dialog))

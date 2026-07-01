@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 from src.editor import _SendDialog
 

@@ -33,9 +33,16 @@ _qt_mocks = [
     "PySide6.QtWebEngineWidgets",
     "PySide6.QtWebChannel",
 ]
+
+# Force-replace these modules even if a prior test module already imported the real
+# PySide6 (e.g. a GUI integration test collected earlier). Editor's classes must be built
+# on the fakes below, never on real Shiboken-backed Qt classes -- passing a plain Python
+# stub (see `object.__new__(editor._ConfigDialog)` below) to a *real* QMessageBox call
+# is undefined behaviour and has crashed the interpreter (SIGABRT in Shiboken's
+# wrong-arguments path) rather than raising a catchable Python exception.
+_saved_qt_modules = {_mod: sys.modules.get(_mod) for _mod in _qt_mocks}
 for _mod in _qt_mocks:
-    if _mod not in sys.modules:
-        sys.modules[_mod] = MagicMock()
+    sys.modules[_mod] = MagicMock()
 
 # Mock visual_filter_builder (imported conditionally by editor.py)
 _filter_builder_mock = MagicMock()
@@ -180,6 +187,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 import editor  # noqa: E402  (must come after sys.modules patching)
 from editor import EditorBridge  # noqa: E402
+
+# Restore whatever was in sys.modules before this file's fakes, so test modules that
+# import the real PySide6 after this one (or reuse `src.editor`) get the real thing back.
+for _mod, _orig in _saved_qt_modules.items():
+    if _orig is not None:
+        sys.modules[_mod] = _orig
+    else:
+        sys.modules.pop(_mod, None)
 
 # ---------------------------------------------------------------------------
 # Helpers
