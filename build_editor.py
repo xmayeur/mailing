@@ -50,7 +50,9 @@ def build() -> None:
         "--enable-plugin=pyside6",  # handles QtWebEngineProcess + qt.conf
         "--nofollow-import-to=pytest,_pytest",
         # ── Qt WebEngine resources (auto-handled by plugin, but be explicit) ─
-        "--include-qt-plugins=platforms,styles,imageformats,tls",
+        # "styles"/"platformthemes" exist on only one of macOS/Linux each (not both), so
+        # keep this to families present on every build platform (ubuntu/macos/windows).
+        "--include-qt-plugins=platforms,imageformats,tls",
         # ── Data directories ──────────────────────────────────────────────
         f"--include-data-dir={SRC / 'editor_assets'}=editor_assets",
         f"--include-data-dir={ROOT / 'css'}=css",
