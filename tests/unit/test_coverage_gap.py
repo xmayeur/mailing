@@ -5,9 +5,7 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 import pytest
 
 # Add source directory to path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 # Mock external dependencies before importing sendMail
 mock_get_secret = MagicMock(return_value={"key": "value"})
@@ -47,9 +45,7 @@ class TestCoverageGap:
         new_callable=mock_open,
         read_data='<html><img src="http://example.com/img.png"><img src="data:image/png;base64,abc"></html>',
     )
-    def test_prepare_html_for_cid_external_and_data(
-        self, mock_file, mock_bs, mock_exists
-    ):
+    def test_prepare_html_for_cid_external_and_data(self, mock_file, mock_bs, mock_exists):
         """Cover line 198: continue on http or data: images"""
         soup = MagicMock()
         img1 = MagicMock()
@@ -104,9 +100,7 @@ class TestCoverageGap:
     @patch("sendMail.Request")
     @patch("sendMail.build")
     @patch("builtins.open", new_callable=mock_open)
-    def test_get_gmail_service_refresh(
-        self, mock_file, mock_build, mock_request, mock_creds, mock_exists
-    ):
+    def test_get_gmail_service_refresh(self, mock_file, mock_build, mock_request, mock_creds, mock_exists):
         """Cover line 299: creds.refresh(Request()) and token write"""
         param = Mock()
         param.token_file = "token.json"
@@ -149,9 +143,7 @@ class TestCoverageGap:
         new_callable=mock_open,
         read_data='<html><img src="foo.png"></html>',
     )
-    def test_prepare_html_and_get_images_skip_empty_or_external(
-        self, mock_file, mock_temp, mock_bs
-    ):
+    def test_prepare_html_and_get_images_skip_empty_or_external(self, mock_file, mock_temp, mock_bs):
         """Cover lines 366-367: skip empty or external images in prepare_html_and_get_images"""
         soup = MagicMock()
         img1 = MagicMock()
@@ -203,9 +195,7 @@ class TestCoverageGap:
         mock_img_open.side_effect = open_side_effect
 
         with patch("sendMail.log") as mock_log:
-            _html, images, _tdir = sendMail.prepare_html_and_get_images(
-                "test.html", max_width=800
-            )
+            _html, images, _tdir = sendMail.prepare_html_and_get_images("test.html", max_width=800)
             assert len(images) == 1
             mock_im1.resize.assert_called()
             mock_log.exception.assert_called_once()
@@ -266,9 +256,7 @@ class TestCoverageGap:
     @patch("sendMail.sleep")
     @patch("sendMail.send_mail")
     @patch("sendMail.build_email")
-    def test_generate_mailing_indexing_and_pause(
-        self, mock_build, mock_send, mock_sleep, mock_reader_func
-    ):
+    def test_generate_mailing_indexing_and_pause(self, mock_build, mock_send, mock_sleep, mock_reader_func):
         """Cover lines 625-628 (from_index), 638 (to_index), 679-680 (hourly limit)"""
         param = Mock()
         param.max_addr_per_mail = 1
@@ -331,9 +319,7 @@ class TestCoverageGap:
             "email": "is not empty",
             "emailBounced": "if False",
         }
-        res = sendMail.filter(
-            filter_rules, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2}
-        )
+        res = sendMail.filter(filter_rules, ["x", "Doe", "John"], {"title": 50, "nom": 1, "prenom": 2})
         assert res is True
 
         # Normal mode with missing title index
@@ -348,9 +334,7 @@ class TestCoverageGap:
             pass
 
         # Patch sendMail.errors to have our custom HttpError
-        with patch.object(
-            sendMail, "errors", new=type("E", (), {"HttpError": MyHttpError})
-        ):
+        with patch.object(sendMail, "errors", new=type("E", (), {"HttpError": MyHttpError})):
             service.users().messages().send().execute.side_effect = MyHttpError("boom")
 
             class Msg:
@@ -402,9 +386,7 @@ class TestCoverageGap2:
 
     def test_get_google_sheets_schema_exception(self):
         """Cover lines 226-236: exception in get_google_sheets_schema."""
-        with patch(
-            "sendMail.open_google_db_members_sheet", side_effect=Exception("API error")
-        ):
+        with patch("sendMail.open_google_db_members_sheet", side_effect=Exception("API error")):
             result = sendMail.get_google_sheets_schema("sa", "sheet_id")
         assert result == []
 
@@ -450,9 +432,7 @@ class TestCoverageGap2:
         msg_related = MIMEMultipart("related")
 
         all_inline_images = [{"path": str(img_file), "cid": "img001"}]
-        sendMail._attach_body(
-            msg, msg_related, "<html><body>test</body></html>", all_inline_images
-        )
+        sendMail._attach_body(msg, msg_related, "<html><body>test</body></html>", all_inline_images)
 
         # related part should have been attached to msg
         assert msg.get_payload()
@@ -466,9 +446,7 @@ class TestCoverageGap2:
 
         all_inline_images = [{"path": "/nonexistent/img.png", "cid": "img001"}]
         with patch("sendMail.log") as mock_log:
-            sendMail._attach_body(
-                msg, msg_related, "<html><body>test</body></html>", all_inline_images
-            )
+            sendMail._attach_body(msg, msg_related, "<html><body>test</body></html>", all_inline_images)
         mock_log.exception.assert_called_once()
 
     def test_build_and_send_temp_dir_cleanup_verbose(self, tmp_path):
@@ -561,9 +539,7 @@ class TestCoverageGap2:
         mock_recipients = ["a@b.com"]
 
         with (
-            patch(
-                "sendMail.get_subscriber_reader", return_value=(iter(rows), mock_file)
-            ),
+            patch("sendMail.get_subscriber_reader", return_value=(iter(rows), mock_file)),
             patch("sendMail.build_email", return_value=(mock_msg, mock_recipients)),
             patch("sendMail.send_mail", return_value=True),
         ):
@@ -668,9 +644,7 @@ class TestCoverageGap2:
                 },
             ),
             patch("sendMail.check_mandatory_param", return_value=True),
-            patch(
-                "sendMail.process_attachments", return_value=(["file.html"], None, [])
-            ),
+            patch("sendMail.process_attachments", return_value=(["file.html"], None, [])),
             patch("sendMail._prepare_message_body", side_effect=lambda p, c, f: p),
             patch("sendMail.generate_mailing", side_effect=capture_filter),
             patch("sendMail._post_send_cleanup"),
@@ -698,9 +672,7 @@ class TestCoverageGap2:
                 },
             ),
             patch("sendMail.check_mandatory_param", return_value=True),
-            patch(
-                "sendMail.process_attachments", return_value=(["file.html"], None, [])
-            ),
+            patch("sendMail.process_attachments", return_value=(["file.html"], None, [])),
             patch("sendMail._prepare_message_body", side_effect=lambda p, c, f: p),
             patch("sendMail.generate_mailing", return_value="Error"),
         ):

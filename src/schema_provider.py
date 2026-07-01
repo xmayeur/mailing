@@ -123,9 +123,7 @@ class DatabaseSchemaProvider:
             return []
 
     @staticmethod
-    def detect_and_extract(
-        database_path: str, sheet_name: str | None = None, gsheet_service: Any = None
-    ) -> list[str]:
+    def detect_and_extract(database_path: str, sheet_name: str | None = None, gsheet_service: Any = None) -> list[str]:
         """Detect database type and extract schema.
 
         B009: Support CSV, Excel (XLSX/XLS), and Google Sheets databases.
@@ -157,12 +155,8 @@ class DatabaseSchemaProvider:
             log.warning("Excel database file not found: %s", database_path)
             return []
 
-        if gsheet_service and (
-            "docs.google" in database_path or len(database_path) > 20
-        ):
-            return DatabaseSchemaProvider.from_google_sheets(
-                gsheet_service, database_path, sheet_name
-            )
+        if gsheet_service and ("docs.google" in database_path or len(database_path) > 20):
+            return DatabaseSchemaProvider.from_google_sheets(gsheet_service, database_path, sheet_name)
 
         # B016: Distinguish between file not found and unknown type
         if suffix in (".csv", ".xlsx", ".xls"):

@@ -27,20 +27,20 @@ run_check() {
     echo ""
 }
 
-run_check "pymarkdown lint"  pymarkdownlnt fix ./*.md ./specs/*.md
+run_check "pymarkdown lint"  poetry run pymarkdownlnt fix ./*.md ./specs/*.md
 
-run_check "black"            black --check . --target-version py312 \
+run_check "black"            poetry run black --check . --target-version py312 \
                                --exclude='(venv|env|\.venv|release|\.git)'
 
-run_check "ruff"             ruff check src/ tests/ --fix
+run_check "ruff"             poetry run ruff check src/ tests/ --fix
 
-run_check "vulture"          vulture src/ --min-confidence 80
+run_check "vulture"          poetry run vulture src/ --min-confidence 80
 
-run_check "pyright"          pyright src/
+run_check "pyright"          poetry run pyright src/
 
-run_check "mypy"             mypy --strict src/
+run_check "mypy"             poetry run mypy --strict src/
 
-run_check "pytest"           pytest tests/unit/ -q --tb=short \
+run_check "pytest"           poetry run pytest tests/unit/ -q --tb=short \
                                --cov=src --cov-report=term-missing
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

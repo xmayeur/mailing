@@ -40,9 +40,7 @@ class FilterValidator:
         except yaml.YAMLError:
             return None
 
-    def validate_field_names(
-        self, filter_dict: dict[str, Any], database_schema: list[str]
-    ) -> list[str]:
+    def validate_field_names(self, filter_dict: dict[str, Any], database_schema: list[str]) -> list[str]:
         """Validate filter field names exist in database schema.
 
         Args:
@@ -62,9 +60,7 @@ class FilterValidator:
                 missing.append(field_name)
         return missing
 
-    def get_validation_status(
-        self, filter_text: str, database_schema: list[str]
-    ) -> dict[str, Any]:
+    def get_validation_status(self, filter_text: str, database_schema: list[str]) -> dict[str, Any]:
         """Get complete validation status of filter.
 
         Returns dict with keys:
@@ -81,18 +77,14 @@ class FilterValidator:
         filter_dict = self.parse_yaml_filter(filter_text)
         if filter_dict is None:
             status["is_valid"] = False
-            status["syntax_errors"] = [
-                "Invalid YAML syntax (check colons, quotes, indentation)"
-            ]
+            status["syntax_errors"] = ["Invalid YAML syntax (check colons, quotes, indentation)"]
             return status
 
         # Check for None filter values (incomplete entries like "email:" with no value)
         for field, value in filter_dict.items():
             if value is None:
                 status["is_valid"] = False
-                cast(list[str], status["syntax_errors"]).append(
-                    f"Field '{field}' is missing a filter condition"
-                )
+                cast(list[str], status["syntax_errors"]).append(f"Field '{field}' is missing a filter condition")
 
         if status["syntax_errors"]:
             return status

@@ -18,9 +18,7 @@ class TestProfileVaultLoading:
         config = {"vault_key": "mailconfig: test_profile", "sender": "test@example.com"}
         profile = Profile("test_profile", config)
 
-        with patch(
-            "src.profile_manager.get_secret", return_value=vault_fixture["response"]
-        ):
+        with patch("src.profile_manager.get_secret", return_value=vault_fixture["response"]):
             result = profile.load_smtp_from_vault()
             assert result["smtp_host"] == "smtp.example.com"
             assert result["smtp_port"] == 587
@@ -31,9 +29,7 @@ class TestProfileVaultLoading:
         config = {"vault_key": "mailconfig: test_profile"}
         profile = Profile("test_profile", config)
 
-        with patch(
-            "src.profile_manager.get_secret", return_value=vault_fixture["response"]
-        ) as mock_get:
+        with patch("src.profile_manager.get_secret", return_value=vault_fixture["response"]) as mock_get:
             # First call - fetches from vault
             profile.load_smtp_from_vault()
             assert mock_get.call_count == 1
@@ -77,9 +73,7 @@ class TestProfileVaultLoading:
         profile = Profile("test_profile", config)
 
         # Mock response missing required fields - returns empty dict, falls back to config
-        invalid_response = {
-            "host": "smtp.example.com"
-        }  # Missing smtp_host, smtp_port, username, password
+        invalid_response = {"host": "smtp.example.com"}  # Missing smtp_host, smtp_port, username, password
 
         with patch("src.profile_manager.get_secret", return_value=invalid_response):
             result = profile.load_smtp_from_vault()
@@ -164,14 +158,10 @@ class TestLoggingLevels:
             content = f.read()
             # Count conversions: "DEBUG:" should only appear in log.debug calls
             debug_prefixed_info = content.count('log.info("DEBUG:')
-            assert (
-                debug_prefixed_info == 0
-            ), "Found debug messages at INFO level in sendMail.py"
+            assert debug_prefixed_info == 0, "Found debug messages at INFO level in sendMail.py"
 
         # Verify editor.py doesn't have debug-diagnostic at INFO
         with open(editor_path) as f:
             content = f.read()
             debug_prefixed_info = content.count('log.info("DEBUG:')
-            assert (
-                debug_prefixed_info == 0
-            ), "Found debug messages at INFO level in editor.py"
+            assert debug_prefixed_info == 0, "Found debug messages at INFO level in editor.py"

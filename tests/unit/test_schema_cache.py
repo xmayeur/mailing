@@ -59,9 +59,7 @@ def counting_loader():
 class TestCacheHit:
     """T009a: test_get_returns_cached_schema_on_second_call"""
 
-    def test_get_returns_cached_schema_on_second_call(
-        self, cache: SchemaCacheProvider, counting_loader
-    ) -> None:
+    def test_get_returns_cached_schema_on_second_call(self, cache: SchemaCacheProvider, counting_loader) -> None:
         """Second get() with same profile returns cached result without loader call."""
         # First call: loader called
         result1 = cache.get("profile_a", counting_loader)
@@ -80,9 +78,7 @@ class TestCacheHit:
 class TestCacheMiss:
     """First call (cache miss) invokes loader"""
 
-    def test_get_calls_loader_on_cache_miss(
-        self, cache: SchemaCacheProvider, counting_loader
-    ) -> None:
+    def test_get_calls_loader_on_cache_miss(self, cache: SchemaCacheProvider, counting_loader) -> None:
         """First get() call invokes loader (cache miss)."""
         result = cache.get("profile_a", counting_loader)
         assert result == ["email", "name", "status"]
@@ -115,9 +111,7 @@ class TestMultipleProfiles:
 class TestInvalidation:
     """T010a, T010b: invalidate() clears cache"""
 
-    def test_invalidate_clears_cache(
-        self, cache: SchemaCacheProvider, counting_loader
-    ) -> None:
+    def test_invalidate_clears_cache(self, cache: SchemaCacheProvider, counting_loader) -> None:
         """invalidate(profile_name) clears cache for that profile."""
         # Load and cache
         result1 = cache.get("profile_a", counting_loader)
@@ -218,9 +212,7 @@ def stateful_loader():
 class TestRefresh:
     """T017a, T017b: refresh() reloads and updates cache"""
 
-    def test_refresh_reloads_schema(
-        self, cache: SchemaCacheProvider, stateful_loader
-    ) -> None:
+    def test_refresh_reloads_schema(self, cache: SchemaCacheProvider, stateful_loader) -> None:
         """refresh() always calls loader (bypasses cache)."""
         # Initial load
         result1 = cache.get("profile_a", stateful_loader)
@@ -237,9 +229,7 @@ class TestRefresh:
         result2 = cache.refresh("profile_a", stateful_loader)
         assert result2 == ["email", "name", "status", "created_at"]  # New schema
 
-    def test_refresh_updates_cache_with_new_schema(
-        self, cache: SchemaCacheProvider, stateful_loader
-    ) -> None:
+    def test_refresh_updates_cache_with_new_schema(self, cache: SchemaCacheProvider, stateful_loader) -> None:
         """After refresh(), subsequent get() returns refreshed schema."""
         # Load and cache
         cache.get("profile_a", stateful_loader)

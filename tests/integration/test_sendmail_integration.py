@@ -43,9 +43,7 @@ class TestSendMailFullWorkflow:
     def test_csv_subscriber_batch_processing(self, tmp_path: Any) -> None:
         """Process batch of subscribers from CSV file."""
         csv_file = tmp_path / "subscribers.csv"
-        csv_file.write_text(
-            "name,email,status\nAlice,alice@example.com,active\nBob,bob@example.com,active\n"
-        )
+        csv_file.write_text("name,email,status\nAlice,alice@example.com,active\nBob,bob@example.com,active\n")
 
         # Read and process
         with open(str(csv_file)) as f:
@@ -154,8 +152,6 @@ class TestSendMailStateManagement:
         """Track rate limit state across batch sends."""
         rate_limit_per_second = 5
         total_to_send = 100
-        batches_needed = (
-            total_to_send + rate_limit_per_second - 1
-        ) // rate_limit_per_second
+        batches_needed = (total_to_send + rate_limit_per_second - 1) // rate_limit_per_second
 
         assert batches_needed == 20

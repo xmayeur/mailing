@@ -30,9 +30,7 @@ class EditorProfileStyler:
         """
         template_file = self.profile_config.get("template_file")
         if not template_file:
-            logger.debug(
-                f"No template file configured for profile '{self.current_profile}'"
-            )
+            logger.debug(f"No template file configured for profile '{self.current_profile}'")
             return None
 
         template_path = Path(template_file)
@@ -40,9 +38,7 @@ class EditorProfileStyler:
             logger.warning(f"Template file not found: {template_file}")
             raise FileNotFoundError(f"Template file not found: {template_file}")
 
-        logger.debug(
-            f"Found template file for profile '{self.current_profile}': {template_file}"
-        )
+        logger.debug(f"Found template file for profile '{self.current_profile}': {template_file}")
         return cast(str, template_file)
 
     def apply_profile_styling(self, html_content: str) -> str:
@@ -77,9 +73,7 @@ class EditorProfileStyler:
         return f"profile-{profile_name}"
 
     @staticmethod
-    def create_profile_css(
-        profile_name: str, css_rules: dict[str, str] | None = None
-    ) -> str:
+    def create_profile_css(profile_name: str, css_rules: dict[str, str] | None = None) -> str:
         """Generate CSS for profile styling.
 
         Args:

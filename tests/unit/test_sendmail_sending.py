@@ -84,14 +84,8 @@ class TestMimeTypeDetection:
         """Detect common file MIME types."""
         assert sm.guess_type("file.pdf") == "application/pdf"
         assert sm.guess_type("image.jpg") == "image/jpeg"
-        assert (
-            sm.guess_type("sheet.xlsx")
-            == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        assert (
-            sm.guess_type("doc.docx")
-            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        assert sm.guess_type("sheet.xlsx") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        assert sm.guess_type("doc.docx") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
     def test_unknown_extension(self) -> None:
         """Return None for unknown extensions."""
@@ -119,9 +113,7 @@ class TestMessageFormatting:
 
     def test_format_with_multiple_fields(self) -> None:
         """Format body with multiple template fields."""
-        template = (
-            "Dear ${title} ${lastname},\n\nYour email is ${email}.\n\nBest regards"
-        )
+        template = "Dear ${title} ${lastname},\n\nYour email is ${email}.\n\nBest regards"
         row = ["Dr", "Smith", "smith@example.com"]
         header = ["title", "lastname", "email"]
 
@@ -269,9 +261,7 @@ class TestBatchOperations:
         """Send batch emails to multiple recipients."""
         # Create CSV with recipients
         csv_file = tmp_path / "recipients.csv"
-        csv_file.write_text(
-            "name,email\nAlice,alice@example.com\nBob,bob@example.com\n"
-        )
+        csv_file.write_text("name,email\nAlice,alice@example.com\nBob,bob@example.com\n")
 
         # Test batch operation would iterate through recipients
         # Each one formatted and sent
@@ -362,9 +352,7 @@ class TestBatchEmailOperations:
             (["Charlie", "12347"], ["name", "order_id"]),
         ]
 
-        results = [
-            sm.format_message(template, row, header) for row, header in recipients
-        ]
+        results = [sm.format_message(template, row, header) for row, header in recipients]
         assert len(results) == 3
         assert "Alice" in results[0]
         assert "12345" in results[0]

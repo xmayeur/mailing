@@ -29,8 +29,8 @@ from dataclasses import dataclass
 from typing import Any
 
 try:
-    from PyQt6.QtCore import Qt, pyqtSignal
-    from PyQt6.QtWidgets import (
+    from PySide6.QtCore import Qt, Signal
+    from PySide6.QtWidgets import (
         QComboBox,
         QHBoxLayout,
         QLineEdit,
@@ -235,11 +235,7 @@ class FilterTable:
             if row.value is None:
                 result[row.field_name] = row.operator
             else:
-                value_str = (
-                    ", ".join(str(v) for v in row.value)
-                    if isinstance(row.value, list)
-                    else str(row.value)
-                )
+                value_str = ", ".join(str(v) for v in row.value) if isinstance(row.value, list) else str(row.value)
                 result[row.field_name] = f"{row.operator} {value_str}"
         return result
 
@@ -355,9 +351,7 @@ class DatabaseSchemaInfo:
         in Phase 2 via sample value inspection.
     """
 
-    def __init__(
-        self, field_names: list[str], field_types: dict[str, str] | None = None
-    ) -> None:
+    def __init__(self, field_names: list[str], field_types: dict[str, str] | None = None) -> None:
         """Initialize schema info.
 
         Args:
@@ -580,7 +574,7 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
     """
 
     if PYQT_AVAILABLE:
-        filter_changed = pyqtSignal(dict)
+        filter_changed = Signal(dict)
 
     def __init__(
         self,
@@ -622,9 +616,7 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         tabs.addTab(self._table_widget, "Visual Editor")
 
         self._yaml_edit = QPlainTextEdit(self)
-        self._yaml_edit.setPlaceholderText(
-            "YAML filter (optional)\nExample: email: is not empty"
-        )
+        self._yaml_edit.setPlaceholderText("YAML filter (optional)\nExample: email: is not empty")
         tabs.addTab(self._yaml_edit, "YAML")
 
         layout.addWidget(tabs)
@@ -676,29 +668,21 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             row_widget.set_error_state(field_error, operator_error, value_error)
 
     def _validate_field_exists(self, row_widget: Any) -> str:
-        if (
-            row_widget.row.field_name
-            and row_widget.row.field_name not in self.schema_info.field_names
-        ):
+        if row_widget.row.field_name and row_widget.row.field_name not in self.schema_info.field_names:
             return f"Field '{row_widget.row.field_name}' not in database schema"
         return ""
 
     def _validate_operator_valid(self, row_widget: Any) -> str:
         if not row_widget.row.operator:
             return ""
-        valid_operators = self.schema_info.get_operators_for_field(
-            row_widget.row.field_name
-        )
+        valid_operators = self.schema_info.get_operators_for_field(row_widget.row.field_name)
         display_op = _canonical_to_display_operator(row_widget.row.operator)
         if display_op not in valid_operators:
             return "Operator not valid for field type"
         return ""
 
     def _validate_value_present(self, row_widget: Any) -> str:
-        if not (
-            row_widget.row.operator
-            and row_widget._operator_needs_value(row_widget.row.operator)
-        ):
+        if not (row_widget.row.operator and row_widget._operator_needs_value(row_widget.row.operator)):
             return ""
 
         if self._is_value_empty(row_widget.row.value):
@@ -808,7 +792,7 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
     """
 
     if PYQT_AVAILABLE:
-        row_changed = pyqtSignal()
+        row_changed = Signal()
 
     def __init__(self, schema_info: DatabaseSchemaInfo, parent: Any = None) -> None:
         """Initialize table widget with schema info.
@@ -959,8 +943,8 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
     """
 
     if PYQT_AVAILABLE:
-        row_changed = pyqtSignal()
-        delete_requested = pyqtSignal(int)
+        row_changed = Signal()
+        delete_requested = Signal(int)
 
     @staticmethod
     def _row_value_to_str(value: str | list[str] | None) -> str:
@@ -1016,10 +1000,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             if row.operator:
                 # Map canonical operator to display label (case-insensitive)
                 display_op = _canonical_to_display_operator(row.operator)
-                combo_items = [
-                    self._operator_combo.itemText(i)
-                    for i in range(self._operator_combo.count())
-                ]
+                combo_items = [self._operator_combo.itemText(i) for i in range(self._operator_combo.count())]
                 log.info(
                     "DEBUG: FilterRowWidget: Setting operator '%s' from canonical '%s', combo items: %s",
                     display_op,
@@ -1136,11 +1117,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         try:
             self._populate_field_combo()
             # B028: Only restore selection if it's a real field (not placeholder)
-            if (
-                current_field
-                and current_field != _PLACEHOLDER_LOAD_DB
-                and current_field in schema_info.field_names
-            ):
+            if current_field and current_field != _PLACEHOLDER_LOAD_DB and current_field in schema_info.field_names:
                 self._field_combo.setCurrentText(current_field)
             elif schema_info.field_names:
                 # B028: If we have real fields, select first one (not placeholder)
@@ -1279,9 +1256,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         B054: Parse comma-separated list values for list operators.
         """
         if PYQT_AVAILABLE:
-            text = (
-                self._get_value_input()
-            )  # Use _get_value_input to get from visible input
+            text = self._get_value_input()  # Use _get_value_input to get from visible input
             # B054: Parse comma-separated values for list operators
             parsed_value: str | list[str] | None = None
             if text and self._operator_is_multiline(self._operator_combo.currentText()):
@@ -1292,9 +1267,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             self.row.value = parsed_value
             self.row_changed.emit()
 
-    def set_error_state(
-        self, field_error: str = "", operator_error: str = "", value_error: str = ""
-    ) -> None:
+    def set_error_state(self, field_error: str = "", operator_error: str = "", value_error: str = "") -> None:
         """Set visual error indicators on row widgets (T042).
 
         Args:
@@ -1315,9 +1288,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
 
         # Operator combo error state
         if operator_error:
-            self._operator_combo.setStyleSheet(
-                "QComboBox { border: 2px solid #f44336; }"
-            )
+            self._operator_combo.setStyleSheet("QComboBox { border: 2px solid #f44336; }")
             self._operator_combo.setToolTip(operator_error)
         else:
             self._operator_combo.setStyleSheet("")
