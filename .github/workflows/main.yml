@@ -50,7 +50,8 @@ jobs:
           sudo apt-get install -y libegl1 libgl1 libxcb-xinerama0 libxkbcommon-x11-0 libdbus-1-3 libxcb-cursor0
 
       - name: Install runtime dependencies
-        run: pip install --only-binary :all: -r requirements-ci.txt
+        run: |
+          pip install --only-binary :all: -r requirements-ci.txt
 
       - name: Install build tools (Nuitka + PySide6)
         run: pip install nuitka==4.1.3 ordered-set zstandard "PySide6==6.11.1"
