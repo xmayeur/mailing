@@ -193,9 +193,7 @@ def open_google_db_members_sheet(sa: str, sheet_id: str) -> Any:
         "https://www.googleapis.com/auth/drive",
     ]
 
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(
-        get_secret(sa), cast(Any, scope)
-    )
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(get_secret(sa), cast(Any, scope))
     gc = gspread.authorize(creds)  # pyright: ignore
 
     spreadsheet_id = get_secret(sheet_id)["ID"]
@@ -260,9 +258,7 @@ class Dict2Class:
             object.__setattr__(self, key.lower(), my_dict[key])
 
     def __getattr__(self, name: str) -> Any:
-        raise AttributeError(
-            f"'{type(self).__name__}' object has no attribute '{name}'"
-        )
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def __setattr__(self, name: str, value: Any) -> None:
         object.__setattr__(self, name, value)
@@ -289,9 +285,7 @@ def guess_type(filepath: str) -> str | None:
         import mimetypes
 
         # Initialize Office file MIME types (not registered on all platforms)
-        mimetypes.add_type(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"
-        )
+        mimetypes.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx")
         mimetypes.add_type(
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ".docx",
@@ -575,9 +569,7 @@ def _decode_base64_image(src: str, temp_dir: str) -> str | None:
         return None
 
 
-def _resize_and_save_image(
-    img_path: str, cid: str, temp_dir: str, max_width: int
-) -> str | None:
+def _resize_and_save_image(img_path: str, cid: str, temp_dir: str, max_width: int) -> str | None:
     """Resize *img_path* to *max_width* and save as a JPEG in *temp_dir*.
 
     :return: Path of the optimised file, or None on error.
@@ -596,9 +588,7 @@ def _resize_and_save_image(
         return None
 
 
-def prepare_html_and_get_images(
-    in_filepath: str, max_width: int = 800
-) -> tuple[str, list[Any], str]:
+def prepare_html_and_get_images(in_filepath: str, max_width: int = 800) -> tuple[str, list[Any], str]:
     """
     Processes an HTML file to embed inline images and resize them for optimized usage.
 
@@ -704,9 +694,7 @@ def _process_google_drive_attachments(
     return files, service, google_drive_files
 
 
-def process_attachments(
-    args: Any, config: dict[str, Any], folder: str = "input"
-) -> tuple[list[str], Any, list[Any]]:
+def process_attachments(args: Any, config: dict[str, Any], folder: str = "input") -> tuple[list[str], Any, list[Any]]:
     """
     Processes attachments by either verifying file paths provided in the arguments or downloading files
     from a Google Drive folder and cleaning up the local folder. Returns processed file paths, the Google
@@ -727,15 +715,11 @@ def process_attachments(
     if files:
         return files, None, []
 
-    files, service, google_drive_files = _process_google_drive_attachments(
-        config, folder
-    )
+    files, service, google_drive_files = _process_google_drive_attachments(config, folder)
     return files, service, google_drive_files
 
 
-def md2html(
-    file_path: str, styles: str | None = None, embed_styles: bool = False
-) -> str | None:
+def md2html(file_path: str, styles: str | None = None, embed_styles: bool = False) -> str | None:
     """
     Converts a Markdown file to an HTML file with optional styling.
 
@@ -854,15 +838,11 @@ def _set_email_headers(
         msg["Bcc"] = bcc
     msg["Date"] = email.utils.formatdate(localtime=True)
     if hasattr(param, "domain"):
-        msg["Message-ID"] = email.utils.make_msgid(
-            idstring=str(uuid4()), domain=param.domain
-        )
+        msg["Message-ID"] = email.utils.make_msgid(idstring=str(uuid4()), domain=param.domain)
     return to, bcc
 
 
-def _process_html_attachment(
-    att: str, param: Any, all_inline_images: list[Any], temp_dirs: list[str]
-) -> str:
+def _process_html_attachment(att: str, param: Any, all_inline_images: list[Any], temp_dirs: list[str]) -> str:
     """Convert Markdown to HTML if needed, then extract inline images. Returns the HTML body."""
     is_md = att.endswith("md")
     if is_md:
@@ -888,21 +868,15 @@ def _process_binary_attachment(att: str, msg: MIMEMultipart) -> None:
         content = f.read()
     if att.endswith("pdf"):
         part: MIMEBase = MIMEApplication(content, _subtype="pdf")
-        part.add_header(
-            "Content-Disposition", "attachment", filename=os.path.basename(att)
-        )
+        part.add_header("Content-Disposition", "attachment", filename=os.path.basename(att))
     elif att.endswith("txt"):
         part = MIMEText(content.decode())
-        part.add_header(
-            "Content-Disposition", "attachment", filename=os.path.basename(att)
-        )
+        part.add_header("Content-Disposition", "attachment", filename=os.path.basename(att))
     else:
         part = MIMEBase("application", "octet-stream")
         part.set_payload(content)
         email_encoders.encode_base64(part)
-        part.add_header(
-            "Content-Disposition", "attachment", filename=os.path.basename(att)
-        )
+        part.add_header("Content-Disposition", "attachment", filename=os.path.basename(att))
     msg.attach(part)
 
 
@@ -990,9 +964,7 @@ def build_email(
     return msg, recipients
 
 
-def _build_and_send(
-    param: Any, addressees: list[Any], row: list[Any], header: list[str]
-) -> bool:
+def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: list[str]) -> bool:
     """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs.
 
     :return: True if the message was sent, False if sending was skipped or failed.
@@ -1114,9 +1086,7 @@ def generate_mailing(param: Any) -> str:
             addressees.append(row[indices["email"]])
             recipient_count += 1
             if len(addressees) >= max_add:
-                log.info(
-                    f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})"
-                )
+                log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
                 _flush_batch(
                     param,
                     addressees,
@@ -1250,24 +1220,14 @@ def _do_string_eval(field_value: str, test_value: Any, op: str) -> bool:
         ("is not", _OP_IS_NOT_EQUAL_TO, _OP_IS_NOT): lambda: field_value != test_value,
         (_OP_IS_NOT_EMPTY,): lambda: field_value != "" and field_value is not None,
         ("is empty",): lambda: field_value == "" or field_value is None,
-        ("contains", _OP_CONTAINS): lambda: (
-            bool(test_value in field_value) if test_value else False
-        ),
+        ("contains", _OP_CONTAINS): lambda: (bool(test_value in field_value) if test_value else False),
         ("does not contain", _OP_DOES_NOT_CONTAIN): lambda: (
             bool(test_value not in field_value) if test_value else True
         ),
-        ("starts with", _OP_STARTS_WITH): lambda: (
-            bool(field_value.startswith(test_value)) if test_value else False
-        ),
-        ("ends with", _OP_ENDS_WITH): lambda: (
-            bool(field_value.endswith(test_value)) if test_value else False
-        ),
-        ("matches", _OP_MATCHES): lambda: _eval_regex(
-            test_value, field_value, negate=False
-        ),
-        ("does not match", _OP_DOES_NOT_MATCH): lambda: _eval_regex(
-            test_value, field_value, negate=True
-        ),
+        ("starts with", _OP_STARTS_WITH): lambda: (bool(field_value.startswith(test_value)) if test_value else False),
+        ("ends with", _OP_ENDS_WITH): lambda: (bool(field_value.endswith(test_value)) if test_value else False),
+        ("matches", _OP_MATCHES): lambda: _eval_regex(test_value, field_value, negate=False),
+        ("does not match", _OP_DOES_NOT_MATCH): lambda: _eval_regex(test_value, field_value, negate=True),
     }
 
     for ops, handler in handlers.items():
@@ -1343,9 +1303,7 @@ def _evaluate_condition(field_value: str, op: str, test_value: Any, _k: str) -> 
         return _eval_string(field_value, test_value, op)
 
 
-def filter(  # noqa: A001
-    filter: dict[str, str], row: list[Any], indices: dict[str, int]  # noqa: A002
-) -> bool:
+def filter(filter: dict[str, str], row: list[Any], indices: dict[str, int]) -> bool:  # noqa: A001, A002
     """Filter row: return True if should be EXCLUDED, False if INCLUDED.
 
     Applies filter conditions to subscriber row. All filter conditions must
@@ -1368,9 +1326,7 @@ def filter(  # noqa: A001
 
     result = True
     for k, v in filter.items():
-        field_value = (
-            row[indices[k]] if k in indices and indices[k] < len(row) else None
-        )
+        field_value = row[indices[k]] if k in indices and indices[k] < len(row) else None
         if field_value is None:
             return True
         try:
@@ -1415,9 +1371,7 @@ def _attempt_smtp_send(param: Any, message: Any, recipients: Any, attempt: int) 
     if not conn:
         return False
     try:
-        conn.sendmail(
-            message["From"], recipients, message.as_string()
-        )  # pyright: ignore
+        conn.sendmail(message["From"], recipients, message.as_string())  # pyright: ignore
         conn.quit()
         if param.verbose:  # pyright: ignore
             log.info("sent")
@@ -1500,11 +1454,7 @@ def _load_config_with_secrets(args: Any) -> dict[str, Any]:
 
     # Try Profile class for vault_key, fall back to legacy MAILCONFIG
     try:
-        vault_key = (
-            config.get("vault_key")
-            or config.get("MAILCONFIG")
-            or config.get("mailconfig")
-        )
+        vault_key = config.get("vault_key") or config.get("MAILCONFIG") or config.get("mailconfig")
         if vault_key:
             profile = Profile(args.profile, config)
             secret = profile.load_smtp_from_vault()
@@ -1547,9 +1497,7 @@ def _prepare_message_body(param: Any, config: dict[str, Any], files: list[str]) 
     param = get_newsletter_name(files, param)
     if not param.message:
         param.message = config["default_message"]
-        param.message = param.message.replace(
-            "${newsletter_name}", param.newsletter_name
-        )
+        param.message = param.message.replace("${newsletter_name}", param.newsletter_name)
         param.message = param.message.replace("${body}", body_txt)
     return param
 
@@ -1619,9 +1567,7 @@ def _check_common_params(param: Any) -> bool:
 
 def _check_data_source(param: Any) -> bool:
     """Return False if neither a database path nor a (SA + sheetid) pair is configured."""
-    if not hasattr(param, "database") and not (
-        hasattr(param, "sa") and hasattr(param, "sheetid")
-    ):
+    if not hasattr(param, "database") and not (hasattr(param, "sa") and hasattr(param, "sheetid")):
         log.error("Database path or (Service Account (SA) and SheetID) is mandatory")
         return False
     return True
@@ -1675,11 +1621,7 @@ def check_mandatory_param(param: Any) -> bool:
     """
     common_ok = _check_common_params(param)
     data_ok = _check_data_source(param)
-    method_ok = (
-        _check_smtp_imap_params(param)
-        if hasattr(param, "smtp_host")
-        else _check_gmail_params(param)
-    )
+    method_ok = _check_smtp_imap_params(param) if hasattr(param, "smtp_host") else _check_gmail_params(param)
     ret = common_ok and data_ok and method_ok
 
     if not ret:
@@ -1725,9 +1667,7 @@ def setup_argparse() -> argparse.Namespace:
         - --profile: Specifies the mail profile to use (default: None).
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-cfg", "--config", help="path to the config file", default=None
-    )
+    parser.add_argument("-cfg", "--config", help="path to the config file", default=None)
     parser.add_argument("-s", "--subject", help="Subject of the mail")
     parser.add_argument("-m", "--message", help="Text message of the mail", default="")
     parser.add_argument("file", nargs="*", help="files to attach to the mail")
@@ -1737,36 +1677,20 @@ def setup_argparse() -> argparse.Namespace:
         action="store_true",
         help="test mode - send only to the tester group",
     )
-    parser.add_argument(
-        "-v", "--verbose", help="increase output verbosity", action="store_true"
-    )
-    parser.add_argument(
-        "-x", "--doNotSend", action="store_true", help="Do not send any mail"
-    )
+    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    parser.add_argument("-x", "--doNotSend", action="store_true", help="Do not send any mail")
     parser.add_argument("-db", "--database", help="database path")
-    parser.add_argument(
-        "-f", "--from_index", help="Starting index in the database", default=None
-    )
-    parser.add_argument(
-        "-to", "--to_index", help="Stopping index in the database", default=None
-    )
-    parser.add_argument(
-        "-w", "--wait", help="Wait x minutes before restarting sending mail", type=int
-    )
-    parser.add_argument(
-        "--selected", action="store_true", help="Only send selected mail", default=False
-    )
+    parser.add_argument("-f", "--from_index", help="Starting index in the database", default=None)
+    parser.add_argument("-to", "--to_index", help="Stopping index in the database", default=None)
+    parser.add_argument("-w", "--wait", help="Wait x minutes before restarting sending mail", type=int)
+    parser.add_argument("--selected", action="store_true", help="Only send selected mail", default=False)
     parser.add_argument("--body")
     parser.add_argument("-mh", "--max-mails-per-hour", default=1000, type=int)
     parser.add_argument("-na", "--max_addr_per_mail", default=50, type=int)
     parser.add_argument("-p", "--pause", default=3, type=int)
     parser.add_argument("--profile", help="mail profile", default="default")
-    parser.add_argument(
-        "--md2html", action="store_true", help="convert md file to html & exit"
-    )
-    parser.add_argument(
-        "--keep-html", action="store_true", help="keep the generated html file"
-    )
+    parser.add_argument("--md2html", action="store_true", help="convert md file to html & exit")
+    parser.add_argument("--keep-html", action="store_true", help="keep the generated html file")
     return parser.parse_args()
 
 

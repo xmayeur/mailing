@@ -43,57 +43,71 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
         run: |
-          pip install --only-binary :all: -r requirements-ci.txt # NOSONAR
+          sudo apt-get update -qq
+          sudo apt-get install -y libegl1 libgl1 libxcb-xinerama0 libxkbcommon-x11-0 libdbus-1-3 libxcb-cursor0
+
+      - name: Install runtime dependencies
+        run: pip install --only-binary :all: -r requirements-ci.txt
+
+      - name: Install build tools (Nuitka + PySide6)
+        run: pip install nuitka==4.1.3 ordered-set zstandard "PySide6==6.11.1"
+
+      - name: Convert icon to ICNS (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p images/mail.iconset
+          sips -z 16   16   images/mail.png --out images/mail.iconset/icon_16x16.png
+          sips -z 32   32   images/mail.png --out images/mail.iconset/icon_32x32.png
+          sips -z 128  128  images/mail.png --out images/mail.iconset/icon_128x128.png
+          sips -z 256  256  images/mail.png --out images/mail.iconset/icon_256x256.png
+          sips -z 512  512  images/mail.png --out images/mail.iconset/icon_512x512.png
+          iconutil -c icns images/mail.iconset -o images/mail.icns
 
       - name: Build executable
-        run: pyinstaller editor.spec
+        timeout-minutes: 60
+        env:
+          QT_QPA_PLATFORM: offscreen   # headless Linux CI
+        run: python build_editor.py
 
-      - name: Package non-macOS build
-        if: runner.os != 'macOS'
+      - name: Package Windows build
+        if: runner.os == 'Windows'
         shell: bash
         run: |
-          cd dist
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            mv sendMailEditor_bin.exe sendMailEditor.exe
-            7z a sendMailEditor-windows.zip sendMailEditor.exe
-          else
-            mv sendMailEditor_bin sendMailEditor
-            tar czf sendMailEditor-linux.tar.gz sendMailEditor
-            zip -j sendMailEditor-linux.zip sendMailEditor
-          fi
+          cd dist_nuitka
+          7z a ../sendMailEditor-windows.zip editor.dist/
 
-      - name: Build sendMailEditor.app (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
+      - name: Package Linux build
+        if: runner.os == 'Linux'
         run: |
-          bash scripts/wrap_onefile_as_app.sh . sendMailEditor_bin sendMailEditor images/mail.png be.sendmail.editor
-          rm dist/sendMailEditor_bin
+          cd dist_nuitka
+          tar czf ../sendMailEditor-linux.tar.gz editor.dist/
+          zip -r ../sendMailEditor-linux.zip editor.dist/
 
       - name: Create macOS DMG
         if: runner.os == 'macOS'
-        shell: bash
         run: |
-          rm -rf release/sendMailEditor-macos
           mkdir -p release/sendMailEditor-macos
-          cp -R dist/sendMailEditor.app release/sendMailEditor-macos/
-          printf 'Unsigned macOS package for sendMailEditor.\nRun the app from Finder after mounting this DMG.\n' > release/sendMailEditor-macos/README.txt
+          cp -R dist_nuitka/editor.app release/sendMailEditor-macos/
+          printf 'Unsigned macOS package for sendMailEditor.\nRun the app from Finder after mounting this DMG.\n' \
+            > release/sendMailEditor-macos/README.txt
           hdiutil create \
             -volname "sendMailEditor" \
             -srcfolder release/sendMailEditor-macos \
             -ov \
             -format UDZO \
-            dist/sendMailEditor-macos.dmg
+            sendMailEditor-macos.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sendMailEditor-${{ matrix.os }}
           path: |
-            dist/sendMailEditor-*.zip
-            dist/sendMailEditor-*.tar.gz
-            dist/sendMailEditor-macos.dmg
+            sendMailEditor-*.zip
+            sendMailEditor-*.tar.gz
+            sendMailEditor-macos.dmg
           if-no-files-found: ignore
 
   release:
@@ -113,7 +127,6 @@ jobs:
 
       - name: Delete existing release assets (if version unchanged)
         run: |
-          # Check if release exists and delete old assets for same version
           release_id=$(gh release view ${{ needs.version.outputs.tag }} --json id -q .id 2>/dev/null || echo "")
           if [ -n "$release_id" ]; then
             echo "Found existing release for ${{ needs.version.outputs.tag }}, will overwrite assets"

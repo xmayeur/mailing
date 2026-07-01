@@ -204,9 +204,7 @@ def mock_google_api_errors():
     from googleapiclient.errors import HttpError
 
     return {
-        "not_found": HttpError(
-            resp=MagicMock(status=404), content=b'{"error": {"message": "Not found"}}'
-        ),
+        "not_found": HttpError(resp=MagicMock(status=404), content=b'{"error": {"message": "Not found"}}'),
         "forbidden": HttpError(
             resp=MagicMock(status=403),
             content=b'{"error": {"message": "Access denied"}}',

@@ -18,9 +18,7 @@ import yaml as _real_yaml
 from googleapiclient import errors
 
 # Add source directory to path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 # Mock external dependencies
 # Note: googleDriveLib is tested separately in test_googleDriveLib.py
@@ -317,9 +315,7 @@ class TestEmailBuilding:
         param.styles = None
         delattr(param, "keep-html")
 
-        msg, _ = sendMail.build_email(
-            param=param, subject="S", to="to@example.com", attachments=[str(md_file)]
-        )
+        msg, _ = sendMail.build_email(param=param, subject="S", to="to@example.com", attachments=[str(md_file)])
 
         # The temporary HTML (derived from the .md) must be removed
         assert removed.get("p") == str(md_file).replace(".md", ".html")
@@ -379,9 +375,7 @@ class TestHTMLProcessing:
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img]
-        mock_soup.__str__ = Mock(
-            return_value='<html><body><img src="cid:test@inline.img"/></body></html>'
-        )
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:test@inline.img"/></body></html>')
 
         mock_bs.return_value = mock_soup
 
@@ -393,9 +387,7 @@ class TestHTMLProcessing:
 
     @patch(
         "builtins.open",
-        mock_open(
-            read_data='<html><body><img src="http://example.com/test.jpg"/></body></html>'
-        ),
+        mock_open(read_data='<html><body><img src="http://example.com/test.jpg"/></body></html>'),
     )
     @patch("os.path.exists")
     def test_prepare_html_for_cid_external_images(self, mock_exists):
@@ -415,9 +407,7 @@ class TestHTMLProcessing:
     @patch("tempfile.mkdtemp")
     @patch("sendMail.Image")
     @patch("sendMail.BeautifulSoup")
-    def test_prepare_html_and_get_images(
-        self, mock_bs, mock_image, mock_temp, mock_join, mock_exists
-    ):
+    def test_prepare_html_and_get_images(self, mock_bs, mock_image, mock_temp, mock_join, mock_exists):
         _dir = tempfile.TemporaryDirectory(dir="./tests")
         """Test HTML processing with image optimization"""
         mock_exists.return_value = True
@@ -439,15 +429,11 @@ class TestHTMLProcessing:
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img_tag]
-        mock_soup.__str__ = Mock(
-            return_value='<html><body><img src="cid:test@inline.img"/></body></html>'
-        )
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:test@inline.img"/></body></html>')
 
         mock_bs.return_value = mock_soup
 
-        html, images, temp_dir = sendMail.prepare_html_and_get_images(
-            "/basepath/test.html"
-        )
+        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
 
         assert "cid:" in html
         assert len(images) > 0
@@ -463,9 +449,7 @@ class TestHTMLProcessing:
     @patch("sendMail.Image")
     @patch("sendMail.BeautifulSoup")
     @patch("email.utils.make_msgid")
-    def test_prepare_html_and_get_images_base64(
-        self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open
-    ):
+    def test_prepare_html_and_get_images_base64(self, mock_msgid, mock_bs, mock_image, mock_temp, mock_exists, m_open):
         _dir = tempfile.TemporaryDirectory(dir="./tests").name
         """Test HTML processing with base64 image"""
         mock_exists.return_value = True
@@ -490,9 +474,7 @@ class TestHTMLProcessing:
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img_tag]
-        mock_soup.__str__ = Mock(
-            return_value='<html><body><img src="cid:cid2@inline.img"/></body></html>'
-        )
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="cid:cid2@inline.img"/></body></html>')
 
         mock_bs.return_value = mock_soup
 
@@ -500,18 +482,14 @@ class TestHTMLProcessing:
         # Let's mock the save method to avoid it calling open.
         mock_img.save = Mock()
 
-        html, images, temp_dir = sendMail.prepare_html_and_get_images(
-            "/basepath/test.html"
-        )
+        html, images, temp_dir = sendMail.prepare_html_and_get_images("/basepath/test.html")
 
         assert "cid:" in html
         assert len(images) > 0
         assert temp_dir == _dir
 
         # The base64 image is first saved to embedded_<cid1>.<ext>
-        m_open.assert_any_call(
-            os.path.join(temp_dir, "embedded_cid1@inline.img.png"), "wb"
-        )
+        m_open.assert_any_call(os.path.join(temp_dir, "embedded_cid1@inline.img.png"), "wb")
 
         # The optimized image is saved by PIL.Image.save
         mock_img.save.assert_called()
@@ -521,17 +499,13 @@ class TestHTMLProcessing:
 
     @patch(
         "builtins.open",
-        mock_open(
-            read_data='<html><body><img src="data:image/png;base64,INVALID"/></body></html>'
-        ),
+        mock_open(read_data='<html><body><img src="data:image/png;base64,INVALID"/></body></html>'),
     )
     @patch("os.path.exists")
     @patch("tempfile.mkdtemp")
     @patch("sendMail.BeautifulSoup")
     @patch("sendMail.log")
-    def test_prepare_html_and_get_images_base64_error(
-        self, mock_log, mock_bs, mock_temp, mock_exists
-    ):
+    def test_prepare_html_and_get_images_base64_error(self, mock_log, mock_bs, mock_temp, mock_exists):
         """Test HTML processing with invalid base64 image"""
         _dir = tempfile.TemporaryDirectory(dir="./tests")
         mock_exists.return_value = True
@@ -544,9 +518,7 @@ class TestHTMLProcessing:
         # Create a mock soup object
         mock_soup = Mock()
         mock_soup.find_all.return_value = [mock_img_tag]
-        mock_soup.__str__ = Mock(
-            return_value='<html><body><img src="data:image/png;base64,INVALID"/></body></html>'
-        )
+        mock_soup.__str__ = Mock(return_value='<html><body><img src="data:image/png;base64,INVALID"/></body></html>')
 
         mock_bs.return_value = mock_soup
 
@@ -623,9 +595,7 @@ class TestSMTPConnection:
         param.password = "wrong_password"
 
         mock_conn = Mock()
-        mock_conn.login.side_effect = SMTPAuthenticationError(
-            535, "Authentication failed"
-        )
+        mock_conn.login.side_effect = SMTPAuthenticationError(535, "Authentication failed")
         mock_smtp.return_value = mock_conn
 
         with pytest.raises(SystemExit):
@@ -971,9 +941,7 @@ class TestGoogleSheetHelpers:
     @patch("sendMail.ServiceAccountCredentials")
     @patch("sendMail.gspread")
     @patch("sendMail.get_secret")
-    def test_open_google_db_members_sheet(
-        self, mock_get_secret, mock_gspread, mock_sac
-    ):
+    def test_open_google_db_members_sheet(self, mock_get_secret, mock_gspread, mock_sac):
         sa_key = "sa_key"
         id_key = "id_key"
 
@@ -1025,9 +993,7 @@ class TestGetGmailService:
     @patch("sendMail.os.path.exists", return_value=True)
     @patch("sendMail.Credentials")
     @patch("sendMail.build")
-    def test_get_gmail_service_with_token_file(
-        self, mock_build, mock_credentials, mock_exists
-    ):
+    def test_get_gmail_service_with_token_file(self, mock_build, mock_credentials, mock_exists):
         param = Mock()
         param.token_file = "token.json"
         param.scopes = ["scope1"]
@@ -1038,9 +1004,7 @@ class TestGetGmailService:
 
         service = sendMail.get_gmail_service(param)
         assert service == mock_build.return_value
-        mock_credentials.from_authorized_user_file.assert_called_once_with(
-            "token.json", ["scope1"]
-        )
+        mock_credentials.from_authorized_user_file.assert_called_once_with("token.json", ["scope1"])
         mock_build.assert_called_once()
 
     @patch("sendMail.os.path.exists", return_value=False)
@@ -1184,7 +1148,9 @@ def mock_config():
 
 def test_prepare_html_for_cid_with_invalid_src():
     """Test prepare_html_for_cid with invalid src (should continue)"""
-    html_content = '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
+    html_content = (
+        '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
+    )
     # Use a real file instead of mock_open to avoid BeautifulSoup issues if it uses other file methods
     with tempfile.TemporaryDirectory() as tmp_dir:
         html_file = os.path.join(tmp_dir, "test.html")
@@ -1195,9 +1161,7 @@ def test_prepare_html_for_cid_with_invalid_src():
             # If it's already mocked, we try to use the mock to return something sensible
             import bs4
 
-            with patch(
-                "sendMail.BeautifulSoup", side_effect=bs4.BeautifulSoup
-            ) as mock_bs:
+            with patch("sendMail.BeautifulSoup", side_effect=bs4.BeautifulSoup) as mock_bs:
                 # Force the mock to NOT be a MagicMock if it's already one?
                 # Actually, patch should work if called correctly.
                 _, images = sendMail.prepare_html_for_cid(html_file)
@@ -1326,9 +1290,7 @@ def test_build_email_max_addr_1():
     param.sender = "sender@example.com"
     param.profile = "other"
 
-    msg, _ = sendMail.build_email(
-        param, subject="Sub", bcc="bcc@example.com", message="Hi"
-    )
+    msg, _ = sendMail.build_email(param, subject="Sub", bcc="bcc@example.com", message="Hi")
     assert msg["To"] == "bcc@example.com"
     assert "Bcc" not in msg
 
@@ -1355,8 +1317,7 @@ def test_build_email_attachments_pdf_txt():
         # Verify attachments are there (basic check)
         payload = msg.get_payload()
         assert any(
-            isinstance(p, email.mime.application.MIMEApplication)
-            and p.get_content_subtype() == "pdf"
+            isinstance(p, email.mime.application.MIMEApplication) and p.get_content_subtype() == "pdf"
             for p in payload  # type: ignore[union-attr]
         )
 
@@ -1534,9 +1495,7 @@ def test_send_gmail_error():
     """Test send_gmail when an HttpError occurs"""
     service = MagicMock()
     message = MagicMock()
-    message.__getitem__.side_effect = lambda k: (
-        "test@example.com" if k == "To" else None
-    )
+    message.__getitem__.side_effect = lambda k: ("test@example.com" if k == "To" else None)
     message.as_bytes.return_value = b"raw message"
 
     with patch("sendMail.log") as mock_log:
@@ -1548,9 +1507,7 @@ def test_send_gmail_error():
         # We need to make sure the call to execute() raises err.
         mock_execute = MagicMock(side_effect=err)
 
-        service.users.return_value.messages.return_value.send.return_value.execute = (
-            mock_execute
-        )
+        service.users.return_value.messages.return_value.send.return_value.execute = mock_execute
 
         # If it STILL returns a MagicMock, maybe it's because service.users()
         # is called twice and returns different mocks?
@@ -1641,9 +1598,7 @@ def test_process_artscroises_wait_and_cleanup():
     }
 
     with patch("sendMail.get_secret", return_value=secret_config):
-        with patch(
-            "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
-        ):
+        with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
             with patch("sendMail.generate_mailing", return_value="OK"):
                 with patch("os.rename"):
                     with patch("os.remove"):
@@ -1679,15 +1634,11 @@ def test_process_artscroises():
             return_value={"artscroises": {"MAILCONFIG": "secret", "SA": "sa.json"}},
         ):
             with patch("sendMail.get_secret", return_value=secret_config):
-                with patch(
-                    "sendMail.process_attachments", return_value=(["att.pdf"], None, [])
-                ):
+                with patch("sendMail.process_attachments", return_value=(["att.pdf"], None, [])):
                     with patch("sendMail.generate_mailing", return_value="OK"):
                         with patch("os.rename"):
                             with patch("os.remove"):
-                                with patch(
-                                    "sendMail.check_mandatory_param", return_value=True
-                                ):
+                                with patch("sendMail.check_mandatory_param", return_value=True):
                                     ret = sendMail.main()
                                     assert ret == 0
 
@@ -1743,9 +1694,7 @@ def test_send_mail_retry_and_verbose():
     param = MagicMock()
     param.verbose = True
     message = MagicMock()
-    message.__getitem__.side_effect = lambda k: (
-        "sender@example.com" if k == "From" else None
-    )
+    message.__getitem__.side_effect = lambda k: ("sender@example.com" if k == "From" else None)
     message.as_string.return_value = "msg_string"
     recipients = ["to@example.com"]
 
@@ -1849,7 +1798,9 @@ def test_main_missing_profile():
 
 
 def test_make_html_images_inline():
-    html_content = '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
+    html_content = (
+        '<html><body><img src="http://example.com/img.png"><img src="data:image/png;base64,xxxx"></body></html>'
+    )
     # Use a real file instead of mock_open to avoid BeautifulSoup issues if it uses other file methods
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1883,9 +1834,7 @@ def test_process_profile_message_replacement_and_password_prompt():
     args.subject = "Test Subject"
     args.test = False
 
-    secret_config = {
-        "MAILCONFIG": "dummy_config"
-    }  # No password here to trigger line 1194
+    secret_config = {"MAILCONFIG": "dummy_config"}  # No password here to trigger line 1194
 
     with (
         patch("sendMail.get_secret", return_value=secret_config),
@@ -1906,9 +1855,7 @@ def test_process_profile_message_replacement_and_password_prompt():
 
         # Verify lines 1187-1190: message was replaced in param, not args
         called_param = mock_generate.call_args[0][0]
-        assert (
-            called_param.message == "Newsletter: MyNewsletter, Body: Test Body Content"
-        )
+        assert called_param.message == "Newsletter: MyNewsletter, Body: Test Body Content"
 
         # Verify line 1194: getpass was called
         mock_getpass.assert_called_once_with("Enter mail user's password")
@@ -2056,9 +2003,7 @@ def test_get_default_config_path_creates_dir_and_file():
             mock_mkdir.assert_called_once_with("/home/testuser/.config")
 
             # Verify config file was opened for writing (line 98)
-            mock_file.assert_called_once_with(
-                "/home/testuser/.config/sendMail.yml", "w"
-            )
+            mock_file.assert_called_once_with("/home/testuser/.config/sendMail.yml", "w")
 
             # Verify default config was written (line 99)
             mock_yaml_dump.assert_called_once()
@@ -2095,8 +2040,6 @@ def test_get_default_config_path_dir_exists_file_not():
             mock_mkdir.assert_not_called()
 
             # Verify config file was still created (lines 98-100)
-            mock_file.assert_called_once_with(
-                "/home/testuser/.config/sendMail.yml", "w"
-            )
+            mock_file.assert_called_once_with("/home/testuser/.config/sendMail.yml", "w")
             mock_yaml_dump.assert_called_once()
             mock_log_warning.assert_called_once()

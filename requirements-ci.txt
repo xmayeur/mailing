@@ -1,6 +1,5 @@
 # Pinned lockfile for CI — generated from Poetry venv (poetry run pip freeze)
 # Update with: poetry update && poetry run pip freeze | grep -f <(grep -oP '^[\w-]+' requirements.txt) > requirements-ci.txt
-altgraph==0.17.5
 beautifulsoup4==4.14.3
 certifi==2026.5.20
 cffi==2.0.0
@@ -31,14 +30,7 @@ pyasn1==0.6.3
 pyasn1-modules==0.4.2
 pycparser==3.0
 Pygments==2.20.0
-pyinstaller==6.20.0
-pyinstaller-hooks-contrib==2026.5
 pyparsing==3.3.2
-PyQt6==6.11.0
-PyQt6-Qt6==6.11.1
-PyQt6-sip==13.11.1
-PyQt6-WebEngine==6.11.0
-PyQt6-WebEngine-Qt6==6.11.1
 PyYAML==6.0.3
 pytest==9.0.3
 pytest-cov==7.1.0

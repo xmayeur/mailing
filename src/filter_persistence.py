@@ -34,9 +34,7 @@ class FilterPersistence:
         if not isinstance(filter_criteria, dict) or len(filter_criteria) == 0:
             raise ValueError("Filter must contain at least one condition")
 
-        logger.debug(
-            f"Saving filter to profile '{self.profile_name}': {filter_criteria}"
-        )
+        logger.debug(f"Saving filter to profile '{self.profile_name}': {filter_criteria}")
 
         self.profile_config["filters"] = {"criteria": filter_criteria, "active": True}
 
@@ -58,9 +56,7 @@ class FilterPersistence:
         logger.debug(f"Loaded filters for profile '{self.profile_name}': {filters}")
         return cast(dict[str, Any], filters)
 
-    def validate_filter_criteria(
-        self, criteria: dict[str, Any], schema_columns: list[str]
-    ) -> bool:
+    def validate_filter_criteria(self, criteria: dict[str, Any], schema_columns: list[str]) -> bool:
         """Validate filter criteria against schema columns.
 
         Args:
@@ -79,9 +75,7 @@ class FilterPersistence:
                 return False
         return True
 
-    def apply_filter(
-        self, criteria: dict[str, Any], schema_columns: list[str]
-    ) -> dict[str, Any]:
+    def apply_filter(self, criteria: dict[str, Any], schema_columns: list[str]) -> dict[str, Any]:
         """Apply filter, validating against schema.
 
         If criteria invalid, skip with warning.

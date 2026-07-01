@@ -9,9 +9,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 # Add source directory to path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 # Mock external dependencies before importing
 mock_get_secret = MagicMock(return_value={"key": "value"})
@@ -137,14 +135,10 @@ class TestRenameFile:
         mock_service.files.return_value = mock_files
         mock_files.update.return_value = mock_update
 
-        result = gd.rename_file(
-            service=mock_service, file_id="file123", new_title="new_name.pdf"
-        )
+        result = gd.rename_file(service=mock_service, file_id="file123", new_title="new_name.pdf")
 
         assert result is not None
-        mock_files.update.assert_called_once_with(
-            fileId="file123", body={"name": "new_name.pdf"}
-        )
+        mock_files.update.assert_called_once_with(fileId="file123", body={"name": "new_name.pdf"})
 
     def test_rename_file_no_service(self):
         """Test rename_file with no service"""
@@ -170,9 +164,7 @@ class TestDownloadFile:
     @patch("googleDriveLib.MediaIoBaseDownload")
     @patch("googleDriveLib.io.BytesIO")
     @patch("builtins.open", create=True)
-    def test_download_file_success(
-        self, mock_open_file, mock_bytesio, mock_downloader_class
-    ):
+    def test_download_file_success(self, mock_open_file, mock_bytesio, mock_downloader_class):
         """Test successful file download"""
         mock_service = Mock()
         mock_files = Mock()
@@ -243,9 +235,7 @@ class TestUploadFile:
             mock_basename.return_value = "test.csv"
             mock_media_upload.return_value = Mock()
 
-            gd.upload_file(
-                service=mock_service, file="/path/to/test.csv", mimetype="text/csv"
-            )
+            gd.upload_file(service=mock_service, file="/path/to/test.csv", mimetype="text/csv")
 
             mock_files.create.assert_called_once()
             mock_media_upload.assert_called_once_with("/path/to/test.csv", "text/csv")
@@ -274,9 +264,7 @@ class TestUploadFile:
             )
 
             # Verify MediaFileUpload was called with the custom mimetype
-            mock_media_upload.assert_called_once_with(
-                "/path/to/test.pdf", "application/pdf"
-            )
+            mock_media_upload.assert_called_once_with("/path/to/test.pdf", "application/pdf")
 
 
 class TestInitLog:

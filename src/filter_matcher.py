@@ -33,9 +33,7 @@ class FilterMatcher:
         """Check if sendMail.filter is available."""
         return self._available
 
-    def match_row(
-        self, row_data: list[Any], filter_dict: dict[str, str], headers: list[str]
-    ) -> bool:
+    def match_row(self, row_data: list[Any], filter_dict: dict[str, str], headers: list[str]) -> bool:
         """Apply filter to a row of data.
 
         Args:

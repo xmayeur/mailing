@@ -134,10 +134,7 @@ class TestFileToBase64:
         assert isinstance(b64, str)
         assert len(b64) > 0
         # Should be valid base64 (only alphanumeric + / + = + whitespace)
-        assert all(
-            c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n"
-            for c in b64
-        )
+        assert all(c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n" for c in b64)
 
     def test_file_not_found(self):
         """Handle missing file gracefully."""
@@ -220,9 +217,7 @@ class TestGetSmtpConnection:
         from smtplib import SMTPAuthenticationError
 
         mock_conn = MagicMock()
-        mock_conn.login.side_effect = SMTPAuthenticationError(
-            530, "Authentication required"
-        )
+        mock_conn.login.side_effect = SMTPAuthenticationError(530, "Authentication required")
         mock_smtp_class.return_value = mock_conn
 
         param = MagicMock()

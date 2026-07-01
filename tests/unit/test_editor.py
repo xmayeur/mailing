@@ -1,7 +1,7 @@
 """
 Unit tests for src/editor.py
 
-All PyQt6 modules are mocked before import so these tests run headlessly
+All PySide6 modules are mocked before import so these tests run headlessly
 on CI without a display server, following the same pattern used in test_sendMail.py.
 """
 
@@ -23,13 +23,15 @@ import pytest
 import yaml as real_yaml
 
 _qt_mocks = [
-    "PyQt6",
-    "PyQt6.QtCore",
-    "PyQt6.QtGui",
-    "PyQt6.QtWidgets",
-    "PyQt6.QtWebEngineCore",
-    "PyQt6.QtWebEngineWidgets",
-    "PyQt6.QtWebChannel",
+    "shiboken6",
+    "shiboken6.Shiboken",
+    "PySide6",
+    "PySide6.QtCore",
+    "PySide6.QtGui",
+    "PySide6.QtWidgets",
+    "PySide6.QtWebEngineCore",
+    "PySide6.QtWebEngineWidgets",
+    "PySide6.QtWebChannel",
 ]
 for _mod in _qt_mocks:
     if _mod not in sys.modules:
@@ -162,23 +164,19 @@ class _FakeQDialog(_FakeQObject):
         pass
 
 
-sys.modules["PyQt6.QtCore"].pyqtSlot = _make_pyqtSlot  # pyright: ignore
-sys.modules["PyQt6.QtCore"].pyqtSignal = _make_pyqtSignal  # pyright: ignore
-sys.modules["PyQt6.QtCore"].QObject = _FakeQObject  # pyright: ignore
-sys.modules["PyQt6.QtCore"].QUrl = MagicMock()  # pyright: ignore
-sys.modules["PyQt6.QtCore"].Qt = MagicMock()  # pyright: ignore
+sys.modules["PySide6.QtCore"].Slot = _make_pyqtSlot  # pyright: ignore
+sys.modules["PySide6.QtCore"].Signal = _make_pyqtSignal  # pyright: ignore
+sys.modules["PySide6.QtCore"].QObject = _FakeQObject  # pyright: ignore
+sys.modules["PySide6.QtCore"].QUrl = MagicMock()  # pyright: ignore
+sys.modules["PySide6.QtCore"].Qt = MagicMock()  # pyright: ignore
 
-sys.modules["PyQt6.QtWidgets"].QMainWindow = _FakeQMainWindow  # pyright: ignore
-sys.modules["PyQt6.QtWidgets"].QDialog = _FakeQDialog  # pyright: ignore
-sys.modules["PyQt6.QtWidgets"].QDialog.DialogCode = (
-    _FakeQDialog.DialogCode
-)  # pyright: ignore
-sys.modules["PyQt6.QtWidgets"].QSpinBox = MagicMock()  # pyright: ignore
+sys.modules["PySide6.QtWidgets"].QMainWindow = _FakeQMainWindow  # pyright: ignore
+sys.modules["PySide6.QtWidgets"].QDialog = _FakeQDialog  # pyright: ignore
+sys.modules["PySide6.QtWidgets"].QDialog.DialogCode = _FakeQDialog.DialogCode  # pyright: ignore
+sys.modules["PySide6.QtWidgets"].QSpinBox = MagicMock()  # pyright: ignore
 
 # Add source directory to path so editor can be imported
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "src")))
 
 import editor  # noqa: E402  (must come after sys.modules patching)
 from editor import EditorBridge  # noqa: E402
@@ -276,9 +274,7 @@ class TestEditorBridgeImageInsert:
     def test_returns_empty_string_on_exception(self):
         bridge = _make_bridge()
         with (
-            patch(
-                "editor.QFileDialog.getOpenFileName", return_value=("/bad/path.png", "")
-            ),
+            patch("editor.QFileDialog.getOpenFileName", return_value=("/bad/path.png", "")),
             patch("editor.sm") as mock_sm,
         ):
             mock_sm.file_to_base64.side_effect = FileNotFoundError("not found")
@@ -292,9 +288,7 @@ class TestEditorBridgeImageInsert:
             tmp.write(b"\x89PNG\r\n\x1a\n")  # minimal PNG header bytes
             tmp_path = tmp.name
         try:
-            with patch(
-                "editor.QFileDialog.getOpenFileName", return_value=(tmp_path, "")
-            ):
+            with patch("editor.QFileDialog.getOpenFileName", return_value=(tmp_path, "")):
                 orig = editor._SM_AVAILABLE
                 editor._SM_AVAILABLE = False
                 try:
@@ -451,14 +445,10 @@ class TestHtmlFileWriter:
 
     def test_user_css_overrides_default(self):
         """When _css_path is set, its contents must appear in the saved HTML."""
-        with tempfile.NamedTemporaryFile(
-            suffix=".css", delete=False, mode="w", encoding="utf-8"
-        ) as css_tmp:
+        with tempfile.NamedTemporaryFile(suffix=".css", delete=False, mode="w", encoding="utf-8") as css_tmp:
             css_tmp.write("body { font-size: 20px; }")
             css_path = css_tmp.name
-        with tempfile.NamedTemporaryFile(
-            suffix=".html", delete=False, mode="w"
-        ) as html_tmp:
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w") as html_tmp:
             html_path = html_tmp.name
         try:
             self._write(html_path, "<p>styled</p>", css_path=css_path)
@@ -517,14 +507,10 @@ class TestLocalImageInlining:
     def test_local_img_inlined_via_sm(self):
         """When _SM_AVAILABLE, make_html_images_inline is called and data URIs appear."""
         win = self._make_window()
-        inlined_html = (
-            '<html><body><img src="data:image/png;base64,abc"/></body></html>'
-        )
+        inlined_html = '<html><body><img src="data:image/png;base64,abc"/></body></html>'
         with (
             patch.object(editor, "_SM_AVAILABLE", True),
-            patch(
-                "editor.sm.make_html_images_inline", return_value=inlined_html
-            ) as mock_inline,
+            patch("editor.sm.make_html_images_inline", return_value=inlined_html) as mock_inline,
         ):
             result = win._html_to_body_html("/fake/file.html")
 
@@ -730,12 +716,7 @@ class TestTableCellNormalization:
         assert len(set(ids)) == 1  # all the same
 
     def test_different_rows_have_different_ids(self):
-        html = (
-            "<table>"
-            "<tr><td>a</td><td>b</td></tr>"
-            "<tr><td>c</td><td>d</td></tr>"
-            "</table>"
-        )
+        html = "<table>" "<tr><td>a</td><td>b</td></tr>" "<tr><td>c</td><td>d</td></tr>" "</table>"
         result = editor.EditorWindow._normalize_table_cells(html)
         ids = self._row_ids(result)
         assert len(ids) == 4
@@ -1042,12 +1023,8 @@ class TestConfigDialogHelpers:
 
         monkeypatch.setattr(sendMail, "yaml", real_yaml)
         # Explicitly set yaml in function globals to use the real module
-        monkeypatch.setitem(
-            editor._ConfigDialog._load_yaml_block.__globals__, "yaml", real_yaml
-        )
-        monkeypatch.setitem(
-            editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml
-        )
+        monkeypatch.setitem(editor._ConfigDialog._load_yaml_block.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(editor._ConfigDialog._dump_yaml_block.__globals__, "yaml", real_yaml)
         dlg = _make_config_dialog_stub()
 
         normalized = dlg._normalize_config_data({"alpha": {"x": 1}, "skip": "nope"})
@@ -1058,9 +1035,7 @@ class TestConfigDialogHelpers:
         assert dlg._profile_value("missing") == {}
         assert dlg._dump_yaml_block({"email": "is not empty"})
         assert dlg._dump_yaml_block(None) == ""
-        assert dlg._load_yaml_block("email: is not empty", "filter") == {
-            "email": "is not empty"
-        }
+        assert dlg._load_yaml_block("email: is not empty", "filter") == {"email": "is not empty"}
         assert dlg._load_yaml_block("scope-a, scope-b", "scopes") == [
             "scope-a",
             "scope-b",
@@ -1092,12 +1067,8 @@ class TestConfigDialogHelpers:
         monkeypatch.setattr(editor, "QSpinBox", _SpinBoxLike)
         monkeypatch.setattr(editor, "QCheckBox", _CheckBoxLike)
         monkeypatch.setattr(editor, "QPlainTextEdit", _PlainTextLike)
-        monkeypatch.setitem(
-            editor._ConfigDialog._read_config_file.__globals__, "yaml", real_yaml
-        )
-        monkeypatch.setitem(
-            editor._ConfigDialog._save_config.__globals__, "yaml", real_yaml
-        )
+        monkeypatch.setitem(editor._ConfigDialog._read_config_file.__globals__, "yaml", real_yaml)
+        monkeypatch.setitem(editor._ConfigDialog._save_config.__globals__, "yaml", real_yaml)
         dlg = _make_config_dialog_stub()
 
         cfg_path = tmp_path / "config.yml"
@@ -1124,9 +1095,7 @@ class TestConfigDialogHelpers:
         dlg.profile_combo = _FakeCombo()
         dlg.profile_combo.current = "alpha"
         dlg._load_profile = MagicMock()
-        dlg._read_config_file = MagicMock(
-            return_value={"alpha": {"sender": "loaded@example.com"}}
-        )
+        dlg._read_config_file = MagicMock(return_value={"alpha": {"sender": "loaded@example.com"}})
         dlg._reload_profiles("alpha")
         assert dlg.profile_combo.items[0] == "alpha"
         assert "default" in dlg.profile_combo.items
@@ -1142,13 +1111,9 @@ class TestConfigDialogHelpers:
             assert "gamma" in dlg._config_data
 
         dlg._current_profile = "alpha"
-        dlg._collect_profile_data = MagicMock(
-            return_value={"sender": "copy@example.com"}
-        )
+        dlg._collect_profile_data = MagicMock(return_value={"sender": "copy@example.com"})
         dlg._reload_profiles = MagicMock()
-        with patch.object(
-            editor.QInputDialog, "getText", return_value=("alpha-copy", True)
-        ):
+        with patch.object(editor.QInputDialog, "getText", return_value=("alpha-copy", True)):
             dlg._duplicate_profile()
             assert dlg._config_data["alpha-copy"]["sender"] == "copy@example.com"
 
@@ -1171,9 +1136,7 @@ class TestConfigDialogHelpers:
             mock_info.assert_called_once()  # pyright: ignore
 
 
-@pytest.mark.xfail(
-    reason="Test isolation issue: pass individually, fail in batch due to shared module state"
-)
+@pytest.mark.xfail(reason="Test isolation issue: pass individually, fail in batch due to shared module state")
 class TestEditorWindowHelpers:
     def _make_window(self):
         win = object.__new__(editor.EditorWindow)
@@ -1190,16 +1153,12 @@ class TestEditorWindowHelpers:
         win.open_file = MagicMock()
         win.statusBar = MagicMock(return_value=_FakeStatusBar())
         win.setWindowTitle = MagicMock()
-        win.style = MagicMock(
-            return_value=MagicMock(standardIcon=MagicMock(return_value="icon"))
-        )
+        win.style = MagicMock(return_value=MagicMock(standardIcon=MagicMock(return_value="icon")))
         return win
 
     def test_editor_window_init_paths(self, monkeypatch):
         with (
-            patch.object(
-                editor.EditorWindow, "_load_editor_page", autospec=True
-            ) as mock_load,
+            patch.object(editor.EditorWindow, "_load_editor_page", autospec=True) as mock_load,
             patch.object(editor.EditorWindow, "open_file", autospec=True) as mock_open,
         ):
             window = editor.EditorWindow()
@@ -1208,9 +1167,7 @@ class TestEditorWindowHelpers:
             mock_open.assert_not_called()  # pyright: ignore
 
         with (
-            patch.object(
-                editor.EditorWindow, "_load_editor_page", autospec=True
-            ) as mock_load,
+            patch.object(editor.EditorWindow, "_load_editor_page", autospec=True) as mock_load,
             patch.object(editor.EditorWindow, "open_file", autospec=True) as mock_open,
         ):
             window = editor.EditorWindow(file_path="sample.md")
@@ -1220,12 +1177,8 @@ class TestEditorWindowHelpers:
     def test_resolve_load_and_format_helpers(self, monkeypatch, tmp_path):
         win = self._make_window()
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
-        monkeypatch.setattr(
-            editor.sm, "get_default_config_path", lambda: str(tmp_path / "cfg.yml")
-        )
-        monkeypatch.setitem(
-            editor.EditorWindow._load_send_config.__globals__, "yaml", real_yaml
-        )
+        monkeypatch.setattr(editor.sm, "get_default_config_path", lambda: str(tmp_path / "cfg.yml"))
+        monkeypatch.setitem(editor.EditorWindow._load_send_config.__globals__, "yaml", real_yaml)
         assert win._resolve_send_config_path() == str(tmp_path / "cfg.yml")
 
         monkeypatch.setattr(editor.sm, "get_default_config_path", lambda: -1)
@@ -1249,16 +1202,12 @@ class TestEditorWindowHelpers:
         win._file_path = str(tmp_path / "doc.html")
         win._bridge.is_dirty = True
         win._update_title()
-        win.setWindowTitle.assert_called_with(
-            "sendMail Editor — doc.html *"
-        )  # pyright: ignore
+        win.setWindowTitle.assert_called_with("sendMail Editor — doc.html *")  # pyright: ignore
 
         win._file_path = None
         win._bridge.is_dirty = False
         win._update_title()
-        win.setWindowTitle.assert_called_with(
-            "sendMail Editor — New Document"
-        )  # pyright: ignore
+        win.setWindowTitle.assert_called_with("sendMail Editor — New Document")  # pyright: ignore
 
         win._run_js("quill.format('font', 'Arial')")
         assert "Arial" in win._view.page().runJavaScript.call_args.args[0]
@@ -1290,9 +1239,7 @@ class TestEditorWindowHelpers:
         (template_dir / "template.md").write_text("# t", encoding="utf-8")
         with patch.object(win, "_ask_save_if_dirty", return_value=True):
             win._open_template()
-        win.open_file.assert_called_with(
-            str(template_dir / "template.md")
-        )  # pyright: ignore
+        win.open_file.assert_called_with(str(template_dir / "template.md"))  # pyright: ignore
 
         (template_dir / "template.md").unlink()
         with (
@@ -1304,20 +1251,14 @@ class TestEditorWindowHelpers:
             ),
         ):
             win._open_template()
-        win.open_file.assert_called_with(
-            str(tmp_path / "fallback.md")
-        )  # pyright: ignore
+        win.open_file.assert_called_with(str(tmp_path / "fallback.md"))  # pyright: ignore
 
         win._run_js = MagicMock()
-        win._bridge.request_image_insert = MagicMock(
-            return_value="data:image/png;base64,abc"
-        )
+        win._bridge.request_image_insert = MagicMock(return_value="data:image/png;base64,abc")
         win._menu_insert_image()
         assert "insertEmbed" in win._run_js.call_args.args[0]
 
-        win._bridge.request_link_insert = MagicMock(
-            return_value=json.dumps({"url": "#anchor", "text": "Anchor"})
-        )
+        win._bridge.request_link_insert = MagicMock(return_value=json.dumps({"url": "#anchor", "text": "Anchor"}))
         win._menu_insert_link()
         assert "quill.insertText" in win._run_js.call_args.args[0]
 
@@ -1366,9 +1307,7 @@ class TestEditorWindowHelpers:
         win._run_js = MagicMock()
         win._on_css_changed(str(css_path))
         assert win._css_path == str(css_path)
-        win._css_status_label.setText.assert_called_with(
-            "CSS: style.css"
-        )  # pyright: ignore
+        win._css_status_label.setText.assert_called_with("CSS: style.css")  # pyright: ignore
         assert "applyCSS" in win._run_js.call_args.args[0]
 
         bad = tmp_path / "missing.css"
@@ -1443,9 +1382,7 @@ class TestEditorWindowHelpers:
         assert win._view.load.called
         assert win._view.loadFinished.connected
         win._view.loadFinished.connected[0](True)
-        win._inject_initial_content.assert_called_once_with(
-            "<p>hello</p>"
-        )  # pyright: ignore
+        win._inject_initial_content.assert_called_once_with("<p>hello</p>")  # pyright: ignore
 
         css_path = tmp_path / "style.css"
         css_path.write_text("body { color: blue; }", encoding="utf-8")
@@ -1479,9 +1416,7 @@ class TestEditorWindowHelpers:
             win._save = MagicMock(return_value=True)
             assert editor.EditorWindow._save_as(win) is True
 
-        win._bridge.request_table_insert = MagicMock(
-            return_value=json.dumps({"rows": 2, "cols": 3})
-        )
+        win._bridge.request_table_insert = MagicMock(return_value=json.dumps({"rows": 2, "cols": 3}))
         win._run_js = MagicMock()
         win._menu_table_insert()
         assert "insertTable" in win._run_js.call_args.args[0]
@@ -1523,12 +1458,8 @@ class TestEditorWindowHelpers:
         monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
         output_html = tmp_path / "output.html"
         output_html.write_text("<html><body><p>ok</p></body></html>", encoding="utf-8")
-        monkeypatch.setattr(
-            editor.sm, "md2html", lambda *_args, **_kwargs: str(output_html)
-        )
-        with patch.object(
-            editor.EditorWindow, "_html_to_body_html", return_value="<p>ok</p>"
-        ) as mock_convert:
+        monkeypatch.setattr(editor.sm, "md2html", lambda *_args, **_kwargs: str(output_html))
+        with patch.object(editor.EditorWindow, "_html_to_body_html", return_value="<p>ok</p>") as mock_convert:
             output = win._md_to_body_html(str(md_path))
             assert output == "<p>ok</p>"
             assert not output_html.exists()
@@ -1549,9 +1480,7 @@ class TestEditorWindowHelpers:
         body = win._html_to_body_html(str(html_path))
         assert "img" in body
 
-        with patch.object(
-            editor.sm, "make_html_images_inline", side_effect=RuntimeError("boom")
-        ):
+        with patch.object(editor.sm, "make_html_images_inline", side_effect=RuntimeError("boom")):
             assert win._html_to_body_html(str(html_path)) == ""
 
 
@@ -1566,9 +1495,7 @@ class TestLogCapture:
 
         log_list: list[str] = []
         handler = editor._LogCapture(log_list)
-        record = _logging.LogRecord(
-            "test.logger", _logging.INFO, "", 0, "Hello world", None, None
-        )
+        record = _logging.LogRecord("test.logger", _logging.INFO, "", 0, "Hello world", None, None)
         handler.emit(record)
         assert len(log_list) == 1
         assert "Hello world" in log_list[0]
@@ -1600,9 +1527,7 @@ class TestLogCapture:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="Test isolation issue: pass individually, fail in batch due to shared module state"
-)
+@pytest.mark.xfail(reason="Test isolation issue: pass individually, fail in batch due to shared module state")
 class TestSmallDialogs:
     """Exercise dialog constructors (covers __init__ bodies) and getter methods."""
 
@@ -1656,9 +1581,7 @@ class TestSmallDialogs:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="Test isolation issue: pass individually, fail in batch due to shared module state"
-)
+@pytest.mark.xfail(reason="Test isolation issue: pass individually, fail in batch due to shared module state")
 class TestConfigDialogTabBuilders:
     """Verify that all _build_*_tab methods run and populate _widgets."""
 
@@ -1735,11 +1658,7 @@ class TestConfigDialogTabBuilders:
             type(
                 "QFD",
                 (),
-                {
-                    "getOpenFileName": staticmethod(
-                        lambda *a, **k: ("/new/config.yml", "")
-                    )
-                },
+                {"getOpenFileName": staticmethod(lambda *a, **k: ("/new/config.yml", ""))},
             ),
         )
         dlg._browse_config()
@@ -1752,9 +1671,7 @@ class TestConfigDialogTabBuilders:
         monkeypatch.setitem(
             editor._ConfigDialog._browse_config.__globals__,
             "QFileDialog",
-            type(
-                "QFD", (), {"getOpenFileName": staticmethod(lambda *a, **k: ("", ""))}
-            ),
+            type("QFD", (), {"getOpenFileName": staticmethod(lambda *a, **k: ("", ""))}),
         )
         dlg._browse_config()
         dlg._reload_profiles.assert_not_called()
@@ -1765,9 +1682,7 @@ class TestConfigDialogTabBuilders:
 # ---------------------------------------------------------------------------
 
 
-def _make_send_dialog_stub(
-    *, config_data=None, attachment="/tmp/test.html", profile="default"  # NOSONAR
-):
+def _make_send_dialog_stub(*, config_data=None, attachment="/tmp/test.html", profile="default"):  # NOSONAR
     """Return a _SendDialog bypassing __init__, with all widgets as testable stubs."""
     dlg = object.__new__(editor._SendDialog)
     dlg._config_data = config_data or {}
@@ -1825,9 +1740,7 @@ class TestSendDialogReloadProfiles:
 
         import yaml as real_yaml
 
-        with patch.dict(
-            editor._SendDialog._reload_profiles.__globals__, {"yaml": real_yaml}
-        ):
+        with patch.dict(editor._SendDialog._reload_profiles.__globals__, {"yaml": real_yaml}):
             dlg._reload_profiles()
 
         assert "alpha" in dlg._config_data
@@ -1864,9 +1777,7 @@ class TestSendDialogLoadCurrentFilter:
         assert dlg._session_filter is None
 
     def test_loads_dict_filter_as_yaml(self):
-        dlg = _make_send_dialog_stub(
-            config_data={"default": {"filter": {"email": "is not empty"}}}
-        )
+        dlg = _make_send_dialog_stub(config_data={"default": {"filter": {"email": "is not empty"}}})
         dlg._current_profile = "default"
         dlg.load_current_filter("default")
         text = dlg.filter_text_edit.toPlainText()
@@ -1889,9 +1800,7 @@ class TestSendDialogLoadCurrentFilter:
         assert "test@test.com" in text
 
     def test_string_filter_displayed(self):
-        dlg = _make_send_dialog_stub(
-            config_data={"default": {"filter": "email: is not empty"}}
-        )
+        dlg = _make_send_dialog_stub(config_data={"default": {"filter": "email: is not empty"}})
         dlg._current_profile = "default"
         dlg.load_current_filter("default")
         text = dlg.filter_text_edit.toPlainText()
@@ -1943,9 +1852,7 @@ class TestSendDialogGetSchemaCache:
         mock_cache_instance = MagicMock()
         mock_cache_cls.return_value = mock_cache_instance
 
-        with patch.dict(
-            sys.modules, {"schema_cache": MagicMock(SchemaCacheProvider=mock_cache_cls)}
-        ):
+        with patch.dict(sys.modules, {"schema_cache": MagicMock(SchemaCacheProvider=mock_cache_cls)}):
             result = dlg._get_schema_cache()
 
         assert result is mock_cache_instance
@@ -1961,9 +1868,7 @@ class TestSendDialogUpdateValidationUi:
     def test_valid_status_sets_green_style(self):
         dlg = _make_send_dialog_stub()
         dlg.filter_and_display_records = MagicMock()
-        dlg._update_validation_ui(
-            {"is_valid": True, "syntax_errors": [], "missing_fields": []}
-        )
+        dlg._update_validation_ui({"is_valid": True, "syntax_errors": [], "missing_fields": []})
         # Verify the status label was called
         dlg.filter_status_label.setText.assert_called_with("")
         dlg.filter_and_display_records.assert_called_once()
@@ -1992,9 +1897,7 @@ class TestSendDialogLoadDatabaseRecords:
 
     def test_csv_path_loads_data(self, tmp_path):
         csv_file = tmp_path / "data.csv"
-        csv_file.write_text(
-            "name,email\nAlice,alice@test.com\nBob,bob@test.com\n", encoding="utf-8"
-        )
+        csv_file.write_text("name,email\nAlice,alice@test.com\nBob,bob@test.com\n", encoding="utf-8")
         dlg = _make_send_dialog_stub()
         dlg.database_input = _LineEditLike(str(csv_file))
         rows, headers = dlg.load_database_records()
@@ -2010,9 +1913,7 @@ class TestSendDialogLoadDatabaseRecords:
         assert headers == ["name", "email"]
 
     def test_gsheet_profile_loads_via_sendmail(self):
-        dlg = _make_send_dialog_stub(
-            config_data={"gsheet_profile": {"SHEETID": "sheet123", "SA": "sa_key"}}
-        )
+        dlg = _make_send_dialog_stub(config_data={"gsheet_profile": {"SHEETID": "sheet123", "SA": "sa_key"}})
         dlg._current_profile = "gsheet_profile"
 
         mock_wb = MagicMock()
@@ -2185,9 +2086,7 @@ class TestEditorWindowOpenFile:
         win._save_documents_path = MagicMock()
         win.statusBar = MagicMock(return_value=_FakeStatusBar())
         win.setWindowTitle = MagicMock()
-        win.style = MagicMock(
-            return_value=MagicMock(standardIcon=MagicMock(return_value="icon"))
-        )
+        win.style = MagicMock(return_value=MagicMock(standardIcon=MagicMock(return_value="icon")))
         return win
 
     def test_open_nonexistent_file_warns(self):
@@ -2209,9 +2108,7 @@ class TestEditorWindowOpenFile:
         win = self._make_window()
         html = tmp_path / "doc.html"
         html.write_text("<html><body><p>hi</p></body></html>")
-        with patch.object(
-            editor.EditorWindow, "_html_to_body_html", return_value="<p>hi</p>"
-        ):
+        with patch.object(editor.EditorWindow, "_html_to_body_html", return_value="<p>hi</p>"):
             win.open_file(str(html))
         assert str(html) in win._file_path
         win._load_editor_page.assert_called_once()
@@ -2220,9 +2117,7 @@ class TestEditorWindowOpenFile:
         win = self._make_window()
         md = tmp_path / "doc.md"
         md.write_text("# Title")
-        with patch.object(
-            editor.EditorWindow, "_md_to_body_html", return_value="<h1>Title</h1>"
-        ):
+        with patch.object(editor.EditorWindow, "_md_to_body_html", return_value="<h1>Title</h1>"):
             win.open_file(str(md))
         assert str(md) in win._file_path
 
@@ -2233,10 +2128,7 @@ class TestEditorWindowOpenFile:
 
     def test_is_template_file_true_for_template_suffix(self):
         win = self._make_window()
-        assert (
-            editor.EditorWindow._is_template_file(win, "newsletter.template.html")
-            is True
-        )
+        assert editor.EditorWindow._is_template_file(win, "newsletter.template.html") is True
 
     def test_is_template_file_false_for_regular(self):
         win = self._make_window()
@@ -2255,9 +2147,7 @@ class TestEditorWindowOpenFile:
 
     def test_validate_documents_path_invalid(self):
         win = self._make_window()
-        assert (
-            editor.EditorWindow._validate_documents_path(win, "/no/such/dir") is False
-        )
+        assert editor.EditorWindow._validate_documents_path(win, "/no/such/dir") is False
 
     def test_load_config_no_file_does_not_raise(self, tmp_path):
         win = self._make_window()
@@ -2285,9 +2175,7 @@ class TestEditorWindowOpenFile:
         css_file = tmp_path / "style.css"
         css_file.write_text("body { color: black; }")
         win._resolve_send_config_path = MagicMock(return_value="cfg.yml")
-        win._load_send_config = MagicMock(
-            return_value={"default": {"styles": str(css_file)}}
-        )
+        win._load_send_config = MagicMock(return_value={"default": {"styles": str(css_file)}})
         win._bridge = _FakeBridge()
         win._bridge.css_changed = MagicMock()
         editor.EditorWindow._load_default_stylesheet(win)
