@@ -49,6 +49,10 @@ def build() -> None:
         "--standalone",  # self-contained directory
         "--enable-plugin=pyside6",  # handles QtWebEngineProcess + qt.conf
         "--nofollow-import-to=pytest,_pytest",
+        # Windows standalone builds need Dependency Walker to analyze extension-module
+        # DLLs; Nuitka prompts to download it and defaults to "no" when non-interactive,
+        # so CI needs this to actually proceed.
+        "--assume-yes-for-downloads",
         # ── Qt WebEngine resources (auto-handled by plugin, but be explicit) ─
         # "styles"/"platformthemes" exist on only one of macOS/Linux each (not both), so
         # keep this to families present on every build platform (ubuntu/macos/windows).
