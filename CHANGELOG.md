@@ -1,3 +1,13 @@
+## v1.14.0 (2026-07-01)
+
+### Feat
+
+- cancel-in-progress sending, non-blocking send dialog, fix test crash
+
+### Fix
+
+- editor crash on startup and silent config-field data loss
+
 ## v1.13.2 (2026-06-23)
 
 ### Fix
