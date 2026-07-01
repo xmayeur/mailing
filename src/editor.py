@@ -232,7 +232,10 @@ _SVG_SEND = (
 def _svg_icon(svg: str) -> QIcon:
     """Create a QIcon from an SVG string; returns an empty icon if the SVG plugin is unavailable."""
     pix = QPixmap()
-    pix.loadFromData(QByteArray(svg.encode()), b"SVG")
+    # PySide6 6.11's stub types `format` as bytes, but the installed runtime's shiboken
+    # overload resolution rejects b"SVG" ("wrong argument values") and only accepts str.
+    # Verified empirically; type: ignore is for the stub, not this call.
+    pix.loadFromData(QByteArray(svg.encode()), "SVG")  # type: ignore[call-overload]
     return QIcon(pix)
 
 
@@ -2371,14 +2374,17 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             widget.setPlainText("")
 
     def _get_config_value_for_widget(self, key: str, widget: QWidget, cfg: ConfigData, defaults: ConfigData) -> object:
-        if key in cfg:
-            return cfg[key]
+        # cfg keys are lowercased by _profile_value(); widget keys (e.g. "MAILCONFIG") are not,
+        # so the lookup must lowercase key to match -- otherwise the field silently loads blank
+        # and a save then wipes the real value from the profile.
+        if key.lower() in cfg:
+            return cfg[key.lower()]
         if isinstance(widget, QSpinBox):
             return defaults.get(key, "")
         return None
 
     def _get_spinbox_default_value(self, key: str, cfg: ConfigData, defaults: ConfigData) -> int:
-        val = defaults.get(key, 0) if key in cfg else 0
+        val = defaults.get(key, 0) if key.lower() in cfg else 0
         if isinstance(val, int):
             return val
         if isinstance(val, str):
