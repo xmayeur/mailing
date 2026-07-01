@@ -35,11 +35,7 @@ class Profile:
     @property
     def vault_key(self) -> str | None:
         """Get vault key for this profile's SMTP credentials."""
-        return (
-            self.config.get("vault_key")
-            or self.config.get("MAILCONFIG")
-            or self.config.get("mailconfig")
-        )
+        return self.config.get("vault_key") or self.config.get("MAILCONFIG") or self.config.get("mailconfig")
 
     @property
     def filters(self) -> dict[str, Any] | None:
@@ -66,9 +62,7 @@ class Profile:
                 f"Add 'vault_key: mailconfig: <key>' to profile config."
             )
 
-        logger.debug(
-            f"Fetching SMTP params for profile '{self.name}' from vault key '{vault_key}'"
-        )
+        logger.debug(f"Fetching SMTP params for profile '{self.name}' from vault key '{vault_key}'")
 
         try:
             # Parse vault key format: "mailconfig: artscroisesmailing" → "artscroisesmailing"

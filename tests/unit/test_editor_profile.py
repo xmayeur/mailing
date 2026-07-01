@@ -47,9 +47,7 @@ class TestEditorProfileStyler:
         assert css.strip().endswith("}")
 
     def test_create_profile_css_with_rules(self):
-        css = EditorProfileStyler.create_profile_css(
-            "myprofile", {"color": "red", "font-size": "12px"}
-        )
+        css = EditorProfileStyler.create_profile_css("myprofile", {"color": "red", "font-size": "12px"})
         assert "color: red;" in css
         assert "font-size: 12px;" in css
 

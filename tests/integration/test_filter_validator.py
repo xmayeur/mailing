@@ -49,44 +49,32 @@ class TestFilterValidator:
         missing = validator.validate_field_names(filter_dict, schema)
         assert set(missing) == {"salary"}
 
-    def test_validate_field_names_empty_filter(
-        self, validator: FilterValidator
-    ) -> None:
+    def test_validate_field_names_empty_filter(self, validator: FilterValidator) -> None:
         """Test validation with empty filter returns no missing."""
         missing = validator.validate_field_names({}, ["age", "name"])
         assert missing == []
 
-    def test_get_validation_status_valid_filter(
-        self, validator: FilterValidator
-    ) -> None:
+    def test_get_validation_status_valid_filter(self, validator: FilterValidator) -> None:
         """Test validation status for valid filter."""
         status = validator.get_validation_status("age: gt 18", ["age", "name"])
         assert status["is_valid"] is True
         assert status["syntax_errors"] == []
         assert status["missing_fields"] == []
 
-    def test_get_validation_status_invalid_syntax(
-        self, validator: FilterValidator
-    ) -> None:
+    def test_get_validation_status_invalid_syntax(self, validator: FilterValidator) -> None:
         """Test validation status for invalid YAML syntax."""
         status = validator.get_validation_status("{ bad yaml:", ["age"])
         assert status["is_valid"] is False
         assert len(status["syntax_errors"]) > 0
         assert "Invalid YAML syntax" in status["syntax_errors"][0]
 
-    def test_get_validation_status_missing_fields(
-        self, validator: FilterValidator
-    ) -> None:
+    def test_get_validation_status_missing_fields(self, validator: FilterValidator) -> None:
         """Test validation status for missing fields."""
-        status = validator.get_validation_status(
-            "age: gt 18\nsalary: gt 50000", ["age", "name"]
-        )
+        status = validator.get_validation_status("age: gt 18\nsalary: gt 50000", ["age", "name"])
         assert status["is_valid"] is False
         assert status["missing_fields"] == ["salary"]
 
-    def test_get_validation_status_empty_filter(
-        self, validator: FilterValidator
-    ) -> None:
+    def test_get_validation_status_empty_filter(self, validator: FilterValidator) -> None:
         """Test validation status for empty filter."""
         status = validator.get_validation_status("", ["age"])
         assert status["is_valid"] is True

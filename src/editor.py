@@ -111,7 +111,7 @@ class _LogCapture(logging.Handler):
 # ---------------------------------------------------------------------------
 # Qt imports
 # ---------------------------------------------------------------------------
-from PyQt6.QtCore import (  # noqa: E402
+from PySide6.QtCore import (  # noqa: E402
     QByteArray,
     QObject,
     QSize,
@@ -119,14 +119,14 @@ from PyQt6.QtCore import (  # noqa: E402
     QThread,
     QTimer,
     QUrl,
-    pyqtSignal,
-    pyqtSlot,
+    Signal,
+    Slot,
 )
-from PyQt6.QtGui import QIcon, QPixmap  # noqa: E402
-from PyQt6.QtWebChannel import QWebChannel  # noqa: E402
-from PyQt6.QtWebEngineCore import QWebEnginePage  # noqa: E402
-from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
-from PyQt6.QtWidgets import (  # noqa: E402
+from PySide6.QtGui import QIcon, QPixmap  # noqa: E402
+from PySide6.QtWebChannel import QWebChannel  # noqa: E402
+from PySide6.QtWebEngineCore import QWebEnginePage  # noqa: E402
+from PySide6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
+from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
     QCheckBox,
     QComboBox,
@@ -231,7 +231,7 @@ _SVG_SEND = (
 def _svg_icon(svg: str) -> QIcon:
     """Create a QIcon from an SVG string; returns an empty icon if the SVG plugin is unavailable."""
     pix = QPixmap()
-    pix.loadFromData(QByteArray(svg.encode()), "SVG")
+    pix.loadFromData(QByteArray(svg.encode()), b"SVG")
     return QIcon(pix)
 
 
@@ -241,15 +241,13 @@ def _svg_icon(svg: str) -> QIcon:
 class _EditorPage(QWebEnginePage):  # pragma: no cover  # type: ignore[misc]
     """Custom page that intercepts link clicks to prevent navigation away from editor.html."""
 
-    def acceptNavigationRequest(  # noqa: N802
-        self, _url: Any, nav_type: Any, _is_main_frame: bool
-    ) -> bool:
+    def acceptNavigationRequest(self, _url: Any, nav_type: Any, _is_main_frame: bool) -> bool:  # noqa: N802
         if nav_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked:
             return False  # block same-frame link navigation
         return True
 
-    def createWindow(self, _win_type: Any) -> None:  # noqa: N802
-        return None  # block target="_blank" new-window creation
+    def createWindow(self, _win_type: Any) -> QWebEnginePage:  # noqa: N802
+        return cast(QWebEnginePage, None)  # block target="_blank" new-window creation
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +306,7 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     signal; blocks close until set_complete() is called after send finishes.
     """
 
-    log_line_received: pyqtSignal = pyqtSignal(str)
+    log_line_received: Signal = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -347,8 +345,7 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         if is_test:
             title = "Test Email Sent" if success else "Test Send Failed"
             msg = (
-                "Test email sent successfully.\n\nHave the test recipients confirmed\n"
-                "the mailing looks good?"
+                "Test email sent successfully.\n\nHave the test recipients confirmed\n" "the mailing looks good?"
                 if success
                 else "Test send encountered an error. See log above."
             )
@@ -361,11 +358,7 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             self._test_confirmed = success and reply == QMessageBox.StandardButton.Yes
         else:
             title = "Send Complete" if success else "Send Failed"
-            msg = (
-                "Mailing sent successfully."
-                if success
-                else "Send encountered an error. See log above."
-            )
+            msg = "Mailing sent successfully." if success else "Send encountered an error. See log above."
             QMessageBox.information(self, title, msg)
             self._test_confirmed = False
         self._close_button.setEnabled(True)
@@ -388,8 +381,8 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 class _SendWorker(QThread):  # pragma: no cover  # type: ignore[misc]
     """Run sendMail in a background thread; emit log lines and final result via signals."""
 
-    log_line: pyqtSignal = pyqtSignal(str)
-    send_result: pyqtSignal = pyqtSignal(str)
+    log_line: Signal = Signal(str)
+    send_result: Signal = Signal(str)
 
     def __init__(self, dialog: Any, send_fn: Any) -> None:
         super().__init__()
@@ -445,7 +438,7 @@ class _HtmlSourceDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
     @staticmethod
     def _copy_to_clipboard(text: str) -> None:
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
 
         clipboard = QApplication.clipboard()
         if clipboard is not None:
@@ -559,7 +552,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        from PyQt6.QtWidgets import QScrollArea
+        from PySide6.QtWidgets import QScrollArea
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -619,9 +612,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.profile_combo.currentTextChanged.connect(self._load_profile_defaults)
         form.addRow("Profile", self.profile_combo)
 
-    def _setup_attachments_widget(
-        self, form: QFormLayout, attachment_path: str
-    ) -> None:
+    def _setup_attachments_widget(self, form: QFormLayout, attachment_path: str) -> None:
         attachment_label = QLabel(Path(attachment_path).name, self)
         attachment_label.setToolTip(attachment_path)
         attachment_widget = QWidget(self)
@@ -632,12 +623,8 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.attachment_list = QListWidget(self)
         self.attachment_list.setMinimumHeight(80)
         self.attachment_list.setMaximumHeight(200)
-        self.attachment_list.setContextMenuPolicy(
-            Qt.ContextMenuPolicy.CustomContextMenu
-        )
-        self.attachment_list.customContextMenuRequested.connect(
-            self._on_attachment_context_menu
-        )
+        self.attachment_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.attachment_list.customContextMenuRequested.connect(self._on_attachment_context_menu)
         add_attachment_btn = QPushButton("Add File(s)", attachment_widget)
         add_attachment_btn.clicked.connect(self._on_add_attachment)
         attachment_layout.addWidget(add_attachment_btn)
@@ -683,15 +670,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _setup_filter_builder(self, form: QFormLayout, initial_profile: str) -> None:
         initial_filter_dict: dict[str, str] = {}
         try:
-            if self._initial_config_data and initial_profile in cast(
-                Any, self._initial_config_data
-            ):
+            if self._initial_config_data and initial_profile in cast(Any, self._initial_config_data):
                 profile_cfg = cast(Any, self._initial_config_data)[initial_profile]
-                filter_obj = (
-                    cast(Any, profile_cfg).get("filter")
-                    if isinstance(profile_cfg, dict)
-                    else None
-                )
+                filter_obj = cast(Any, profile_cfg).get("filter") if isinstance(profile_cfg, dict) else None
                 if isinstance(filter_obj, dict):
                     initial_filter_dict = cast(dict[str, str], filter_obj)
         except (KeyError, TypeError, AttributeError) as e:
@@ -707,7 +688,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.filter_status_label = QLabel("", self)
         self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
 
-        from PyQt6.QtWidgets import QScrollArea
+        from PySide6.QtWidgets import QScrollArea
 
         filter_widget = QWidget(self)
         filter_layout = QVBoxLayout(filter_widget)
@@ -727,9 +708,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
     def _setup_filter_yaml_editor(self, form: QFormLayout) -> None:
         self.filter_text_edit = QPlainTextEdit(self)
-        self.filter_text_edit.setPlaceholderText(
-            "YAML filter (optional)\nExample: status: is active"
-        )
+        self.filter_text_edit.setPlaceholderText("YAML filter (optional)\nExample: status: is active")
         self.filter_text_edit.setMinimumHeight(60)
         self.filter_status_label = QLabel("", self)
         self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
@@ -863,11 +842,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sendMail config",
-            (
-                str(Path(self.config_input.text()).parent)
-                if self.config_input.text()
-                else str(Path.home())
-            ),
+            (str(Path(self.config_input.text()).parent) if self.config_input.text() else str(Path.home())),
             "YAML Files (*.yml *.yaml);;All Files (*)",
         )
         if path:
@@ -878,11 +853,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select database",
-            (
-                str(Path(self.database_input.text()).parent)
-                if self.database_input.text()
-                else str(Path.home())
-            ),
+            (str(Path(self.database_input.text()).parent) if self.database_input.text() else str(Path.home())),
             "Data Files (*.csv *.xlsx *.xlsm *.xls *.ods);;All Files (*)",
         )
         if path:
@@ -949,7 +920,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
         self.database_input.setText(str(profile_cfg.get("database", "")))
         # Process any pending Qt events to ensure database path is set before validation
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
 
         QApplication.processEvents()
 
@@ -986,12 +957,8 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.from_index_input.setValue(_int_or_zero(profile_cfg.get("from_index")))
         self.to_index_input.setValue(_int_or_zero(profile_cfg.get("to_index")))
         self.wait_input.setValue(_int_or_zero(profile_cfg.get("wait")))
-        self.max_mails_input.setValue(
-            max(1, _int_or_zero(profile_cfg.get("max_mails_per_hour", 1000)) or 1000)
-        )
-        self.max_addr_input.setValue(
-            max(1, _int_or_zero(profile_cfg.get("max_addr_per_mail", 50)) or 50)
-        )
+        self.max_mails_input.setValue(max(1, _int_or_zero(profile_cfg.get("max_mails_per_hour", 1000)) or 1000))
+        self.max_addr_input.setValue(max(1, _int_or_zero(profile_cfg.get("max_addr_per_mail", 50)) or 50))
         self.pause_input.setValue(max(0, _int_or_zero(profile_cfg.get("pause", 3))))
         self.verbose_check.setChecked(bool(profile_cfg.get("verbose", False)))
         self.do_not_send_check.setChecked(bool(profile_cfg.get("doNotSend", False)))
@@ -1138,7 +1105,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         # Each call hits Google Sheets API (1+ sec), blocking user input
         # Only load records on explicit apply or after user stops editing (5+ sec debounce)
         if not hasattr(self, "_filter_apply_timer"):
-            from PyQt6.QtCore import QTimer
+            from PySide6.QtCore import QTimer
 
             self._filter_apply_timer = QTimer()
             self._filter_apply_timer.setSingleShot(True)
@@ -1256,9 +1223,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             ),
         )
 
-    def _get_gsheet_schema(
-        self, cache: Any, profile_name: str, sa_val: Any, sheet_id_val: Any
-    ) -> list[str]:
+    def _get_gsheet_schema(self, cache: Any, profile_name: str, sa_val: Any, sheet_id_val: Any) -> list[str]:
         """Fetch Google Sheets schema via cache (helper for _get_database_schema)."""
         log.debug(
             "DEBUG: Google Sheets profile detected: SA=%s, SHEETID=%s",
@@ -1285,21 +1250,15 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
         # T021: Visual distinction (green/red border)
         if is_valid:
-            self.filter_text_edit.setStyleSheet(
-                "QPlainTextEdit { border: 1px solid #4CAF50; background: #f1f8f6; }"
-            )
+            self.filter_text_edit.setStyleSheet("QPlainTextEdit { border: 1px solid #4CAF50; background: #f1f8f6; }")
         else:
-            self.filter_text_edit.setStyleSheet(
-                "QPlainTextEdit { border: 1px solid #f44336; background: #ffebee; }"
-            )
+            self.filter_text_edit.setStyleSheet("QPlainTextEdit { border: 1px solid #f44336; background: #ffebee; }")
 
         # T020, T041: Error message display with count
         error_msg = ""
         error_count = len(syntax_errors) + len(missing_fields)
         if error_count > 0:
-            error_msg = (
-                f"✗ {error_count} validation error{'s' if error_count != 1 else ''} "
-            )
+            error_msg = f"✗ {error_count} validation error{'s' if error_count != 1 else ''} "
         if syntax_errors:
             error_msg += "| Syntax: " + "; ".join(syntax_errors)
         if missing_fields:
@@ -1327,9 +1286,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         if self._is_cache_valid(db_path):
             assert self._cached_records is not None
             assert self._cached_headers is not None
-            log.debug(
-                f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers)} headers"
-            )
+            log.debug(f"Using cached records: {len(self._cached_records)} rows, {len(self._cached_headers)} headers")
             return self._cached_records, self._cached_headers
 
         profile_cfg = self._config_data.get(self._current_profile, {})
@@ -1363,9 +1320,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self._cached_for_db = db_path
         return rows, headers
 
-    def _load_from_google_sheets(
-        self, profile_cfg: dict[str, Any], db_path: str
-    ) -> tuple[list[list[str]], list[str]]:
+    def _load_from_google_sheets(self, profile_cfg: dict[str, Any], db_path: str) -> tuple[list[list[str]], list[str]]:
         sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
         sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
         if not (sa_val and sheet_id_val):
@@ -1374,10 +1329,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         try:
             import sendMail as sm  # noqa: N813
 
-            if not (
-                hasattr(sm, "open_google_db_members_sheet")
-                and hasattr(sm, "read_all_sheet")
-            ):
+            if not (hasattr(sm, "open_google_db_members_sheet") and hasattr(sm, "read_all_sheet")):
                 return self._set_cache_and_return([], [], db_path)
 
             wb = sm.open_google_db_members_sheet(str(sa_val), str(sheet_id_val))
@@ -1385,9 +1337,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             if data and len(data) > 0:
                 headers = [h.strip() for h in data[0] if h.strip()]
                 rows = data[1:]
-                log.debug(
-                    f"Loaded {len(rows)} records from Google Sheet {sheet_id_val}"
-                )
+                log.debug(f"Loaded {len(rows)} records from Google Sheet {sheet_id_val}")
                 return self._set_cache_and_return(rows, headers, db_path)
         except Exception as e:
             log.debug("Could not load Google Sheets records: %s", e)
@@ -1404,9 +1354,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
                     reader = csv.reader(f)
                     headers = next(reader, [])
                     rows = list(reader)
-                    log.debug(
-                        f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})"
-                    )
+                    log.debug(f"Loaded {len(rows)} records from {db_path} (encoding: {encoding})")
                     return self._set_cache_and_return(rows, headers, db_path)
             except UnicodeError:
                 continue
@@ -1426,10 +1374,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             data = ws.to_python()
             if data and len(data) > 0:
                 headers = [str(h).strip() for h in data[0] if h]
-                rows = [
-                    [str(cell) if cell is not None else "" for cell in row]
-                    for row in data[1:]
-                ]
+                rows = [[str(cell) if cell is not None else "" for cell in row] for row in data[1:]]
                 log.debug(f"Loaded {len(rows)} records from {db_path}")
                 return self._set_cache_and_return(rows, headers, db_path)
             log.debug(f"No data found in {db_path}")
@@ -1528,9 +1473,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             log.debug("Could not filter records: %s", e)
             self._update_record_display(rows, headers, len(rows))
 
-    def _update_record_display(
-        self, rows: list[list[str]], headers: list[str], total: int
-    ) -> None:
+    def _update_record_display(self, rows: list[list[str]], headers: list[str], total: int) -> None:
         """Update record table display (T025)."""
         self.records_table.setColumnCount(len(headers))
         self.records_table.setHorizontalHeaderLabels(headers)
@@ -1574,9 +1517,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
         if not filter_dict:
             self._session_filter = None
-            self.filter_status_label.setText(
-                "(Filter cleared - will use profile default)"
-            )
+            self.filter_status_label.setText("(Filter cleared - will use profile default)")
             self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
             self.filter_and_display_records()
             return
@@ -1633,9 +1574,7 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.filter_status_label.setText("(Filter reset to profile default)")
         self.filter_status_label.setStyleSheet(_STYLE_LABEL_GRAY)
 
-    def build_args(
-        self, config_data: dict[str, dict[str, str | int]]
-    ) -> SimpleNamespace:
+    def build_args(self, config_data: dict[str, dict[str, str | int]]) -> SimpleNamespace:
         profile = self.profile_combo.currentText().strip() or "default"
         namespace = SimpleNamespace()
         namespace.config = self.config_input.text().strip() or None
@@ -1650,21 +1589,13 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         namespace.verbose = self.verbose_check.isChecked()
         namespace.doNotSend = self.do_not_send_check.isChecked()
         namespace.database = self.database_input.text().strip() or None
-        namespace.from_index = (
-            str(self.from_index_input.value())
-            if self.from_index_input.value()
-            else None
-        )
-        namespace.to_index = (
-            str(self.to_index_input.value()) if self.to_index_input.value() else None
-        )
+        namespace.from_index = str(self.from_index_input.value()) if self.from_index_input.value() else None
+        namespace.to_index = str(self.to_index_input.value()) if self.to_index_input.value() else None
         namespace.wait = self.wait_input.value() or None
         namespace.max_mails_per_hour = self.max_mails_input.value()
         namespace.max_addr_per_mail = self.max_addr_input.value()
         namespace.pause = self.pause_input.value()
-        namespace.session_filter = (
-            self._session_filter
-        )  # T036: Pass session-active filter if set
+        namespace.session_filter = self._session_filter  # T036: Pass session-active filter if set
         return namespace
 
 
@@ -1757,9 +1688,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         parent: QWidget | None = None,
         *,
         config_path: str,
-        config_data: (
-            dict[str, dict[str, str | int | list[str] | dict[str, str]]] | None
-        ) = None,
+        config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] | None = None,
         initial_profile: str = "default",
     ) -> None:
         super().__init__(parent)
@@ -1767,9 +1696,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.setMinimumWidth(1080)
         self.setMinimumHeight(780)
 
-        self._config_data: ConfigProfile = self._normalize_config_data(
-            config_data or {}
-        )
+        self._config_data: ConfigProfile = self._normalize_config_data(config_data or {})
         self._current_profile = ""
         self._widgets: dict[str, QWidget] = {}
         self._yaml_keys = {"filter", "filter_test"}
@@ -1932,9 +1859,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _reload_from_disk(self) -> None:
         self._reload_profiles(self.profile_combo.currentText() or "default")
 
-    def _read_config_file(
-        self, path: str
-    ) -> dict[str, dict[str, str | int | list[str] | dict[str, str]]]:
+    def _read_config_file(self, path: str) -> dict[str, dict[str, str | int | list[str] | dict[str, str]]]:
         if not path or not os.path.exists(path):
             return {}
         try:
@@ -1943,9 +1868,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             return self._normalize_config_data(data if isinstance(data, dict) else {})
         except Exception as exc:
             try:
-                QMessageBox.warning(
-                    self, _CONFIG_ERROR, f"Could not load config:\n{exc}"
-                )
+                QMessageBox.warning(self, _CONFIG_ERROR, f"Could not load config:\n{exc}")
             except Exception as e:
                 log.debug("Could not show warning dialog: %s", e)
             return {}
@@ -1954,11 +1877,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sendMail config",
-            (
-                str(Path(self.config_input.text()).parent)
-                if self.config_input.text()
-                else str(Path.home())
-            ),
+            (str(Path(self.config_input.text()).parent) if self.config_input.text() else str(Path.home())),
             "YAML Files (*.yml *.yaml);;All Files (*)",
         )
         if path:
@@ -1991,17 +1910,11 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         browse_button.setToolTip(spec.tooltip or spec.browse_caption or "Browse")
 
         def _pick_path() -> None:
-            start_dir = (
-                str(Path(edit.text()).parent) if edit.text() else str(Path.home())
-            )
+            start_dir = str(Path(edit.text()).parent) if edit.text() else str(Path.home())
             if spec.browse_type == "directory":
-                path = QFileDialog.getExistingDirectory(
-                    self, spec.browse_caption, start_dir
-                )
+                path = QFileDialog.getExistingDirectory(self, spec.browse_caption or "", start_dir)
             else:
-                path, _ = QFileDialog.getOpenFileName(
-                    self, spec.browse_caption, start_dir, spec.browse_filter
-                )
+                path, _ = QFileDialog.getOpenFileName(self, spec.browse_caption or "", start_dir, spec.browse_filter)
             if path:
                 edit.setText(path)
 
@@ -2088,21 +2001,15 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         _, layout = self._build_tab("Identity")
         self._add_line_field(
             layout,
-            _LineFieldSpec(
-                "MAILCONFIG", "MAILCONFIG", tooltip="Secret name used by getSecrets()."
-            ),
+            _LineFieldSpec("MAILCONFIG", "MAILCONFIG", tooltip="Secret name used by getSecrets()."),
         )
         self._add_line_field(
             layout,
-            _LineFieldSpec(
-                "sender", "Sender", tooltip="Email address used in the From header."
-            ),
+            _LineFieldSpec("sender", "Sender", tooltip="Email address used in the From header."),
         )
         self._add_line_field(
             layout,
-            _LineFieldSpec(
-                "sendername", "Sender name", tooltip="Display name for the sender."
-            ),
+            _LineFieldSpec("sendername", "Sender name", tooltip="Display name for the sender."),
         )
         self._add_line_field(
             layout,
@@ -2110,15 +2017,11 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         )
         self._add_line_field(
             layout,
-            _LineFieldSpec(
-                "password", "Password", tooltip="SMTP or IMAP password.", password=True
-            ),
+            _LineFieldSpec("password", "Password", tooltip="SMTP or IMAP password.", password=True),
         )
         self._add_line_field(
             layout,
-            _LineFieldSpec(
-                "domain", "Domain", tooltip="Message-ID domain for generated emails."
-            ),
+            _LineFieldSpec("domain", "Domain", tooltip="Message-ID domain for generated emails."),
         )
 
     def _build_delivery_tab(self) -> None:
@@ -2231,9 +2134,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         )
         self._add_line_field(
             layout,
-            _LineFieldSpec(
-                "token_id", "Token ID", tooltip="Secret key name for Gmail OAuth token."
-            ),
+            _LineFieldSpec("token_id", "Token ID", tooltip="Secret key name for Gmail OAuth token."),
         )
         self._add_line_field(
             layout,
@@ -2276,9 +2177,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         )
         self._add_line_field(
             layout,
-            _LineFieldSpec(
-                "body", "Body", tooltip="Optional body replacement text for ${body}."
-            ),
+            _LineFieldSpec("body", "Body", tooltip="Optional body replacement text for ${body}."),
         )
         self._add_line_field(
             layout,
@@ -2356,21 +2255,15 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _build_flags_tab(self) -> None:
         _, layout = self._build_tab("Flags")
         self._add_check_field(layout, "test", "Test", tooltip="Enable test mode.")
-        self._add_check_field(
-            layout, "verbose", "Verbose", tooltip="Increase logging verbosity."
-        )
-        self._add_check_field(
-            layout, "doNotSend", "Do not send", tooltip="Suppress actual sending."
-        )
+        self._add_check_field(layout, "verbose", "Verbose", tooltip="Increase logging verbosity.")
+        self._add_check_field(layout, "doNotSend", "Do not send", tooltip="Suppress actual sending.")
         self._add_check_field(
             layout,
             "md2html",
             "md2html",
             tooltip="Keep the Markdown-to-HTML compatibility flag.",
         )
-        self._add_check_field(
-            layout, "keep-html", "keep-html", tooltip="Preserve generated HTML output."
-        )
+        self._add_check_field(layout, "keep-html", "keep-html", tooltip="Preserve generated HTML output.")
 
     def _profile_names(self) -> list[str]:
         return list(self._config_data.keys())
@@ -2386,9 +2279,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         if value in (None, ""):
             return ""
         try:
-            result: str = yaml.safe_dump(
-                value, sort_keys=False, allow_unicode=True
-            ).strip()
+            result: str = yaml.safe_dump(value, sort_keys=False, allow_unicode=True).strip()
             return result
         except Exception:
             return str(value)
@@ -2418,9 +2309,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _load_widget_line_edit(self, widget: QLineEdit, value: object) -> None:
         widget.setText("" if value is None else str(value))
 
-    def _load_widget_spin_box(
-        self, widget: QSpinBox, value: object, default: int
-    ) -> None:
+    def _load_widget_spin_box(self, widget: QSpinBox, value: object, default: int) -> None:
         try:
             if isinstance(value, int):
                 widget.setValue(value)
@@ -2434,9 +2323,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _load_widget_check_box(self, widget: QCheckBox, value: object) -> None:
         widget.setChecked(bool(value))
 
-    def _load_widget_plain_text(
-        self, widget: QPlainTextEdit, value: object, key: str
-    ) -> None:
+    def _load_widget_plain_text(self, widget: QPlainTextEdit, value: object, key: str) -> None:
         if key in self._yaml_keys:
             widget.setPlainText(self._dump_yaml_block(value))
         elif key in self._list_keys:
@@ -2444,30 +2331,22 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         else:
             widget.setPlainText("" if value is None else str(value))
 
-    def _load_widget_plain_text_list(
-        self, widget: QPlainTextEdit, value: object
-    ) -> None:
+    def _load_widget_plain_text_list(self, widget: QPlainTextEdit, value: object) -> None:
         if isinstance(value, list):
-            widget.setPlainText(
-                "\n".join(str(item) for item in value if str(item).strip())
-            )
+            widget.setPlainText("\n".join(str(item) for item in value if str(item).strip()))
         elif value:
             widget.setPlainText(str(value))
         else:
             widget.setPlainText("")
 
-    def _get_config_value_for_widget(
-        self, key: str, widget: QWidget, cfg: ConfigData, defaults: ConfigData
-    ) -> object:
+    def _get_config_value_for_widget(self, key: str, widget: QWidget, cfg: ConfigData, defaults: ConfigData) -> object:
         if key in cfg:
             return cfg[key]
         if isinstance(widget, QSpinBox):
             return defaults.get(key, "")
         return None
 
-    def _get_spinbox_default_value(
-        self, key: str, cfg: ConfigData, defaults: ConfigData
-    ) -> int:
+    def _get_spinbox_default_value(self, key: str, cfg: ConfigData, defaults: ConfigData) -> int:
         val = defaults.get(key, 0) if key in cfg else 0
         if isinstance(val, int):
             return val
@@ -2514,9 +2393,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _collect_profile_data(self) -> dict[str, object]:
         original_profile = self._config_data.get(self._current_profile, {})
         original_case_map = (
-            {str(k).lower(): k for k in original_profile.keys()}
-            if isinstance(original_profile, dict)
-            else {}
+            {str(k).lower(): k for k in original_profile.keys()} if isinstance(original_profile, dict) else {}
         )
 
         base: dict[str, object] = {}
@@ -2563,9 +2440,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             return
         self._persist_current_profile()
         if name in self._config_data:
-            QMessageBox.warning(
-                self, "Profile Exists", f"Profile '{name}' already exists."
-            )
+            QMessageBox.warning(self, "Profile Exists", f"Profile '{name}' already exists.")
             return
         self._config_data[name] = self._default_profile_data()
         self._reload_profiles(name)
@@ -2573,16 +2448,12 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
     def _duplicate_profile(self) -> None:
         if not self._current_profile:
             return
-        name = self._new_profile_name(
-            "Duplicate Profile", f"{self._current_profile}-copy"
-        )
+        name = self._new_profile_name("Duplicate Profile", f"{self._current_profile}-copy")
         if not name:
             return
         self._persist_current_profile()
         if name in self._config_data:
-            QMessageBox.warning(
-                self, "Profile Exists", f"Profile '{name}' already exists."
-            )
+            QMessageBox.warning(self, "Profile Exists", f"Profile '{name}' already exists.")
             return
         self._config_data[name] = self._collect_profile_data()  # type: ignore
         self._reload_profiles(name)
@@ -2638,9 +2509,7 @@ class _ConfigDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         try:
             self._save_config()
         except Exception as exc:
-            QMessageBox.critical(
-                self, "Save Error", f"Could not save configuration:\n{exc}"
-            )
+            QMessageBox.critical(self, "Save Error", f"Could not save configuration:\n{exc}")
             return
         self.accept()
 
@@ -2670,9 +2539,7 @@ class ConfigLoader:
                 if isinstance(profile_config, dict):
                     self.profiles[profile_name] = {
                         "name": profile_name,
-                        "default_documents_path": profile_config.get(
-                            "default_documents_path"
-                        ),
+                        "default_documents_path": profile_config.get("default_documents_path"),
                         "config": profile_config,
                     }
         except Exception as exc:
@@ -2700,9 +2567,7 @@ class ClipboardProcessor:
 
     URL_PATTERN = r"https?://[^\s<>\"{}|\\^`\[\]]+|ftp://[^\s<>\"{}|\\^`\[\]]+"
 
-    def analyze_paste(
-        self, raw_text: str, raw_html: str | None = None
-    ) -> ClipboardOperation:
+    def analyze_paste(self, raw_text: str, raw_html: str | None = None) -> ClipboardOperation:
         """Determine clipboard content type and detect URLs."""
         has_existing_links = self._check_existing_links(raw_html) if raw_html else False
         detected_urls: list[str] = []
@@ -2783,9 +2648,7 @@ class EditorPasteHandler:
         if clipboard_op.content_type == "html_rich":
             return {"action": "paste_html", "html": clipboard_op.raw_html}
         elif clipboard_op.content_type == "plain_text" and clipboard_op.has_urls:
-            linkified_html = self.linkify_urls(
-                clipboard_op.raw_text, clipboard_op.detected_urls
-            )
+            linkified_html = self.linkify_urls(clipboard_op.raw_text, clipboard_op.detected_urls)
             return {
                 "action": "linkify_urls",
                 "text": clipboard_op.raw_text,
@@ -2820,13 +2683,9 @@ class EditorBridge(QObject):
         clipboard_analyzed: Emitted when JS detects clipboard content on paste
     """
 
-    dirty_changed = pyqtSignal(bool)
-    css_changed = pyqtSignal(
-        str
-    )  # emits absolute CSS file path when user selects a stylesheet
-    clipboard_analyzed = pyqtSignal(
-        str, bool, list
-    )  # content_type, has_html_links, detected_urls
+    dirty_changed = Signal(bool)
+    css_changed = Signal(str)  # emits absolute CSS file path when user selects a stylesheet
+    clipboard_analyzed = Signal(str, bool, list)  # content_type, has_html_links, detected_urls
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -2837,7 +2696,7 @@ class EditorBridge(QObject):
     # Slots called from JavaScript
     # ------------------------------------------------------------------
 
-    @pyqtSlot(str)
+    @Slot(str)
     def on_content_changed(self, html: str) -> None:
         """Receives the editor's current HTML after every edit (debounced 500ms)."""
         self._current_html = html
@@ -2845,7 +2704,7 @@ class EditorBridge(QObject):
             self._dirty = True
             self.dirty_changed.emit(True)
 
-    @pyqtSlot(result=str)  # type: ignore
+    @Slot(result=str)
     def request_image_insert(self) -> str:
         """
         Opens a file dialog and returns a base64 data URI for the chosen image.
@@ -2853,9 +2712,7 @@ class EditorBridge(QObject):
         """
         parent_obj = self.parent()
         try:
-            parent_widget: QWidget | None = (
-                parent_obj if isinstance(parent_obj, QWidget) else None
-            )
+            parent_widget: QWidget | None = parent_obj if isinstance(parent_obj, QWidget) else None
         except TypeError:
             parent_widget = None
         path, _ = QFileDialog.getOpenFileName(
@@ -2882,7 +2739,7 @@ class EditorBridge(QObject):
             log.exception("Image insert failed: %s", exc)
             return ""
 
-    @pyqtSlot(str, result=str)  # type: ignore
+    @Slot(str, result=str)
     def request_link_insert(self, selected_text: str) -> str:
         """
         Opens a link dialog pre-filled with *selected_text*.
@@ -2891,9 +2748,7 @@ class EditorBridge(QObject):
         """
         parent_obj = self.parent()
         try:
-            parent_widget: QWidget | None = (
-                parent_obj if isinstance(parent_obj, QWidget) else None
-            )
+            parent_widget: QWidget | None = parent_obj if isinstance(parent_obj, QWidget) else None
         except TypeError:
             parent_widget = None
         dialog = _LinkDialog(parent_widget, selected_text=selected_text)
@@ -2904,7 +2759,7 @@ class EditorBridge(QObject):
             return ""
         return json.dumps({"url": url, "text": dialog.get_text()})
 
-    @pyqtSlot(result=str)  # type: ignore
+    @Slot(result=str)
     def request_table_insert(self) -> str:
         """
         Opens a dialog asking for table dimensions.
@@ -2912,9 +2767,7 @@ class EditorBridge(QObject):
         """
         parent_obj = self.parent()
         try:
-            parent_widget: QWidget | None = (
-                parent_obj if isinstance(parent_obj, QWidget) else None
-            )
+            parent_widget: QWidget | None = parent_obj if isinstance(parent_obj, QWidget) else None
         except TypeError:
             parent_widget = None
         dialog = _TableDialog(parent_widget)
@@ -2922,15 +2775,13 @@ class EditorBridge(QObject):
             return ""
         return json.dumps({"rows": dialog.get_rows(), "cols": dialog.get_cols()})
 
-    @pyqtSlot(str)
+    @Slot(str)
     def log_js_error(self, msg: str) -> None:
         """Receives JS-side errors forwarded via window.onerror."""
         log.warning("JS: %s", msg)
 
-    @pyqtSlot(str, bool, list)
-    def on_clipboard_analyzed(
-        self, content_type: str, has_html_links: bool, detected_urls: list[str]
-    ) -> None:
+    @Slot(str, bool, list)
+    def on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
         """Receives clipboard analysis result from JavaScript paste handler."""
         self.clipboard_analyzed.emit(content_type, has_html_links, detected_urls)
 
@@ -2967,9 +2818,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         file_path: Optional markdown or HTML file to open on startup
     """
 
-    def __init__(
-        self, file_path: str | None = None, profile: str | None = None
-    ) -> None:
+    def __init__(self, file_path: str | None = None, profile: str | None = None) -> None:
         super().__init__()
         self._file_path: str | None = None
         self._css_path: str | None = None  # user-selected CSS stylesheet
@@ -2978,9 +2827,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         self._is_template = False
         # Use same config path as Send mailing dialog (not hardcoded src/config.yml)
         self._config_path = self._resolve_send_config_path()
-        self._config_data: dict[
-            str, dict[str, str | int | list[str] | dict[str, str]]
-        ] = {}
+        self._config_data: dict[str, dict[str, str | int | list[str] | dict[str, str]]] = {}
         self._current_profile = profile or "default"
         self._default_documents_path = self._get_default_documents_path()
         self._load_config()
@@ -3002,12 +2849,11 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         except Exception as e:
             log.exception("Failed to create QWebEngineView: %s", e)
             # Fallback to text editor
-            from PyQt6.QtWidgets import QTextEdit
+            from PySide6.QtWidgets import QTextEdit
 
             text_edit = QTextEdit(self)
             text_edit.setPlainText(
-                "WebEngine failed to initialize. This is a fallback text editor.\n\nError: "
-                + str(e)
+                "WebEngine failed to initialize. This is a fallback text editor.\n\nError: " + str(e)
             )
             text_edit.setReadOnly(True)
             self.setCentralWidget(text_edit)
@@ -3047,10 +2893,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         """Load deferred content after window is shown."""
         super().showEvent(event)
         # Load content after window is visible
-        if (
-            hasattr(self, "_deferred_file_path")
-            and self._deferred_file_path is not None
-        ):
+        if hasattr(self, "_deferred_file_path") and self._deferred_file_path is not None:
             self.open_file(self._deferred_file_path)
             self._deferred_file_path = None
         elif hasattr(self, "_deferred_file_path"):
@@ -3196,13 +3039,9 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                 }}, 200);
                 """
                 self._run_js(script)
-                log.info(
-                    "Queued stylesheet application (hash=%d): %s", css_hash, css_path
-                )
+                log.info("Queued stylesheet application (hash=%d): %s", css_hash, css_path)
             else:
-                log.info(
-                    "Deferred stylesheet application (UI not ready yet): %s", css_path
-                )
+                log.info("Deferred stylesheet application (UI not ready yet): %s", css_path)
         except Exception as exc:
             log.exception("Failed to apply profile stylesheet %s: %s", css_path, exc)
 
@@ -3221,9 +3060,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             self._config_data[self._current_profile]["default_documents_path"] = path
             tmp_path = self._config_path + ".tmp"
             with open(tmp_path, "w", encoding="utf-8") as f:
-                yaml.dump(
-                    self._config_data, f, default_flow_style=False, sort_keys=False
-                )
+                yaml.dump(self._config_data, f, default_flow_style=False, sort_keys=False)
             os.replace(tmp_path, self._config_path)
             if hasattr(self, "_default_documents_path"):
                 self._default_documents_path = path
@@ -3248,9 +3085,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
         editor_html_path = ASSETS_DIR / "editor.html"
         if not editor_html_path.exists():
-            log.error(
-                f"editor.html not found at {editor_html_path} (ASSETS_DIR={ASSETS_DIR})"
-            )
+            log.error(f"editor.html not found at {editor_html_path} (ASSETS_DIR={ASSETS_DIR})")
             return
         editor_url = QUrl.fromLocalFile(str(editor_html_path))
         view = self._view  # Capture for nested function
@@ -3393,9 +3228,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                 src = m.group(1)
                 if src.startswith(("data:", "http")):
                     return m.group(0)
-                img_path = (
-                    os.path.join(base_dir, src) if not os.path.isabs(src) else src
-                )
+                img_path = os.path.join(base_dir, src) if not os.path.isabs(src) else src
                 try:
                     import base64
                     import mimetypes
@@ -3497,9 +3330,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
     def _unwrap_cell_blocks(cell: Any, soup: Any, block_tags: tuple[str, ...]) -> None:
         """Unwrap block-level children in a table cell, inserting <br> between them."""
         while True:
-            direct_blocks = [
-                c for c in cell.children if getattr(c, "name", None) in block_tags
-            ]
+            direct_blocks = [c for c in cell.children if getattr(c, "name", None) in block_tags]
             if not direct_blocks:
                 break
             for i, block in enumerate(direct_blocks):
@@ -3642,9 +3473,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
     def _write_html_file(self, path: str, body_html: str) -> None:
         """Write a complete HTML document file from body HTML."""
         # Use user-selected CSS if set; otherwise use profile/home/project default
-        css_source = (
-            Path(self._css_path) if self._css_path else self._get_stylesheet_path()
-        )
+        css_source = Path(self._css_path) if self._css_path else self._get_stylesheet_path()
         if css_source.exists():
             with open(css_source, encoding="utf-8") as f:
                 css_content = f.read()
@@ -3742,15 +3571,11 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
         bold_action = fmt_menu.addAction("&Bold")
         bold_action.setShortcut("Ctrl+B")
-        bold_action.triggered.connect(
-            lambda: self._run_js("quill.format('bold', !quill.getFormat().bold)")
-        )
+        bold_action.triggered.connect(lambda: self._run_js("quill.format('bold', !quill.getFormat().bold)"))
 
         italic_action = fmt_menu.addAction("&Italic")
         italic_action.setShortcut("Ctrl+I")
-        italic_action.triggered.connect(
-            lambda: self._run_js("quill.format('italic', !quill.getFormat().italic)")
-        )
+        italic_action.triggered.connect(lambda: self._run_js("quill.format('italic', !quill.getFormat().italic)"))
 
         underline_action = fmt_menu.addAction("&Underline")
         underline_action.setShortcut("Ctrl+U")
@@ -3759,24 +3584,18 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
         strike_action = fmt_menu.addAction("&Strikethrough")
         strike_action.setShortcut("Ctrl+Shift+X")
-        strike_action.triggered.connect(
-            lambda: self._run_js("quill.format('strike', !quill.getFormat().strike)")
-        )
+        strike_action.triggered.connect(lambda: self._run_js("quill.format('strike', !quill.getFormat().strike)"))
 
         fmt_menu.addSeparator()
 
         for level in (1, 2, 3):
             h_action = fmt_menu.addAction(f"Heading &{level}")
             h_action.triggered.connect(
-                lambda _checked=False, lvl=level: self._run_js(
-                    f"quill.format('header', {lvl})"
-                )  # noqa: ARG005
+                lambda _checked=False, lvl=level: self._run_js(f"quill.format('header', {lvl})")  # noqa: ARG005
             )
 
         normal_action = fmt_menu.addAction("&Normal Paragraph")
-        normal_action.triggered.connect(
-            lambda: self._run_js("quill.format('header', false)")
-        )
+        normal_action.triggered.connect(lambda: self._run_js("quill.format('header', false)"))
 
         fmt_menu.addSeparator()
 
@@ -3791,30 +3610,20 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         )
         for font_name in FONT_CHOICES:
             font_menu.addAction(font_name).triggered.connect(
-                lambda _checked=False, family=font_name: self._set_font_family(
-                    family
-                )  # noqa: ARG005
+                lambda _checked=False, family=font_name: self._set_font_family(family)  # noqa: ARG005
             )
 
         fmt_menu.addSeparator()
 
         valign_menu = fmt_menu.addMenu("&Vertical Alignment")
-        valign_menu.addAction("Align &Top").triggered.connect(
-            lambda: self._run_js("setVAlign('top')")
-        )
-        valign_menu.addAction("Align &Middle").triggered.connect(
-            lambda: self._run_js("setVAlign('middle')")
-        )
-        valign_menu.addAction("Align &Bottom").triggered.connect(
-            lambda: self._run_js("setVAlign('bottom')")
-        )
+        valign_menu.addAction("Align &Top").triggered.connect(lambda: self._run_js("setVAlign('top')"))
+        valign_menu.addAction("Align &Middle").triggered.connect(lambda: self._run_js("setVAlign('middle')"))
+        valign_menu.addAction("Align &Bottom").triggered.connect(lambda: self._run_js("setVAlign('bottom')"))
 
         fmt_menu.addSeparator()
 
         apply_css_action = fmt_menu.addAction("Apply &Stylesheet...")
-        apply_css_action.setToolTip(
-            "Choose a CSS file to style the editor and saved HTML"
-        )
+        apply_css_action.setToolTip("Choose a CSS file to style the editor and saved HTML")
         apply_css_action.triggered.connect(self._menu_apply_css)
 
     def _build_view_menu(self, menubar: Any) -> None:
@@ -3828,56 +3637,34 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         tbl_menu = menubar.addMenu("&Table")
         assert tbl_menu is not None
 
-        insert_tbl_action = tbl_menu.addAction(
-            _svg_icon(_SVG_INSERT_TABLE), "&Insert Table..."
-        )
+        insert_tbl_action = tbl_menu.addAction(_svg_icon(_SVG_INSERT_TABLE), "&Insert Table...")
         insert_tbl_action.setShortcut("Ctrl+Shift+T")
         insert_tbl_action.triggered.connect(self._menu_table_insert)
 
         tbl_menu.addSeparator()
 
         rows_menu = tbl_menu.addMenu("&Rows")
-        rows_menu.addAction("Insert Row &Above").triggered.connect(
-            lambda: self._run_js("tableOp('insertRowAbove')")
-        )
-        rows_menu.addAction("Insert Row &Below").triggered.connect(
-            lambda: self._run_js("tableOp('insertRowBelow')")
-        )
+        rows_menu.addAction("Insert Row &Above").triggered.connect(lambda: self._run_js("tableOp('insertRowAbove')"))
+        rows_menu.addAction("Insert Row &Below").triggered.connect(lambda: self._run_js("tableOp('insertRowBelow')"))
         rows_menu.addSeparator()
-        rows_menu.addAction("&Delete Row").triggered.connect(
-            lambda: self._run_js("tableOp('deleteRow')")
-        )
+        rows_menu.addAction("&Delete Row").triggered.connect(lambda: self._run_js("tableOp('deleteRow')"))
 
         cols_menu = tbl_menu.addMenu("&Columns")
-        cols_menu.addAction("Insert Column &Left").triggered.connect(
-            lambda: self._run_js("tableOp('insertColLeft')")
-        )
-        cols_menu.addAction("Insert Column &Right").triggered.connect(
-            lambda: self._run_js("tableOp('insertColRight')")
-        )
+        cols_menu.addAction("Insert Column &Left").triggered.connect(lambda: self._run_js("tableOp('insertColLeft')"))
+        cols_menu.addAction("Insert Column &Right").triggered.connect(lambda: self._run_js("tableOp('insertColRight')"))
         cols_menu.addSeparator()
-        cols_menu.addAction("Delete &Column").triggered.connect(
-            lambda: self._run_js("tableOp('deleteColumn')")
-        )
+        cols_menu.addAction("Delete &Column").triggered.connect(lambda: self._run_js("tableOp('deleteColumn')"))
 
         tbl_menu.addSeparator()
 
         cell_valign_menu = tbl_menu.addMenu("Cell &Vertical Alignment")
-        cell_valign_menu.addAction("Align &Top").triggered.connect(
-            lambda: self._run_js("setVAlign('top')")
-        )
-        cell_valign_menu.addAction("Align &Middle").triggered.connect(
-            lambda: self._run_js("setVAlign('middle')")
-        )
-        cell_valign_menu.addAction("Align &Bottom").triggered.connect(
-            lambda: self._run_js("setVAlign('bottom')")
-        )
+        cell_valign_menu.addAction("Align &Top").triggered.connect(lambda: self._run_js("setVAlign('top')"))
+        cell_valign_menu.addAction("Align &Middle").triggered.connect(lambda: self._run_js("setVAlign('middle')"))
+        cell_valign_menu.addAction("Align &Bottom").triggered.connect(lambda: self._run_js("setVAlign('bottom')"))
 
         tbl_menu.addSeparator()
 
-        tbl_menu.addAction("Delete &Table").triggered.connect(
-            lambda: self._run_js("tableOp('deleteTable')")
-        )
+        tbl_menu.addAction("Delete &Table").triggered.connect(lambda: self._run_js("tableOp('deleteTable')"))
 
     def _build_insert_menu(self, menubar: Any) -> None:
         ins_menu = menubar.addMenu("&Insert")
@@ -3904,14 +3691,10 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         ins_menu.addSeparator()
 
         quote_action = ins_menu.addAction("Block&quote")
-        quote_action.triggered.connect(
-            lambda: self._run_js("quill.format('blockquote', true)")
-        )
+        quote_action.triggered.connect(lambda: self._run_js("quill.format('blockquote', true)"))
 
         code_action = ins_menu.addAction("&Code Block")
-        code_action.triggered.connect(
-            lambda: self._run_js("quill.format('code-block', true)")
-        )
+        code_action.triggered.connect(lambda: self._run_js("quill.format('code-block', true)"))
 
     def _build_toolbars(self) -> None:
         toolbar = QToolBar("Main", self)
@@ -3923,14 +3706,9 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         if hasattr(self, "_config_loader"):
             profile_label = QLabel("Profile: ")
             self._profile_selector = QComboBox(self)
-            self._profile_selector.addItems(
-                list(self._config_loader.get_profiles().keys())
-            )
+            self._profile_selector.addItems(list(self._config_loader.get_profiles().keys()))
             self._profile_selector.currentTextChanged.connect(self._on_profile_selected)
-            if (
-                hasattr(self, "_current_profile")
-                and self._current_profile in self._config_loader.get_profiles()
-            ):
+            if hasattr(self, "_current_profile") and self._current_profile in self._config_loader.get_profiles():
                 self._profile_selector.setCurrentText(self._current_profile)
             toolbar.addWidget(profile_label)
             toolbar.addWidget(self._profile_selector)
@@ -3972,9 +3750,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             self._editor_session.active_profile_name = profile_name
         self._save_editor_session()
 
-    def _update_profile_path(
-        self, profile_name: str, profile_info: dict[str, Any]
-    ) -> None:
+    def _update_profile_path(self, profile_name: str, profile_info: dict[str, Any]) -> None:
         default_path = profile_info.get("default_documents_path")
         log.debug("Profile '%s' default_documents_path: %r", profile_name, default_path)
         if default_path and default_path != "":
@@ -3997,9 +3773,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return
 
         raw_profile = self._config_data[profile_name]
-        styles_path = (
-            raw_profile.get("styles") if isinstance(raw_profile, dict) else None
-        )
+        styles_path = raw_profile.get("styles") if isinstance(raw_profile, dict) else None
         log.info("Profile stylesheet path: %s", styles_path)
         if not (styles_path and isinstance(styles_path, str)):
             log.info("Profile %s has no stylesheet defined", profile_name)
@@ -4023,9 +3797,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                 if self._editor_session.active_profile_name:
                     self._current_profile = self._editor_session.active_profile_name
                 if self._editor_session.active_profile_default_path:
-                    self._default_documents_path = (
-                        self._editor_session.active_profile_default_path
-                    )
+                    self._default_documents_path = self._editor_session.active_profile_default_path
         except Exception as exc:
             log.debug("Failed to load editor session: %s", exc)
 
@@ -4048,10 +3820,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         if not self._ask_save_if_dirty():
             return
         # Use profile's default_documents_path; fallback to system default documents folder
-        default_dir = (
-            getattr(self, "_default_documents_path", None)
-            or self._get_default_documents_path()
-        )
+        default_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
         log.debug(
             "_menu_open: using directory: %r (current profile: %s)",
             default_dir,
@@ -4075,13 +3844,8 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             self.open_file(str(template_path))
         else:
             # Use profile's default_documents_path for template browsing; fallback to system default
-            template_dir = (
-                getattr(self, "_default_documents_path", None)
-                or self._get_default_documents_path()
-            )
-            path, _ = QFileDialog.getOpenFileName(
-                self, "Open Template", template_dir, "Markdown (*.md);;HTML (*.html)"
-            )
+            template_dir = getattr(self, "_default_documents_path", None) or self._get_default_documents_path()
+            path, _ = QFileDialog.getOpenFileName(self, "Open Template", template_dir, "Markdown (*.md);;HTML (*.html)")
             if path:
                 self.open_file(path)
 
@@ -4133,9 +3897,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                 log.debug("Could not resolve sendMail config path: %s", exc)
         return str(Path.home() / ".config" / "sendMail.yml")
 
-    def _load_send_config(
-        self, config_path: str
-    ) -> dict[str, dict[str, str | int | list[str] | dict[str, str]]]:
+    def _load_send_config(self, config_path: str) -> dict[str, dict[str, str | int | list[str] | dict[str, str]]]:
         """Load the sendMail YAML config file."""
         if not config_path or not os.path.exists(config_path):
             return {}
@@ -4172,11 +3934,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         if dialog_password:
             args.conf[args.profile]["password"] = dialog_password
 
-        sendmail_dir = (
-            Path(sm.__file__).resolve().parent
-            if hasattr(sm, "__file__")
-            else Path.cwd()
-        )
+        sendmail_dir = Path(sm.__file__).resolve().parent if hasattr(sm, "__file__") else Path.cwd()
         old_cwd = os.getcwd()
         try:
             os.chdir(sendmail_dir)
@@ -4200,9 +3958,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             return True
         return bool(result)
 
-    def _on_send_finished(
-        self, result: str, dialog: _SendDialog, log_dialog: _SessionLogDialog
-    ) -> None:
+    def _on_send_finished(self, result: str, dialog: _SendDialog, log_dialog: _SessionLogDialog) -> None:
         """Handle send worker completion: show confirmation in log dialog, manage test lock."""
         self._send_in_progress = False
         dialog.spinner_label.hide()
@@ -4229,9 +3985,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         log_dialog = _SessionLogDialog(self)
         worker = _SendWorker(dialog, self._send_with_sendmail)
         worker.log_line.connect(log_dialog.log_line_received)
-        worker.send_result.connect(
-            lambda result: self._on_send_finished(result, dialog, log_dialog)
-        )
+        worker.send_result.connect(lambda result: self._on_send_finished(result, dialog, log_dialog))
         worker.start()
         log_dialog.exec()
 
@@ -4290,11 +4044,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
     def _menu_apply_css(self) -> None:
         """Open a CSS file picker and apply the stylesheet to the editor canvas."""
-        initial = (
-            str(Path(self._css_path).parent)
-            if self._css_path
-            else str(self._get_css_directory())
-        )
+        initial = str(Path(self._css_path).parent) if self._css_path else str(self._get_css_directory())
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Apply Stylesheet",
@@ -4339,9 +4089,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
     def _on_dirty_changed(self, _dirty: bool) -> None:  # noqa: ARG002
         self._update_title()
 
-    def _on_clipboard_analyzed(
-        self, content_type: str, has_html_links: bool, detected_urls: list[str]
-    ) -> None:
+    def _on_clipboard_analyzed(self, content_type: str, has_html_links: bool, detected_urls: list[str]) -> None:
         """Handle clipboard analysis from paste event.
 
         For html_rich: Quill natively preserves links.
@@ -4407,14 +4155,10 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
     def _update_title(self) -> None:
         dirty_marker = " *" if self._bridge.is_dirty else ""
-        template_marker = (
-            " [Read-Only Template]" if getattr(self, "_is_template", False) else ""
-        )
+        template_marker = " [Read-Only Template]" if getattr(self, "_is_template", False) else ""
         if self._file_path:
             filename = Path(self._file_path).name
-            self.setWindowTitle(
-                f"sendMail Editor — {filename}{template_marker}{dirty_marker}"
-            )
+            self.setWindowTitle(f"sendMail Editor — {filename}{template_marker}{dirty_marker}")
         else:
             self.setWindowTitle(f"sendMail Editor — New Document{dirty_marker}")
 
@@ -4429,9 +4173,7 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             self,
             "Unsaved Changes",
             "The document has unsaved changes.\nDo you want to save before continuing?",
-            QMessageBox.StandardButton.Save
-            | QMessageBox.StandardButton.Discard
-            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
         )
         if reply == QMessageBox.StandardButton.Save:
             return self._save()
@@ -4458,7 +4200,7 @@ def main() -> None:
         app.setOrganizationName("sendMail")
 
         # Force light theme by setting explicit light palette
-        from PyQt6.QtGui import QColor, QPalette
+        from PySide6.QtGui import QColor, QPalette
 
         light_palette = QPalette()
         light_palette.setColor(QPalette.ColorRole.Window, QColor(240, 240, 240))
@@ -4473,9 +4215,7 @@ def main() -> None:
         light_palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 255, 255))
         light_palette.setColor(QPalette.ColorRole.Link, QColor(0, 0, 255))
         light_palette.setColor(QPalette.ColorRole.Highlight, QColor(76, 163, 224))
-        light_palette.setColor(
-            QPalette.ColorRole.HighlightedText, QColor(255, 255, 255)
-        )
+        light_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
         app.setPalette(light_palette)
 
         file_arg = sys.argv[1] if len(sys.argv) > 1 else None

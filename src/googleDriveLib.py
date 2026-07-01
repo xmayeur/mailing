@@ -72,18 +72,14 @@ def connect_google_driver(service_account_id: str = "artscroisesServiceAccount")
     creds = get_secret(service_account_id)
     try:
         scope = ["https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-            creds, cast(Any, scope)
-        )
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, cast(Any, scope))
         return build("drive", "v3", credentials=credentials)
     except HttpError as e:
         _log.exception(e)
         return None
 
 
-def get_files(
-    service: Any = None, folder_id: str | None = None
-) -> dict[str, Any] | None:
+def get_files(service: Any = None, folder_id: str | None = None) -> dict[str, Any] | None:
     """List files from Google Drive folder (excluding published files).
 
     Args:
@@ -113,9 +109,7 @@ def get_files(
         return None
 
 
-def rename_file(
-    service: Any = None, file_id: str | None = None, new_title: str | None = None
-) -> dict[str, Any] | None:
+def rename_file(service: Any = None, file_id: str | None = None, new_title: str | None = None) -> dict[str, Any] | None:
     """Rename file in Google Drive.
 
     Args:

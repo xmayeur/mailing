@@ -21,13 +21,12 @@ dependencies = [
     "pymarkdownlnt (>=0.9.36,<0.10.0)",
     "requests (>=2.33.0)",
     "pyyaml>=6.0.3",
-    "PyQt6>=6.7.0",
-    "PyQt6-WebEngine>=6.7.0",
+    "PySide6>=6.7.0",
     "html2text>=2024.2.26",
     "commitizen (>=4.13.10,<5.0.0)",
     "sphinx (>=9.1.0,<10.0.0)",
     "sphinx-rtd-theme (>=3.1.0,<4.0.0)",
-    "pyinstaller (>=6.20.0,<7.0.0)",
+    "nuitka (>=2.0,<5.0)",
 ]
 
 
@@ -154,10 +153,15 @@ module = [
     "PIL",
     "PIL.*",
     "python_calamine",
-    "PyQt6",
-    "PyQt6.*",
+    "PySide6",
+    "PySide6.*",
 ]
 ignore_missing_imports = true
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+extend-exclude = "dist_nuitka/"
 
 [tool.ruff]
 line-length = 120
@@ -228,7 +232,10 @@ source = ["."]
 omit = [
     "tests/*",
     "src/setup.py",
+    "src/editor.py",                  # GUI app — shiboken6/PySide6 not importable in headless Python 3.14
     "src/visual_filter_builder.py",  # GUI widget mocked in unit tests, integration tests needed
+    "build_editor.py",               # Nuitka build script, not application code
+    "dist_nuitka/*",
 ]
 
 [tool.coverage.report]
