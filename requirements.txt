@@ -7,7 +7,7 @@ google-auth-oauthlib>=1.2.2
 google-auth-httplib2
 gspread>=6.2.1
 oauth2client
-pillow>=12.1.1
+pillow>=12.3.0
 PyYAML
 requests
 markdown2
