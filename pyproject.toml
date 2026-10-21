@@ -44,7 +44,7 @@ dev = [
     "pytest-cov (>=7.1.0,<8.0.0)",
     "mypy (>=2.0.0,<3.0.0)",
     "pyright (>=1.1.408,<2.0.0)",
-    "ruff (>=0.15.11,<0.16.0)",
+    "ruff (>=0.15.22,<0.16.0)",
 ]
 
 testing = [# runtime tooling required to exercise the test suite
