@@ -377,11 +377,9 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             return
         if is_test:
             title = "Test Email Sent" if success else "Test Send Failed"
-            msg = (
-                "Test email sent successfully.\n\nHave the test recipients confirmed\n" "the mailing looks good?"
-                if success
-                else "Test send encountered an error. See log above."
-            )
+            msg = "Test email sent successfully.\n\nHave the test recipients confirmed\n"
+            msg += "the mailing looks good?" if success else "Test send encountered an error. See log above."
+
             buttons = (
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 if success
@@ -953,9 +951,8 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
         self.database_input.setText(str(profile_cfg.get("database", "")))
         # Process any pending Qt events to ensure database path is set before validation
-        from PySide6.QtWidgets import QApplication
 
-        QApplication.processEvents()
+        # QApplication.processEvents()
 
         # T035: Update FilterBuilder schema when database changes
         # B008: Ensure schema is refreshed for both CSV and Google Sheets databases
@@ -1116,6 +1113,9 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         self.load_current_filter(self._current_profile)
         # Clear session filter since we're switching filter mode
         self._session_filter = None
+        # Restore focus: _clear_rows destroys focused widgets, Qt shifts focus to parent window
+        self.activateWindow()
+        self.raise_()
 
     def _on_filter_changed(self, filter_dict: dict[str, str]) -> None:
         """Handle FilterBuilder filter_changed signal (T035, T041-T042).
@@ -3415,7 +3415,10 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
                 EditorWindow._unwrap_cell_blocks(cell, soup, block_tags)
 
         body = soup.find("body")
-        return body.decode_contents() if body else str(soup)
+        if body:
+            return body.decode_contents()
+        else:
+            return str(soup)
 
     def _inline_images_fallback(self, html_path: str) -> str:
         """Inline local <img src> as base64 data URIs without the sendMail module."""

@@ -4,6 +4,9 @@
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
+# Use virtual environment Python
+PYTHON=".venv/bin/python"
+
 # Convert icon if needed
 if [ ! -f images/mail.icns ]; then
   echo "Converting icon..."
@@ -18,6 +21,6 @@ fi
 
 rm -rf dist_nuitka
 echo "Building with Nuitka..."
-python build_editor.py
+$PYTHON build_editor.py
 
 echo "✓ Build complete: dist_nuitka/editor.app"

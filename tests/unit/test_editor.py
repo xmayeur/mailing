@@ -1825,10 +1825,14 @@ class TestSendDialogLoadCurrentFilter:
 class TestSendDialogOnTestModeToggled:
     def test_on_test_mode_toggled_clears_session_filter(self):
         dlg = _make_send_dialog_stub(config_data={"default": {}})
+        dlg.activateWindow = MagicMock()
+        dlg.raise_ = MagicMock()
         dlg._session_filter = {"email": "is not empty"}
         dlg._current_profile = "default"
         dlg._on_test_mode_toggled(True)
         assert dlg._session_filter is None
+        dlg.activateWindow.assert_called_once_with()
+        dlg.raise_.assert_called_once_with()
 
     def test_on_filter_text_changed_restarts_timer(self):
         dlg = _make_send_dialog_stub()
