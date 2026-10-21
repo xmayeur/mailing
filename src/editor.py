@@ -527,12 +527,12 @@ class _TableDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
         self.rows_spin = QSpinBox(self)
         self.rows_spin.setRange(1, 20)
-        self.rows_spin.setValue(3)
+        self.rows_spin.setValue(1)
         layout.addRow("Rows:", self.rows_spin)
 
         self.cols_spin = QSpinBox(self)
         self.cols_spin.setRange(1, 20)
-        self.cols_spin.setValue(3)
+        self.cols_spin.setValue(2)
         layout.addRow("Columns:", self.cols_spin)
 
         buttons = QDialogButtonBox(
