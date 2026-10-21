@@ -12,7 +12,7 @@ dependencies = [
     "oauth2client",
     "pillow>=12.3.0",
     "markdown2",
-    "google-auth>=2.47.0",
+    "google-auth>=2.62.0",
     "google-auth-oauthlib>=1.2.2",
     "pyasn1>=0.6.3",
     "protobuf>=6.33.5",
