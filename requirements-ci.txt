@@ -1,7 +1,7 @@
 # Pinned lockfile for CI — generated from Poetry venv (poetry run pip freeze)
 # Update with: poetry update && poetry run pip freeze | grep -f <(grep -oP '^[\w-]+' requirements.txt) > requirements-ci.txt
 beautifulsoup4==4.14.3
-certifi==2026.5.20
+certifi==2026.10.19
 get_hc_secrets==1.5.28
 google-api-python-client==2.197.0
 google-auth==2.53.0
