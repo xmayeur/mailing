@@ -455,7 +455,7 @@ files = [
     {file = "cffi-2.0.0-cp39-cp39-win_amd64.whl", hash = "sha256:b882b3df248017dba09d6b16defe9b5c407fe32fc7c65a9c69798e6175601be9"},
     {file = "cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529"},
 ]
-markers = {main = "platform_python_implementation != \"PyPy\"", dev = "(sys_platform == \"win32\" or implementation_name == \"pypy\") and (platform_python_implementation == \"CPython\" or implementation_name == \"pypy\")"}
+markers = {main = "platform_python_implementation != \"PyPy\"", dev = "(platform_python_implementation == \"CPython\" or implementation_name == \"pypy\") and (sys_platform == \"win32\" or implementation_name == \"pypy\")"}
 
 [package.dependencies]
 pycparser = {version = "*", markers = "implementation_name != \"PyPy\""}
@@ -1357,14 +1357,14 @@ httplib2 = ">=0.19.0,<1.0.0"
 
 [[package]]
 name = "google-auth-oauthlib"
-version = "1.4.0"
+version = "1.5.0"
 description = "Google Authentication Library"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "google_auth_oauthlib-1.4.0-py3-none-any.whl", hash = "sha256:251314f213a9ee46a5ae73988e84fd7cca8bb68e7ecf4bfd45940f9e7f51d070"},
-    {file = "google_auth_oauthlib-1.4.0.tar.gz", hash = "sha256:18b5e28880eb8eba9065c436becdc0ee8e4b59117a73a510679c82f70cd363d2"},
+    {file = "google_auth_oauthlib-1.5.0-py3-none-any.whl", hash = "sha256:71625fdea21c6c03217eb9ff13741c3096e6d257ebca0ad084dbd6e9f4aa4ef4"},
+    {file = "google_auth_oauthlib-1.5.0.tar.gz", hash = "sha256:b351107c7dd9017f426cbb0272ea1bc04f469020fd18f4443c7d40362e0b1510"},
 ]
 
 [package.dependencies]
@@ -2881,7 +2881,7 @@ files = [
     {file = "pycparser-3.0-py3-none-any.whl", hash = "sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992"},
     {file = "pycparser-3.0.tar.gz", hash = "sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29"},
 ]
-markers = {main = "platform_python_implementation != \"PyPy\" and implementation_name != \"PyPy\"", dev = "(sys_platform == \"win32\" or implementation_name == \"pypy\") and implementation_name != \"PyPy\" and (platform_python_implementation == \"CPython\" or implementation_name == \"pypy\")"}
+markers = {main = "platform_python_implementation != \"PyPy\" and implementation_name != \"PyPy\"", dev = "(platform_python_implementation == \"CPython\" or implementation_name == \"pypy\") and implementation_name != \"PyPy\" and (sys_platform == \"win32\" or implementation_name == \"pypy\")"}
 
 [[package]]
 name = "pygments"
@@ -4770,4 +4770,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12, <3.15"
-content-hash = "4b21c4ae7a490145db454d53c2906da88451d6412e1898c0b9f8476ea2b87959"
+content-hash = "12650e843d342687419321f6877c10f11eb0c3c3e1980e2b749d97d021f9a14f"
