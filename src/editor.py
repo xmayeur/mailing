@@ -429,6 +429,7 @@ class _SendWorker(QThread):  # pragma: no cover  # type: ignore[misc]
             result = self._send_fn(self._dialog)
             self.send_result.emit(str(result))
         except Exception as exc:  # noqa: BLE001
+            log.exception("Unexpected error while sending mailing")
             self.send_result.emit(f"ERROR: {exc}")
         finally:
             logging.getLogger().removeHandler(handler)
