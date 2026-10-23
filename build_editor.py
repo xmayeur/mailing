@@ -46,6 +46,7 @@ def build() -> None:
         "-m",
         "nuitka",
         # ── Core ──────────────────────────────────────────────────────────
+        "--mode=app",  # Required for PySide6/Qt WebEngine support
         "--standalone",  # self-contained directory
         "--enable-plugin=pyside6",  # handles QtWebEngineProcess + qt.conf
         "--nofollow-import-to=pytest,_pytest",
