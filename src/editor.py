@@ -235,7 +235,7 @@ def _svg_icon(svg: str) -> QIcon:
     # PySide6 6.11's stub types `format` as bytes, but the installed runtime's shiboken
     # overload resolution rejects b"SVG" ("wrong argument values") and only accepts str.
     # Verified empirically; type: ignore is for the stub, not this call.
-    pix.loadFromData(QByteArray(svg.encode()), "SVG") 
+    pix.loadFromData(QByteArray(svg.encode()), "SVG") # type: ignore
     return QIcon(pix)
 
 
