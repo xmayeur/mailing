@@ -77,6 +77,7 @@ import googleDriveLib as gd  # noqa: N813
 from profile_manager import Profile, ProfileLoadError
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
+NETWORK_TIMEOUT_SECONDS = 30
 _CSP_IMG_DOMAIN = "{_CSP_IMG_DOMAIN}"
 _HTML_PARSER = "html.parser"
 _CID_INLINE_DOMAIN = "inline.img"
@@ -465,7 +466,7 @@ def get_smtp_connection(param: Any) -> SMTP | None:
     context.verify_mode = ssl.CERT_NONE  # NOSONAR
 
     try:
-        conn = SMTP(param.smtp_host, param.smtp_port)
+        conn = SMTP(param.smtp_host, param.smtp_port, timeout=NETWORK_TIMEOUT_SECONDS)
         conn.starttls(context=context)
         conn.ehlo()
         conn.login(param.username, param.password)
@@ -531,7 +532,11 @@ def save_to_sent(param: Any, msg: MIMEMultipart) -> None:
     n = 3
     for attempt in range(n):
         try:
-            imap = imaplib.IMAP4_SSL(param.imap_host, param.imap_port)
+            imap = imaplib.IMAP4_SSL(
+                param.imap_host,
+                param.imap_port,
+                timeout=NETWORK_TIMEOUT_SECONDS,
+            )
             imap.login(param.username, param.password)
             imap.append(
                 param.sent_folder,
@@ -1037,12 +1042,12 @@ def _flush_batch(
     if cancel_event is not None:
         cancel_event.wait(pause)
         if recipient_count % max_mail_per_hour == 0 and not cancel_event.is_set():
-            log.info("Limite horaire atteinte. Pause d'une heure...")
+            log.info("Hourly mail limit reached; pausing for up to one hour.")
             cancel_event.wait(3600)
     else:
         sleep(pause)
         if recipient_count % max_mail_per_hour == 0:
-            log.info("Limite horaire atteinte. Pause d'une heure...")
+            log.info("Hourly mail limit reached; pausing for one hour.")
             sleep(3600)
 
 
