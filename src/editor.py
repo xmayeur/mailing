@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast, override
+
 import yaml
 
 # Type aliases for complex config structures (PEP 695, Python 3.12+)
@@ -1454,49 +1455,11 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
             return
 
         # Refresh filter builder schema with inferred field types from actual data.
-        # _syncing guard prevents refresh_schema from emitting filter_changed and
-        # corrupting _session_filter mid-execution.
-        if self._filter_builder:
-            try:
-                new_schema = DatabaseSchemaInfo.with_inferred_types(headers, rows)
-                if new_schema.field_types != self._schema_info.field_types:
-                    self._schema_info = new_schema
-                    self._filter_builder.schema_info = new_schema
-                    self._filter_builder._syncing = True
-                    try:
-                        self._filter_builder._table_widget.refresh_schema(new_schema)
-                    finally:
-                        self._filter_builder._syncing = False
-            except Exception as e:
-                log.debug("Could not infer field types: %s", e)
+        self._refresh_filter_builder_schema(rows, headers)
 
         # T028: Apply filter using FilterMatcher
         try:
-            from filter_matcher import FilterMatcher
-
-            matcher = FilterMatcher()
-            # Use _session_filter if set (from FilterBuilder), otherwise read from YAML editor
-            filter_dict: dict[str, str] = {}
-            if self._session_filter:
-                filter_dict = self._session_filter
-                filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
-                log.debug(
-                    f"Filter applied (from session): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records"
-                )
-            else:
-                filter_text = self.filter_text_edit.toPlainText()
-                if filter_text and filter_text.strip():
-                    import yaml
-
-                    filter_dict = yaml.safe_load(filter_text) or {}
-                    filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
-                    log.debug(
-                        f"Filter applied (from YAML): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records"
-                    )
-                else:
-                    filtered_rows = rows
-                    log.debug(f"No filter, showing all {len(rows)} records")
-
+            filtered_rows = self._filter_rows_for_display(rows, headers)
             self._update_record_display(filtered_rows, headers, len(rows))
             # Reset error state on success
             self.record_count_label.setStyleSheet("font-weight: bold;")
@@ -1504,6 +1467,52 @@ class _SendDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
         except Exception as e:
             log.debug("Could not filter records: %s", e)
             self._update_record_display(rows, headers, len(rows))
+
+    def _refresh_filter_builder_schema(self, rows: list[list[str]], headers: list[str]) -> None:
+        """Refresh filter builder schema with inferred field types from actual data.
+
+        _syncing guard prevents refresh_schema from emitting filter_changed and
+        corrupting _session_filter mid-execution.
+        """
+        if not self._filter_builder:
+            return
+        try:
+            new_schema = DatabaseSchemaInfo.with_inferred_types(headers, rows)
+            if new_schema.field_types != self._schema_info.field_types:
+                self._schema_info = new_schema
+                self._filter_builder.schema_info = new_schema
+                self._filter_builder._syncing = True
+                try:
+                    self._filter_builder._table_widget.refresh_schema(new_schema)
+                finally:
+                    self._filter_builder._syncing = False
+        except Exception as e:
+            log.debug("Could not infer field types: %s", e)
+
+    def _filter_rows_for_display(self, rows: list[list[str]], headers: list[str]) -> list[list[str]]:
+        """Apply the active filter (session filter or YAML editor) to rows."""
+        from filter_matcher import FilterMatcher
+
+        matcher = FilterMatcher()
+        filter_dict: dict[str, str] = {}
+        if self._session_filter:
+            filter_dict = self._session_filter
+            filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
+            log.debug(f"Filter applied (from session): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records")
+        else:
+            filter_text = self.filter_text_edit.toPlainText()
+            if filter_text and filter_text.strip():
+                import yaml
+
+                filter_dict = yaml.safe_load(filter_text) or {}
+                filtered_rows = matcher.filter_rows(rows, filter_dict, headers)
+                log.debug(
+                    f"Filter applied (from YAML): {filter_dict}, matched {len(filtered_rows)}/{len(rows)} records"
+                )
+            else:
+                filtered_rows = rows
+                log.debug(f"No filter, showing all {len(rows)} records")
+        return filtered_rows
 
     def _update_record_display(self, rows: list[list[str]], headers: list[str], total: int) -> None:
         """Update record table display (T025)."""
@@ -3343,9 +3352,12 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             )
             span.string = "⚓"  # ⚓
             a.replace_with(span)
-        # If html.parser wrapped the fragment in html/body, extract body content only
+        # If html.parser wrapped the fragment in html/body, extract body content onlybody
         body = soup.find("body")
-        return body.decode_contents() if body else str(soup)
+        if body:
+            return body.decode_contents()
+        else:
+            return str(soup)
 
     @staticmethod
     def _spans_to_anchors(html: str) -> str:

@@ -2,7 +2,7 @@
 <project version="4">
   <component name="SonarLintProjectSettings">
     <option name="bindingEnabled" value="true" />
-    <option name="projectKey" value="mailing_mailing" />
+    <option name="projectKey" value="xmayeur_mailing" />
     <option name="serverId" value="mailing" />
   </component>
 </project>
