@@ -51,6 +51,7 @@ def build() -> None:
         # Workaround for macOS 27 NSCalendarDate crash in CoreUI when using NSAlert
         "--force-runtime-environment-variable=QT_USE_NATIVE_DIALOGS=0",
         "--force-runtime-environment-variable=QT_QPA_PLATFORM=cocoa",
+        "--force-runtime-environment-variable=QT_MAC_WANTS_LAYER=0",
         "--nofollow-import-to=pytest,_pytest",
         # Windows standalone builds need Dependency Walker to analyze extension-module
         # DLLs; Nuitka prompts to download it and defaults to "no" when non-interactive,

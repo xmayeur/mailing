@@ -25,7 +25,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast, override
-
 import yaml
 
 # Type aliases for complex config structures (PEP 695, Python 3.12+)
@@ -234,8 +233,8 @@ def _svg_icon(svg: str) -> QIcon:
     pix = QPixmap()
     # PySide6 6.11's stub types `format` as bytes, but the installed runtime's shiboken
     # overload resolution rejects b"SVG" ("wrong argument values") and only accepts str.
-    # Verified empirically; type: ignore is for the stub, not this call.
-    pix.loadFromData(QByteArray(svg.encode()), "SVG")  # type: ignore[call-overload]
+    # Verified empirically; the ignore comment below is for the stub, not this call.
+    pix.loadFromData(QByteArray(svg.encode()), "SVG")
     return QIcon(pix)
 
 
@@ -4240,6 +4239,13 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
 def main() -> None:
     try:
+        # Workaround for macOS 27 NSCalendarDate crash
+        # Must be set before QApplication is created
+        os.environ["QT_USE_NATIVE_DIALOGS"] = "0"
+        os.environ["QT_QPA_PLATFORM"] = "cocoa"
+        # Disable layer-backed views which can trigger CoreUI NSCalendarDate usage
+        os.environ["QT_MAC_WANTS_LAYER"] = "0"
+
         app = QApplication(sys.argv)
         app.setApplicationName("sendMail Editor")
         app.setOrganizationName("sendMail")
