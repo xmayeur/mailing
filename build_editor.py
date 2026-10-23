@@ -46,8 +46,7 @@ def build() -> None:
         "-m",
         "nuitka",
         # ── Core ──────────────────────────────────────────────────────────
-        "--mode=app",  # Required for PySide6/Qt WebEngine support
-        "--standalone",  # self-contained directory
+        "--mode=app-dist",  # "standalone" on non-macOS, app bundle on macOS
         "--enable-plugin=pyside6",  # handles QtWebEngineProcess + qt.conf
         "--nofollow-import-to=pytest,_pytest",
         # Windows standalone builds need Dependency Walker to analyze extension-module
@@ -93,7 +92,6 @@ def build() -> None:
     # ── Platform-specific ─────────────────────────────────────────────────
     if PLATFORM == "darwin":
         cmd += [
-            "--macos-create-app-bundle",
             "--macos-app-name=sendMailEditor",
             "--macos-app-version=1.13.2",
             # Chromium requires these entitlements on macOS 10.15+
