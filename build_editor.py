@@ -38,6 +38,14 @@ def icon_path() -> str | None:
     return str(p) if p.exists() else None
 
 
+def app_version() -> str:
+    """Read the project version from pyproject.toml ([project] version)."""
+    for line in (ROOT / "pyproject.toml").read_text().splitlines():
+        if line.startswith("version = "):
+            return line.split("=", 1)[1].strip().strip('"')
+    raise RuntimeError("version not found in pyproject.toml")
+
+
 def build() -> None:
     dry_run = "--dry-run" in sys.argv
 
@@ -81,7 +89,7 @@ def build() -> None:
     if PLATFORM == "darwin":
         cmd += [
             "--macos-app-name=sendMailEditor",
-            "--macos-app-version=1.13.2",
+            f"--macos-app-version={app_version()}",
             # Chromium requires these entitlements on macOS 10.15+
             "--macos-signed-app-name=com.hc.sendMailEditor",
         ]
@@ -90,8 +98,8 @@ def build() -> None:
             "--windows-disable-console",
             "--windows-company-name=HC",
             "--windows-product-name=sendMailEditor",
-            "--windows-file-version=1.13.2.0",
-            "--windows-product-version=1.13.2.0",
+            "--windows-file-version=" + app_version() + ".0",
+            "--windows-product-version=" + app_version() + ".0",
         ]
     # Linux: no extra flags needed
 
