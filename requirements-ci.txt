@@ -1,10 +1,12 @@
-# Pinned lockfile for CI — generated from Poetry venv (poetry run pip freeze)
-# Update with: poetry update && poetry run pip freeze | grep -f <(grep -oP '^[\w-]+' requirements.txt) > requirements-ci.txt
+# Pinned lockfile for CI — generated from the Poetry venv (pip freeze).
+# Regenerate after `poetry update` / `poetry.lock` changes:
+#   .venv/bin/pip freeze  (pin the names below)
+# Keep in sync with poetry.lock; pyproject.toml holds the version ranges.
 beautifulsoup4==4.14.3
-certifi>=2026.10.19
+certifi==2026.10.23
 get_hc_secrets==1.5.28
 google-api-python-client==2.197.0
-google-auth==2.53.0
+google-auth==2.62.0
 google-auth-httplib2==0.4.4
 google-auth-oauthlib==1.4.0
 gspread==6.2.1
@@ -19,7 +21,7 @@ pytest==9.0.3
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 pytest-httpx==0.36.2
-pytest-mock==3.15.1
+pytest-mock==3.17.0
 python-calamine==0.6.2
 PyYAML==6.0.3
 requests==2.34.2
