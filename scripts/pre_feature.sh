@@ -11,5 +11,4 @@ git branch -a
 # git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -d
 
 echo "Updating dependencies to latest compatible versions..."
-pip install --upgrade pip
-pip install -r requirements.txt -r requirements-dev.txt
+poetry update

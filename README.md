@@ -87,7 +87,7 @@ git clone <repository-url>
 cd sendMail
 
 # Install required dependencies
-pip install -r requirements.txt
+poetry install
 ```
 
 ### Dependencies

@@ -121,7 +121,7 @@ Note: the editor binary is ~80–150 MB due to Chromium (QWebEngine). It is buil
 
 ## Package manager & dependencies
 
-`pyproject.toml` (PEP 621, Python 3.12+) + `requirements.txt`.
+`pyproject.toml` (PEP 621, Python 3.12+) + `poetry.lock` — single source of truth; no `requirements*.txt` files are committed (CI exports `requirements-ci.txt` from `poetry.lock`).
 
 Core: `google-api-python-client`, `gspread`, `beautifulsoup4`, `markdown2`, `pillow`, `pyyaml`, `get-hc-secrets`
 Dev: `pytest`, `pytest-cov`, `mypy`, `ruff`, `behave`
