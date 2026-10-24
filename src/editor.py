@@ -4290,18 +4290,19 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
 def main() -> None:
     try:
-        # Workaround for macOS 27 NSCalendarDate crash
-        # Must be set before QApplication is created
-        os.environ["QT_USE_NATIVE_DIALOGS"] = "0"
-        os.environ["QT_QPA_PLATFORM"] = "cocoa"
-        # Disable layer-backed views which can trigger CoreUI NSCalendarDate usage
-        os.environ["QT_MAC_WANTS_LAYER"] = "0"
-        # QT_USE_NATIVE_DIALOGS alone is not honored by Qt 6.12's cocoa theme for
-        # message boxes: the NSAlert still renders an SF Symbol template image via
-        # CoreUI, whose NSCalendarDate decode throws on macOS 27.0.1 (verified in
-        # crash reports from both 1.14.0 and 1.14.1 builds). The application
-        # attribute demonstrably keeps QMessageBox off the NSAlert path.
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True)
+        if sys.platform == "darwin":
+            # Workaround for macOS 27 NSCalendarDate crash
+            # Must be set before QApplication is created
+            os.environ["QT_USE_NATIVE_DIALOGS"] = "0"
+            os.environ["QT_QPA_PLATFORM"] = "cocoa"
+            # Disable layer-backed views which can trigger CoreUI NSCalendarDate usage
+            os.environ["QT_MAC_WANTS_LAYER"] = "0"
+            # QT_USE_NATIVE_DIALOGS alone is not honored by Qt 6.12's cocoa theme for
+            # message boxes: the NSAlert still renders an SF Symbol template image via
+            # CoreUI, whose NSCalendarDate decode throws on macOS 27.0.1 (verified in
+            # crash reports from both 1.14.0 and 1.14.1 builds). The application
+            # attribute demonstrably keeps QMessageBox off the NSAlert path.
+            QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True)
 
         app = QApplication(sys.argv)
         app.setApplicationName("sendMail Editor")
