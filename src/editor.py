@@ -34,11 +34,13 @@ type ConfigData = dict[str, ConfigValue]
 type ConfigProfile = dict[str, ConfigData]
 
 # ---------------------------------------------------------------------------
-# PyInstaller-safe asset & module path resolution
+# Asset & module path resolution (PyInstaller + Nuitka aware)
 # ---------------------------------------------------------------------------
-_IS_FROZEN = getattr(sys, "frozen", False)
+_IS_NUITKA = "__compiled__" in globals()
+_IS_PYINSTALLER = bool(getattr(sys, "frozen", False)) and hasattr(sys, "_MEIPASS")
+_IS_FROZEN = _IS_NUITKA or _IS_PYINSTALLER
 
-if _IS_FROZEN:
+if _IS_PYINSTALLER:
     _MEIPASS = Path(sys._MEIPASS)  # type: ignore
     # For macOS BUNDLE, sys._MEIPASS is Contents/Frameworks/
     # Correct to Contents/ for asset/module resolution
@@ -46,17 +48,15 @@ if _IS_FROZEN:
         _BASE = _MEIPASS.parent  # Contents/
     else:
         _BASE = _MEIPASS
-
-    # In bundled macOS app, modules/assets are in _MEIPASS/ (onefile extraction)
-    _MODULES_PATH = [_BASE]
 else:
+    # Nuitka standalone: __file__ of the main module points at the
+    # executable's directory (e.g. editor.app/Contents/MacOS), where
+    # --include-data-dir places editor_assets/ and css/.
     _BASE = Path(__file__).parent
-    _MODULES_PATH = [_BASE]
 
-# Add module paths so local modules (sendMail, googleDriveLib, etc.) can be imported
-for mod_path in _MODULES_PATH:
-    if str(mod_path) not in sys.path:
-        sys.path.insert(0, str(mod_path))
+# Add module path so local modules (sendMail, googleDriveLib, etc.) can be imported
+if str(_BASE) not in sys.path:
+    sys.path.insert(0, str(_BASE))
 
 # onefile extracts to _MEIPASS/, assets are at _MEIPASS/editor_assets/ (not in Resources/)
 # (.app bundle approach would have Resources/, but we're using onefile now)
@@ -340,9 +340,24 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 
         self.log_line_received.connect(self.append_log)
 
+    def _ask(self, title: str, text: str, buttons: QMessageBox.StandardButton) -> QMessageBox.StandardButton:
+        """Show a message box without the native SF-symbol icon.
+
+        On macOS 26+, the AppKit alert renders its icon as an SF Symbol via
+        CoreUI; in packaged (non-App-Store) bundles that rasterization raises
+        an uncaught NSException during NSView layout and crashes the app
+        (EXC_BREAKPOINT in +[NSApplication _crashOnException:]). NoIcon
+        avoids the SF Symbol path entirely.
+        """
+        box = QMessageBox(self)
+        box.setWindowTitle(title)
+        box.setText(text)
+        box.setIcon(QMessageBox.Icon.NoIcon)
+        box.setStandardButtons(buttons)
+        return QMessageBox.StandardButton(box.exec())
+
     def _on_cancel_clicked(self) -> None:
-        reply = QMessageBox.question(
-            self,
+        reply = self._ask(
             "Cancel Sending",
             "Are you sure you want to stop sending this mailing?\n\n"
             "Emails already sent will not be un-sent; remaining recipients will be skipped.",
@@ -385,12 +400,12 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
                 if success
                 else QMessageBox.StandardButton.Ok
             )
-            reply = QMessageBox.question(self, title, msg, buttons)
+            reply = self._ask(title, msg, buttons)
             self._test_confirmed = success and reply == QMessageBox.StandardButton.Yes
         else:
             title = "Send Complete" if success else "Send Failed"
             msg = "Mailing sent successfully." if success else "Send encountered an error. See log above."
-            QMessageBox.information(self, title, msg)
+            self._ask(title, msg, QMessageBox.StandardButton.Ok)
             self._test_confirmed = False
         self._close_button.setEnabled(True)
 
@@ -409,6 +424,29 @@ class _SessionLogDialog(QDialog):  # pragma: no cover  # type: ignore[misc]
 # ---------------------------------------------------------------------------
 # Background send worker
 # ---------------------------------------------------------------------------
+class _SendResultRelay(QObject):  # pragma: no cover
+    """Relay the send result to the main thread.
+
+    A plain Python callable (lambda) connected to a signal has no receiver
+    QObject, so the connection is direct and the callback runs in the
+    emitting thread. Creating QMessageBox dialogs from a QThread raises an
+    AppKit exception and crashes on macOS (_crashOnException). This relay
+    lives in the main thread (parented to the main window), so connecting
+    worker.send_result -> relay.forward yields a queued connection and
+    re-emitting here keeps send-result handling on the main thread.
+    """
+
+    result_ready: Signal = Signal(str, object, object)
+
+    def __init__(self, dialog: _SendDialog, log_dialog: _SessionLogDialog, parent: Any) -> None:
+        super().__init__(parent)
+        self._dialog = dialog
+        self._log_dialog = log_dialog
+
+    def forward(self, result: str) -> None:
+        self.result_ready.emit(result, self._dialog, self._log_dialog)
+
+
 class _SendWorker(QThread):  # pragma: no cover  # type: ignore[misc]
     """Run sendMail in a background thread; emit log lines and final result via signals."""
 
@@ -429,6 +467,7 @@ class _SendWorker(QThread):  # pragma: no cover  # type: ignore[misc]
             result = self._send_fn(self._dialog)
             self.send_result.emit(str(result))
         except Exception as exc:  # noqa: BLE001
+            log.exception("Unexpected error while sending mailing")
             self.send_result.emit(f"ERROR: {exc}")
         finally:
             logging.getLogger().removeHandler(handler)
@@ -2997,14 +3036,9 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         if home_css.exists():
             return home_css
 
-        # Fall back to project default
-        if _IS_FROZEN:
-            if sys.platform == "darwin":
-                default_css = _BASE / "Resources" / "css" / _STYLES_CSS
-            else:
-                default_css = _BASE / "css" / _STYLES_CSS
-        else:
-            default_css = _BASE / "css" / _STYLES_CSS
+        # Fall back to project default (css/ sits next to the binary,
+        # both under Nuitka standalone and in the source tree)
+        default_css = _BASE / "css" / _STYLES_CSS
         return default_css
 
     def _get_css_directory(self) -> Path:
@@ -4039,9 +4073,14 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
 
         log_dialog = _SessionLogDialog(self)
         log_dialog.cancel_requested.connect(dialog.cancel_event.set)
+        # Relay the result through a main-thread QObject: a lambda connection
+        # has no receiver QObject, so it runs in the worker thread and any
+        # GUI call there (QMessageBox in set_complete) crashes on macOS.
+        relay = _SendResultRelay(dialog, log_dialog, self)
         worker = _SendWorker(dialog, self._send_with_sendmail)
         worker.log_line.connect(log_dialog.log_line_received)
-        worker.send_result.connect(lambda result: self._on_send_finished(result, dialog, log_dialog))
+        worker.send_result.connect(relay.forward)
+        relay.result_ready.connect(self._on_send_finished)
         worker.start()
         log_dialog.exec()
 

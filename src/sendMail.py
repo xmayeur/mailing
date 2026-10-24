@@ -1409,7 +1409,7 @@ def _attempt_smtp_send(param: Any, message: Any, recipients: Any, attempt: int) 
         if param.verbose:  # pyright: ignore
             log.info("sent")
         return True
-    except SMTPException:
+    except (OSError, SMTPException):
         log.exception(f"SMTP error on attempt {attempt + 1}")
         if attempt == 0:
             sleep(10)

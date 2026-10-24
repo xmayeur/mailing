@@ -64,30 +64,14 @@ def build() -> None:
         # ── Data directories ──────────────────────────────────────────────
         f"--include-data-dir={SRC / 'editor_assets'}=editor_assets",
         f"--include-data-dir={ROOT / 'css'}=css",
-        # ── Companion .py modules (loaded at runtime via importlib/exec) ──
-        f"--include-data-files={SRC / 'sendMail.py'}=sendMail.py",
-        f"--include-data-files={SRC / 'googleDriveLib.py'}=googleDriveLib.py",
-        f"--include-data-files={SRC / 'filter_validator.py'}=filter_validator.py",
-        f"--include-data-files={SRC / 'profile_manager.py'}=profile_manager.py",
-        # ── Hidden imports ────────────────────────────────────────────────
-        "--include-module=getSecrets",
-        "--include-module=html2text",
-        "--include-module=bs4",
-        "--include-module=markdown2",
-        "--include-module=yaml",
-        "--include-module=PIL",
-        "--include-module=PIL.Image",
-        "--include-module=gspread",
-        "--include-module=gspread.auth",
-        "--include-module=googleapiclient",
-        "--include-module=googleapiclient.discovery",
-        "--include-module=googleapiclient.http",
-        "--include-module=google.auth",
-        "--include-module=google.auth.transport",
-        "--include-module=google.auth.transport.requests",
-        "--include-module=google.api_core",
-        "--include-module=google.api_core.gapic_v1",
-        "--include-module=requests",
+        # ── Modules compagnons ────────────────────────────────────────────
+        # sendMail, googleDriveLib, filter_validator, profile_manager,
+        # getSecrets, PIL, gspread, googleapiclient, requests, ... sont
+        # tous atteints par de vrais imports : Nuitka les compile et
+        # inclut leurs dépendances automatiquement. Pas de
+        # --include-data-files pour les .py (doublons ambigus avec les
+        # modules compilés) ni de --include-module=PIL redondant (cause
+        # d'un double module.PIL.c avec un build dir périmé).
         # ── Output ────────────────────────────────────────────────────────
         f"--output-dir={DIST}",
         "--output-filename=sendMailEditor",
