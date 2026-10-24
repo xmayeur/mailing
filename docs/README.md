@@ -9,7 +9,7 @@ This directory contains the Sphinx documentation for the sendMail project.
 Install the required dependencies:
 
 ```bash
-pip install -r requirements.txt
+poetry install --with docs
 ```
 
 ### Build HTML Documentation

@@ -70,21 +70,10 @@ git status --porcelain
 poetry run scripts/pre_push_checks.sh
 ```
 
-### 8. Regenerate requirements files
+### 8. (Removed) Regenerate requirements files
 
-`poetry export` requires the export plugin (one-time install):
-
-```bash
-# poetry self add poetry-plugin-export
-```
-
-Then regenerate:
-
-```bash
-# poetry export --without-hashes -f requirements.txt --with docs -o requirements.txt
-# git add requirements.txt
-# git diff --cached --quiet || git commit -m "chore: regenerate requirements files"
-```
+`requirements.txt` was removed — `pyproject.toml` + `poetry.lock` are the single
+source of truth, and CI exports `requirements-ci.txt` from `poetry.lock`.
 
 ### 9. Bump version and update changelog
 
