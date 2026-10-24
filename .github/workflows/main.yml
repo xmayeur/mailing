@@ -1,7 +1,9 @@
 name: Build and Release Executables
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
 
@@ -9,7 +11,17 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    # Only proceed when the Tests workflow succeeded on the same commit
+    # (workflow_dispatch always proceeds)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify upstream Tests result
+        run: echo "Tests passed for ${{ github.event.workflow_run.head_sha || github.sha }}; proceeding with build & release"
+
   version:
+    needs: gate
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.extract.outputs.version }}
@@ -17,6 +29,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Extract version from pyproject.toml
         id: extract
@@ -26,7 +40,7 @@ jobs:
           echo "tag=v$version" >> $GITHUB_OUTPUT
 
   build:
-    needs: version
+    needs: [gate, version]
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
@@ -36,6 +50,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
         timeout-minutes: 10
 
       - name: Set up Python
