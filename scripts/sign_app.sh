@@ -25,7 +25,9 @@ if ! security find-identity -v -p codesigning | grep -q "$IDENTITY_NAME"; then
 fi
 
 echo "Signing $APP_PATH with identity: $IDENTITY_NAME"
-codesign --force --deep --sign "$IDENTITY_NAME" --timestamp=none "$APP_PATH"
+ENTITLEMENTS="$(dirname "$0")/editor.entitlements"
+codesign --force --deep --sign "$IDENTITY_NAME" --timestamp=none \
+    --options runtime --entitlements "$ENTITLEMENTS" "$APP_PATH"
 codesign -v --deep --verbose=2 "$APP_PATH"
 
 echo "✓ Signed successfully: $APP_PATH"

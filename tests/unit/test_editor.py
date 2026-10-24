@@ -265,7 +265,7 @@ class TestEditorBridgeContentTracking:
 
 
 class TestEditorBridgeImageInsert:
-    def test_returns_data_uri_on_file_selection(self):
+    def test_returns_data_uri_on_file_selection(self, monkeypatch):
         bridge = _make_bridge()
         with (
             patch(
@@ -276,7 +276,7 @@ class TestEditorBridgeImageInsert:
         ):
             mock_sm.file_to_base64.return_value = "abc123"
             mock_sm.guess_type.return_value = "image/png"
-            editor._SM_AVAILABLE = True
+            monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
             result = bridge.request_image_insert()
         assert result == "data:image/png;base64,abc123"
 
@@ -286,30 +286,26 @@ class TestEditorBridgeImageInsert:
             result = bridge.request_image_insert()
         assert result == ""
 
-    def test_returns_empty_string_on_exception(self):
+    def test_returns_empty_string_on_exception(self, monkeypatch):
         bridge = _make_bridge()
         with (
             patch("editor.QFileDialog.getOpenFileName", return_value=("/bad/path.png", "")),
             patch("editor.sm") as mock_sm,
         ):
             mock_sm.file_to_base64.side_effect = FileNotFoundError("not found")
-            editor._SM_AVAILABLE = True
+            monkeypatch.setattr(editor, "_SM_AVAILABLE", True)
             result = bridge.request_image_insert()
         assert result == ""
 
-    def test_fallback_when_sm_unavailable(self):
+    def test_fallback_when_sm_unavailable(self, monkeypatch):
         bridge = _make_bridge()
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             tmp.write(b"\x89PNG\r\n\x1a\n")  # minimal PNG header bytes
             tmp_path = tmp.name
         try:
             with patch("editor.QFileDialog.getOpenFileName", return_value=(tmp_path, "")):
-                orig = editor._SM_AVAILABLE
-                editor._SM_AVAILABLE = False
-                try:
-                    result = bridge.request_image_insert()
-                finally:
-                    editor._SM_AVAILABLE = orig
+                monkeypatch.setattr(editor, "_SM_AVAILABLE", False)
+                result = bridge.request_image_insert()
             assert result.startswith(("data:image/png;base64,", "data:"))
         finally:
             os.unlink(tmp_path)

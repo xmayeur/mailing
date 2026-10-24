@@ -99,12 +99,11 @@ class TestGoogleDriveFileOperations:
 
         from googleapiclient.errors import HttpError
 
-        mock_service.files().get_media(fileId="invalid").execute.side_effect = HttpError(
-            MagicMock(status=404), b"Not found"
-        )
+        get_media = mock_service.files().get_media(fileId="invalid")
+        get_media.execute.side_effect = HttpError(MagicMock(status=404), b"Not found")
 
         with pytest.raises(HttpError):
-            mock_service.files().get_media(fileId="invalid").execute()
+            get_media.execute()
 
     @patch("googleDriveLib.build")
     def test_upload_file(self, mock_build: Any) -> None:
@@ -158,10 +157,11 @@ class TestGoogleDriveQuotaAndLimits:
 
         from googleapiclient.errors import HttpError
 
-        mock_service.files().list().execute.side_effect = HttpError(MagicMock(status=429), b"Rate limit exceeded")
+        list_call = mock_service.files().list()
+        list_call.execute.side_effect = HttpError(MagicMock(status=429), b"Rate limit exceeded")
 
         with pytest.raises(HttpError) as exc:
-            mock_service.files().list().execute()
+            list_call.execute()
         assert exc.value.resp.status == 429
 
     @patch("googleDriveLib.build")
@@ -172,10 +172,11 @@ class TestGoogleDriveQuotaAndLimits:
 
         from googleapiclient.errors import HttpError
 
-        mock_service.files().create().execute.side_effect = HttpError(MagicMock(status=403), b"Quota exceeded")
+        create_call = mock_service.files().create()
+        create_call.execute.side_effect = HttpError(MagicMock(status=403), b"Quota exceeded")
 
         with pytest.raises(HttpError) as exc:
-            mock_service.files().create().execute()
+            create_call.execute()
         assert exc.value.resp.status == 403
 
 
