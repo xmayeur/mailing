@@ -56,10 +56,6 @@ def build() -> None:
         # ── Core ──────────────────────────────────────────────────────────
         "--mode=app-dist",  # "standalone" on non-macOS, app bundle on macOS
         "--enable-plugin=pyside6",  # handles QtWebEngineProcess + qt.conf
-        # Workaround for macOS 27 NSCalendarDate crash in CoreUI when using NSAlert
-        "--force-runtime-environment-variable=QT_USE_NATIVE_DIALOGS=0",
-        "--force-runtime-environment-variable=QT_QPA_PLATFORM=cocoa",
-        "--force-runtime-environment-variable=QT_MAC_WANTS_LAYER=0",
         "--nofollow-import-to=pytest,_pytest",
         # Windows standalone builds need Dependency Walker to analyze extension-module
         # DLLs; Nuitka prompts to download it and defaults to "no" when non-interactive,
@@ -88,6 +84,10 @@ def build() -> None:
     # ── Platform-specific ─────────────────────────────────────────────────
     if PLATFORM == "darwin":
         cmd += [
+            # Workaround for macOS 27 NSCalendarDate crash in CoreUI when using NSAlert
+            "--force-runtime-environment-variable=QT_USE_NATIVE_DIALOGS=0",
+            "--force-runtime-environment-variable=QT_QPA_PLATFORM=cocoa",
+            "--force-runtime-environment-variable=QT_MAC_WANTS_LAYER=0",
             "--macos-app-name=sendMailEditor",
             f"--macos-app-version={app_version()}",
             # Chromium requires these entitlements on macOS 10.15+
