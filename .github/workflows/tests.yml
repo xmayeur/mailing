@@ -40,7 +40,7 @@ jobs:
     - name: Install dependencies
       run: |
         poetry export -f requirements.txt --with testing --output requirements-ci.txt
-        pip install --only-binary :all: -r requirements-ci.txt
+        pip install -r requirements-ci.txt
 
     - name: Run unit tests with pytest
       run: |
@@ -89,7 +89,7 @@ jobs:
     - name: Install dependencies
       run: |
         poetry export -f requirements.txt --with testing --output requirements-ci.txt
-        pip install --only-binary :all: -r requirements-ci.txt
+        pip install -r requirements-ci.txt
 
     - name: Run tests with coverage
       run: |
@@ -118,7 +118,7 @@ jobs:
     - name: Install runtime dependencies
       run: |
         poetry export -f requirements.txt --only main --output requirements-ci.txt
-        pip install --only-binary :all: -r requirements-ci.txt
+        pip install -r requirements-ci.txt
         pip install --only-binary :all: "types-PyYAML==6.0.12.20260518" "types-requests==2.33.0.20260518"
 
     - name: Install linting and type checking tools
@@ -173,7 +173,7 @@ jobs:
     - name: Install dependencies
       run: |
         poetry export -f requirements.txt --with testing --output requirements-ci.txt
-        pip install --only-binary :all: -r requirements-ci.txt
+        pip install -r requirements-ci.txt
 
     - name: Run unit tests and extract coverage
       run: |

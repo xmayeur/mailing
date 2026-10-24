@@ -55,7 +55,7 @@ jobs:
       - name: Install runtime dependencies
         run: |
           poetry export -f requirements.txt --only main --output requirements-ci.txt
-          pip install --only-binary :all: -r requirements-ci.txt
+          pip install -r requirements-ci.txt
 
       - name: Install build tools (Nuitka)
         run: pip install nuitka==4.3.1 ordered-set zstandard
