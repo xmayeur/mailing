@@ -133,8 +133,7 @@ jobs:
       continue-on-error: false
 
     - name: Dead code detection with vulture
-      run: vulture src/ --exclude venv,tests,build,dist,release
-      continue-on-error: true
+      run: vulture src/ --exclude venv,tests,build,dist,release || true
 
     - name: Lint with flake8
       run: |
