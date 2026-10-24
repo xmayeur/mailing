@@ -117,6 +117,8 @@ jobs:
 
     - name: Install runtime and lint dependencies
       run: poetry install --with lint
+      env:
+        POETRY_VIRTUALENVS_CREATE: false
 
     - name: Type checking with mypy
       run: mypy --strict src/
