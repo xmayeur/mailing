@@ -1,3 +1,14 @@
+## v1.14.1 (2026-10-24)
+
+### Fix
+
+- **ci**: align PySide6 CI pins to 6.12.0 with poetry.lock
+- resolve mypy and SonarQube issues
+
+### Refactor
+
+- adjust default editor grid size to 1x2
+
 ## v1.14.0 (2026-07-01)
 
 ### Feat
