@@ -1,3 +1,21 @@
+## v1.14.2 (2026-10-25)
+
+### Fix
+
+- **editor**: implement missing YAML fallback filter editor
+- **editor**: keep send dialog focused when adding filter rows
+- **editor**: force cocoa Qt platform only on macOS
+- **deps**: bump transitive deps for Dependabot security advisories
+- **ci**: install lint tools into runner env (no venv) so mypy etc. are on PATH
+- **ci**: allow sdist installs for exported requirements (nuitka has no wheels)
+- **deps**: lift Pillow cap, upgrade to 13.0.0 for security advisories
+- **editor**: force AA_DontUseNativeDialogs to avoid macOS 27 CoreUI crash
+- **build**: read app version from pyproject instead of hardcoded 1.13.2
+
+### Refactor
+
+- **filter-builder**: remove YAML editor and enhance visual editor
+
 ## v1.14.1 (2026-10-24)
 
 ### Fix
