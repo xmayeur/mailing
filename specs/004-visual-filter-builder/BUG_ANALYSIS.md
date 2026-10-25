@@ -190,44 +190,10 @@ def _populate_operator_combo(self) -> None:
 
 ## Bug #4: Switching to YAML Editor Doesn't Sync Changes
 
-**Severity**: HIGH  
+**Severity**: RESOLVED (YAML tab removed)  
 **Symptoms**: User edits YAML tab, but visual table doesn't update. Or user switches tabs and changes are lost.
 
-### Root Cause Analysis
-
-Located in `src/visual_filter_builder.py:600-618` - `FilterBuilder._on_yaml_changed()`:
-
-```python
-def _on_yaml_changed(self) -> None:
-    """Handle YAML text change—parse and update filter table."""
-    if self._syncing or not PYQT_AVAILABLE:
-        return
-    
-    self._syncing = True
-    try:
-        yaml_text = self._yaml_edit.toPlainText()
-        if yaml_text.strip():
-            filter_dict = self._parse_yaml(yaml_text)
-            self._filter_table = FilterTable.from_dict(filter_dict)
-        else:
-            self._filter_table = FilterTable()
-        self._table_widget.set_rows(self._filter_table.rows)  # <-- Calls set_rows again!
-        self.filter_changed.emit(self._filter_table.to_dict())
-    except Exception as e:
-        log.debug("YAML parse error: %s", e)
-    finally:
-        self._syncing = False
-```
-
-**Problems**:
-
-1. **set_rows() causes duplicate rows** (relates to Bug #1):
-   - When user types in YAML tab, `textChanged` signal fires
-   - `_on_yaml_changed()` calls `set_rows()` which calls `_clear_rows()`
-   - Due to Bug #1 (async deletion), old rows aren't removed
-   - New rows are added, resulting in duplicates
-
-2. **Parsing failure silently fails**:
+**Status**: This bug is now moot as the YAML tab has been removed from the filter builder. Only the visual editor is available.
    - `_parse_yaml()` catches all exceptions and returns empty dict
    - If YAML is malformed, user gets no feedback
    - Table disappears or becomes empty

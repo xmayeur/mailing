@@ -158,16 +158,16 @@ class DatabaseSchemaInfo:
 
 ### FilterBuilder (Qt Widget)
 
-Main visual editor widget combining FilterTableWidget + YAML text editor.
+Main visual editor widget using FilterTableWidget.
 
 ```python
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QPlainTextEdit, QPushButton, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel
 from PyQt6.QtCore import pyqtSignal
 from typing import Any
 
 class FilterBuilder(QWidget):
     """
-    Visual filter editor with bidirectional sync between table and YAML.
+    Visual filter editor.
     
     Signals:
         filter_changed: Emitted when filter changes. Emits dict[str, str].
@@ -191,34 +191,20 @@ class FilterBuilder(QWidget):
             self.set_filter_from_yaml(initial_filter)
     
     def _init_ui(self) -> None:
-        """Create UI: tabs with table editor and YAML editor."""
+        """Create UI: visual table editor."""
         layout = QVBoxLayout(self)
         
-        # Tab widget for switching between visual and YAML
-        tabs = QTabWidget(self)
-        
-        # Visual table editor
         self._table_widget = FilterTableWidget(self.schema_info, parent=self)
         self._table_widget.row_changed.connect(self._on_table_changed)
-        tabs.addTab(self._table_widget, "Visual Editor")
-        
-        # YAML text editor
-        self._yaml_edit = QPlainTextEdit(self)
-        self._yaml_edit.setPlaceholderText("YAML filter (optional)\nExample: email: is not empty")
-        self._yaml_edit.textChanged.connect(self._on_yaml_changed)
-        tabs.addTab(self._yaml_edit, "YAML")
-        
-        layout.addWidget(tabs)
+        layout.addWidget(self._table_widget)
         self.setLayout(layout)
     
     def set_filter_from_yaml(self, filter_dict: dict[str, str]) -> None:
-        """Load filter from YAML dict into visual table."""
+        """Load filter from dict into visual table."""
         self._syncing = True
         try:
             self._filter_table = FilterTable.from_dict(filter_dict)
             self._table_widget.set_rows(self._filter_table.rows)
-            yaml_text = self._dict_to_yaml(filter_dict)
-            self._yaml_edit.setPlainText(yaml_text)
         finally:
             self._syncing = False
     
@@ -227,36 +213,13 @@ class FilterBuilder(QWidget):
         return self._filter_table.to_dict()
     
     def _on_table_changed(self) -> None:
-        """Visual table changed. Sync to YAML."""
+        """Visual table changed. Emit filter_changed."""
         if self._syncing:
             return
         self._syncing = True
         try:
             filter_dict = self._filter_table.to_dict()
-            yaml_text = self._dict_to_yaml(filter_dict)
-            self._yaml_edit.setPlainText(yaml_text)
             self.filter_changed.emit(filter_dict)
-        finally:
-            self._syncing = False
-    
-    def _on_yaml_changed(self) -> None:
-        """YAML text changed. Parse and sync to visual table."""
-        if self._syncing:
-            return
-        self._syncing = True
-        try:
-            yaml_text = self._yaml_edit.toPlainText()
-            if yaml_text.strip():
-                filter_dict = self._parse_yaml(yaml_text)
-                self._filter_table = FilterTable.from_dict(filter_dict)
-                self._table_widget.set_rows(self._filter_table.rows)
-            else:
-                self._filter_table = FilterTable()
-                self._table_widget.set_rows([])
-            self.filter_changed.emit(self._filter_table.to_dict())
-        except Exception:
-            # Invalid YAML—don't update table, wait for user to fix
-            pass
         finally:
             self._syncing = False
     

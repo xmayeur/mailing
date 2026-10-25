@@ -72,10 +72,8 @@ Build core data model and base widget infrastructure. **BLOCKING**: All user sto
   - Internal state: `_filter_table: FilterTable`, `_syncing: bool`
   - Docstring with usage example
 
-- [x] T012 [P] Implement FilterBuilder._init_ui() (tab structure only):
-  - Create QTabWidget with two tabs: "Visual Editor" (placeholder) + "YAML"
-  - Add QPlainTextEdit for YAML tab
-  - Connect textChanged signal (will implement handler in US5)
+- [x] T012 [P] Implement FilterBuilder._init_ui() (visual editor only):
+  - Create visual table editor without YAML tab
   - Layout in FilterBuilder
 
 - [x] T013 Implement FilterBuilder YAML sync methods:
@@ -369,7 +367,7 @@ Phase 8: Polish & Cross-Cutting (validation, optimization, docs, final tests)
 - Field dropdown shows database columns
 - filter_changed signal emits updated dict
 - "Matching Records" preview updates in real-time (<100ms)
-- YAML tab stays in sync with visual changes
+- Filters are stored internally as YAML-compatible dicts
 
 ---
 
