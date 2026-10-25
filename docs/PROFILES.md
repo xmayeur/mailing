@@ -6,18 +6,24 @@ Email profiles manage SMTP configuration, styling, and filtering for email campa
 
 ## Profile Structure
 
+Each top-level key in `config.yml` is a profile name:
+
 ```yaml
-profiles:
-  artscroises:
-   mailconfig: "artscroises"    # Secrets Manager key for SMTP credentials
-    sender: "newsletter@artscroises.com"    # Default sender email
-    template_file: "templates/artscroises.html"  # Profile styling template (optional)
-    default_message: "Default newsletter content"
-    rate_limit_mh: 100                      # Max emails per hour
-    filters:                                 # Saved subscriber filters (optional)
-      criteria:
-        status: "active"
-      active: true
+artscroises:
+  default_documents_path: ""
+  MAILCONFIG: "artscroisesmailing"       # Secrets Manager key for SMTP credentials
+  SHEETID: "artscroisesDBmembreID"       # Google Sheets id secret (optional)
+  SA: "artscroisesServiceAccount"        # Google service account secret (optional)
+  domain: "artscroises.be"
+  styles: "./css/styles.css"             # Profile styling template (optional)
+  max_mails_per_hour: 100                # Max emails per hour
+  max_addr_per_mail: 50                  # Max recipients per mail batch
+  pause: 3                               # Pause between batches (seconds)
+  default_message: "Default newsletter content"
+  filter:                                # Subscriber filter (optional)
+    status: "is active"
+  filter_test:                           # Test-mode filter (optional)
+    email: "is john.doe@example.com"
 ```
 
 ## Vault Configuration
@@ -38,7 +44,7 @@ profiles:
 2. Reference vault key in profile config:
    ```yaml
    artscroises:
-     mailconfig: "artscroises"
+     MAILCONFIG: "artscroises"
    ```
 
 ### Required SMTP Fields

@@ -7,9 +7,9 @@
 
 ## What's New?
 
-The **Send Mailing** dialog now has a visual **Filter** editor. Instead of writing YAML syntax, you can build filters by selecting fields and operators from dropdown menus.
+The **Send Mailing** dialog now has a visual **Filter** editor. You can build filters by selecting fields and operators from dropdown menus without needing to write YAML syntax.
 
-Before this feature:
+Before this feature, filters were written as:
 ```yaml
 email: is not empty
 status: is active
@@ -17,13 +17,12 @@ region: contains USA
 ```
 
 Now with visual editor:
-1. Click **"Visual Editor"** tab
-2. Click **"Add Row"** button
-3. Select field: **email**
-4. Select operator: **Is not empty**
-5. Click **"Add Row"** again for next condition
+1. Click **"Add Row"** button
+2. Select field: **email**
+3. Select operator: **Is not empty**
+4. Click **"Add Row"** again for next condition
 
-The YAML is generated automatically.
+The filter is built automatically.
 
 ---
 
@@ -38,13 +37,9 @@ The YAML is generated automatically.
 
 ## Using the Visual Filter Editor
 
-### The Two Views
+### The Filter Editor
 
-The **Filter** section has two tabs:
-
-#### Visual Editor Tab (Default)
-
-A table with columns:
+The **Filter** section uses a visual table with columns:
 - **Field** — Column name from your subscriber database
 - **Operator** — Comparison type (equals, contains, greater than, etc.)
 - **Value** — The value to compare against (optional for some operators)
@@ -52,12 +47,6 @@ A table with columns:
 Buttons:
 - **Add Row** — Add a new filter condition
 - **Delete** (on each row) — Remove that condition
-
-#### YAML Tab
-
-The raw YAML representation of your filter. Edit here directly if you prefer, or let the visual editor generate it for you.
-
-Both tabs stay in sync automatically — edit one, the other updates.
 
 ---
 
@@ -84,12 +73,7 @@ Both tabs stay in sync automatically — edit one, the other updates.
    - **Operator** dropdown: Select **Is not empty**
    - Value field: Empty (not shown for this operator)
 
-**Result**: Filter table shows 3 rows. YAML tab shows:
-```yaml
-status: is equal to active
-region: contains USA
-email: is not empty
-```
+**Result**: Filter table shows 3 rows with your conditions.
 
 ### Preview
 
@@ -160,16 +144,9 @@ To edit a row, click the field or operator dropdown and select a new value. Chan
 
 To delete a row, click **Delete** on that row.
 
-### YAML Mode
+### Advanced Usage
 
-If you're familiar with YAML syntax, click the **YAML** tab to edit directly. Example:
-```yaml
-email: is not empty
-status: is equal to active
-region: contains USA
-```
-
-Changes in YAML mode sync back to visual mode automatically.
+Filters are stored internally in YAML format and saved with your profile configuration. The visual editor generates the appropriate YAML syntax automatically.
 
 ### Testing Filters
 

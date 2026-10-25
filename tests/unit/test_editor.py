@@ -1717,7 +1717,8 @@ def _make_send_dialog_stub(*, config_data=None, attachment="/tmp/test.html", pro
     dlg.config_input = _LineEditLike("")
     dlg.profile_combo = MagicMock()
     dlg.database_input = _LineEditLike("")
-    dlg.filter_text_edit = _PlainTextLike("")
+    dlg._filter_builder = MagicMock()
+    dlg._filter_builder.get_filter_as_yaml.return_value = {}
     dlg.filter_status_label = MagicMock()
     dlg.record_count_label = MagicMock()
     dlg.records_table = MagicMock()
@@ -1784,16 +1785,16 @@ class TestSendDialogLoadCurrentFilter:
         dlg = _make_send_dialog_stub(config_data={"default": {}})
         dlg._current_profile = "default"
         dlg.load_current_filter("default")
-        assert dlg.filter_text_edit.toPlainText() == ""
+        # With FilterBuilder, check that filter was set to empty
+        dlg._filter_builder.set_filter_from_yaml.assert_called_with({})
         assert dlg._session_filter is None
 
     def test_loads_dict_filter_as_yaml(self):
         dlg = _make_send_dialog_stub(config_data={"default": {"filter": {"email": "is not empty"}}})
         dlg._current_profile = "default"
         dlg.load_current_filter("default")
-        text = dlg.filter_text_edit.toPlainText()
-        assert "email" in text
-        assert dlg._original_filter_text != ""
+        # Check that FilterBuilder received the filter
+        dlg._filter_builder.set_filter_from_yaml.assert_called_with({"email": "is not empty"})
 
     def test_loads_filter_test_when_test_checked(self):
         dlg = _make_send_dialog_stub(
@@ -1807,15 +1808,16 @@ class TestSendDialogLoadCurrentFilter:
         dlg.test_check = _CheckBoxLike(True)
         dlg._current_profile = "default"
         dlg.load_current_filter("default")
-        text = dlg.filter_text_edit.toPlainText()
-        assert "test@test.com" in text
+        # Check that FilterBuilder received the filter_test
+        dlg._filter_builder.set_filter_from_yaml.assert_called_with({"email": "is test@test.com"})
 
-    def test_string_filter_displayed(self):
+    def test_string_filter_ignored(self):
+        # String filters are no longer supported with FilterBuilder
         dlg = _make_send_dialog_stub(config_data={"default": {"filter": "email: is not empty"}})
         dlg._current_profile = "default"
         dlg.load_current_filter("default")
-        text = dlg.filter_text_edit.toPlainText()
-        assert "email" in text
+        # String filter is not a dict, so FilterBuilder receives empty dict
+        dlg._filter_builder.set_filter_from_yaml.assert_called_with({})
 
 
 class TestSendDialogOnTestModeToggled:
@@ -1886,7 +1888,8 @@ class TestSendDialogUpdateValidationUi:
         dlg._update_validation_ui({"is_valid": True, "syntax_errors": [], "missing_fields": []})
         # Verify the status label was called
         dlg.filter_status_label.setText.assert_called_with("")
-        dlg.filter_and_display_records.assert_called_once()
+        # Record refresh is debounced elsewhere, not triggered per validation
+        dlg.filter_and_display_records.assert_not_called()
 
     def test_invalid_status_sets_error_message(self):
         dlg = _make_send_dialog_stub()
@@ -1976,26 +1979,28 @@ class TestSendDialogFilterAndDisplayRecords:
     def test_apply_filter_button(self):
         dlg = _make_send_dialog_stub()
         dlg._filter_validator = None
-        dlg.filter_text_edit = _PlainTextLike("")
+        dlg._filter_builder = MagicMock()
+        dlg._filter_builder.get_filter_as_yaml.return_value = {}
         dlg.filter_and_display_records = MagicMock()
         dlg._apply_filter()
         assert dlg._session_filter is None
 
-    def test_apply_filter_with_invalid_yaml(self):
+    def test_apply_filter_with_invalid_filter(self):
         mock_validator = MagicMock()
         mock_validator.get_validation_status.return_value = {
             "is_valid": False,
-            "syntax_errors": ["bad yaml"],
+            "syntax_errors": ["bad filter"],
             "missing_fields": [],
         }
         dlg = _make_send_dialog_stub()
         dlg._filter_validator = mock_validator
         dlg._get_database_schema = MagicMock(return_value=[])
-        dlg.filter_text_edit = _PlainTextLike("bad: [yaml")
+        dlg._filter_builder = MagicMock()
+        dlg._filter_builder.get_filter_as_yaml.return_value = {"bad": "filter"}
         dlg._apply_filter()
         dlg.filter_status_label.setText.assert_called()
 
-    def test_apply_filter_with_valid_yaml(self):
+    def test_apply_filter_with_valid_filter(self):
         mock_validator = MagicMock()
         mock_validator.get_validation_status.return_value = {
             "is_valid": True,
@@ -2006,23 +2011,30 @@ class TestSendDialogFilterAndDisplayRecords:
         dlg._filter_validator = mock_validator
         dlg._get_database_schema = MagicMock(return_value=[])
         dlg.filter_and_display_records = MagicMock()
-        dlg.filter_text_edit = _PlainTextLike("email: is not empty")
+        dlg._filter_builder = MagicMock()
+        dlg._filter_builder.get_filter_as_yaml.return_value = {"email": "is not empty"}
         dlg._apply_filter()
         assert dlg._session_filter == {"email": "is not empty"}
 
     def test_reset_filter_restores_original(self):
         dlg = _make_send_dialog_stub()
-        dlg._original_filter_text = "email: is not empty"
+        dlg._filter_builder = MagicMock()
+        dlg._filter_builder.set_filter_from_yaml = MagicMock()
         dlg._session_filter = {"email": "is active"}
+        dlg._current_profile = "default"
         dlg._reset_filter()
         assert dlg._session_filter is None
-        assert dlg.filter_text_edit.toPlainText() == "email: is not empty"
+        # FilterBuilder should have been called to reload the filter
+        dlg._filter_builder.set_filter_from_yaml.assert_called()
 
     def test_reset_filter_clears_when_no_original(self):
         dlg = _make_send_dialog_stub()
-        dlg._original_filter_text = ""
+        dlg._filter_builder = MagicMock()
+        dlg._filter_builder.set_filter_from_yaml = MagicMock()
+        dlg._current_profile = "default"
         dlg._reset_filter()
-        assert dlg.filter_text_edit.toPlainText() == ""
+        # FilterBuilder should have been called to set empty filter
+        dlg._filter_builder.set_filter_from_yaml.assert_called_with({})
 
 
 class TestSendDialogBuildArgs:

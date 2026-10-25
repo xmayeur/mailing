@@ -105,7 +105,7 @@ All code contributions must meet the following quality standards:
 - **Configuration Modules** (config.py): ≥85% coverage
 - **GUI Modules** (editor.py): ≥70% coverage (complex Qt interactions)
 
-Current coverage: 72.5% — See [Coverage Reports](../build/coverage-reports/index.html)
+Current coverage: 91% — See [Coverage Reports](../build/coverage-reports/index.html)
 
 ### Type Checking
 

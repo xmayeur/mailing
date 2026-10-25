@@ -36,7 +36,6 @@ try:
         QLineEdit,
         QPlainTextEdit,
         QPushButton,
-        QTabWidget,
         QVBoxLayout,
         QWidget,
     )
@@ -601,7 +600,7 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
                 self.set_filter_from_yaml(initial_filter)
 
     def _init_ui(self) -> None:
-        """Create UI: tabs with visual table and YAML editor."""
+        """Create UI: visual table editor only (YAML tab removed)."""
         if not PYQT_AVAILABLE:
             return
 
@@ -609,20 +608,11 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        tabs = QTabWidget(self)
-
         self._table_widget = FilterTableWidget(self.schema_info)
         self._table_widget.row_changed.connect(self._on_table_changed)
-        tabs.addTab(self._table_widget, "Visual Editor")
+        layout.addWidget(self._table_widget)
 
-        self._yaml_edit = QPlainTextEdit(self)
-        self._yaml_edit.setPlaceholderText("YAML filter (optional)\nExample: email: is not empty")
-        tabs.addTab(self._yaml_edit, "YAML")
-
-        layout.addWidget(tabs)
         self.setLayout(layout)
-
-        self._yaml_edit.textChanged.connect(self._on_yaml_changed)
 
     def set_filter_from_yaml(self, filter_dict: dict[str, str]) -> None:
         """Load filter from YAML dict into visual table.
@@ -634,8 +624,6 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         try:
             self._filter_table = FilterTable.from_dict(filter_dict)
             if PYQT_AVAILABLE:
-                yaml_text = self._dict_to_yaml(filter_dict)
-                self._yaml_edit.setPlainText(yaml_text)
                 self._table_widget.set_rows(self._filter_table.rows)
         finally:
             self._syncing = False
@@ -698,7 +686,7 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         return False
 
     def _on_table_changed(self) -> None:
-        """Handle visual table change—update YAML and emit filter_changed."""
+        """Handle visual table change—emit filter_changed."""
         if self._syncing or not PYQT_AVAILABLE:
             return
 
@@ -707,37 +695,9 @@ class FilterBuilder(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             rows = self._table_widget.get_rows()
             self._filter_table = FilterTable(rows)
             filter_dict = self._filter_table.to_dict()
-            yaml_text = self._dict_to_yaml(filter_dict)
-            self._yaml_edit.setPlainText(yaml_text)
             self.filter_changed.emit(filter_dict)
         except Exception as e:
             log.debug("Table change error: %s", e)
-        finally:
-            self._syncing = False
-
-    def _on_yaml_changed(self) -> None:
-        """Handle YAML text change—parse and update filter table."""
-        if self._syncing or not PYQT_AVAILABLE:
-            return
-
-        self._syncing = True
-        try:
-            yaml_text = self._yaml_edit.toPlainText()
-            if yaml_text.strip():
-                filter_dict = self._parse_yaml(yaml_text)
-                # B020: Detect if YAML parsing failed (empty dict when text was present)
-                if not filter_dict and yaml_text.strip():
-                    log.warning("Invalid YAML filter syntax: %s", yaml_text[:50])
-                    # Don't update table, keep previous state
-                    self._syncing = False
-                    return
-                self._filter_table = FilterTable.from_dict(filter_dict)
-            else:
-                self._filter_table = FilterTable()
-            self._table_widget.set_rows(self._filter_table.rows)
-            self.filter_changed.emit(self._filter_table.to_dict())
-        except Exception as e:
-            log.warning("YAML parse error: %s", e)
         finally:
             self._syncing = False
 
@@ -882,7 +842,7 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
         """
         if not PYQT_AVAILABLE:
             return
-        widget = FilterRowWidget(row_idx, row, self.schema_info)
+        widget = FilterRowWidget(row_idx, row, self.schema_info, parent=self)
         widget.row_changed.connect(self._on_row_changed)
         widget.delete_requested.connect(self._on_delete_row)
         self._row_widgets.append(widget)
@@ -894,9 +854,11 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             return
         while self._row_widgets:
             widget = self._row_widgets.pop()
-            # B014: Remove widget from layout immediately before async cleanup
-            # setParent(None) removes from layout + schedules for deletion
-            widget.setParent(None)
+            # Keep the parent until deferred deletion: detaching a QWidget
+            # makes it a top-level window and can change macOS window focus
+            # while YAML edits rebuild these rows.
+            self._container_layout.removeWidget(widget)
+            widget.hide()
             widget.deleteLater()
 
     def _on_row_changed(self) -> None:
@@ -922,9 +884,9 @@ class FilterTableWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             return
         if 0 <= row_idx < len(self._row_widgets):
             widget = self._row_widgets.pop(row_idx)
-            # B034: Remove widget from layout immediately (setParent(None))
-            # before async deletion (deleteLater), matching _clear_rows pattern
-            widget.setParent(None)
+            # Remove immediately without creating a temporary top-level window.
+            self._container_layout.removeWidget(widget)
+            widget.hide()
             widget.deleteLater()
             self.row_changed.emit()
 
@@ -984,7 +946,10 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             self.schema_info = schema_info
             layout = QHBoxLayout()
 
-            self._field_combo = QComboBox()
+            # Parent all children to self: created parentless, a later show()
+            # (e.g. _update_value_input_visibility before setLayout) would flash
+            # the widget as a top-level window and break macOS window focus.
+            self._field_combo = QComboBox(self)
             # B041: Set consistent combo size
             self._field_combo.setMinimumHeight(26)
             self._populate_field_combo()
@@ -993,7 +958,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             self._field_combo.currentTextChanged.connect(self._on_field_changed)
             layout.addWidget(self._field_combo, 1)  # stretch: equal width
 
-            self._operator_combo = QComboBox()
+            self._operator_combo = QComboBox(self)
             # B041: Match field combo size for consistent appearance
             self._operator_combo.setMinimumHeight(26)
             self._populate_operator_combo()
@@ -1020,13 +985,13 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             layout.addWidget(self._operator_combo, 1)  # stretch: equal width
 
             value_str = self._row_value_to_str(row.value)
-            self._value_edit = QLineEdit(value_str)
+            self._value_edit = QLineEdit(value_str, self)
             # B041: Set minimum height so text isn't vertically truncated
             self._value_edit.setMinimumHeight(26)
             # B044: Center text vertically within QLineEdit
             self._value_edit.setAlignment(Qt.AlignmentFlag.AlignVCenter)
             self._value_edit.textChanged.connect(self._on_value_changed)
-            self._value_edit_multiline = QPlainTextEdit()
+            self._value_edit_multiline = QPlainTextEdit(self)
             self._value_edit_multiline.setPlainText(value_str)
             self._value_edit_multiline.textChanged.connect(self._on_value_changed)
             self._value_edit_multiline.setMaximumHeight(80)
@@ -1035,7 +1000,7 @@ class FilterRowWidget(QWidget if PYQT_AVAILABLE else object):  # type: ignore
             layout.addWidget(self._value_edit, 1)  # stretch: equal width
             layout.addWidget(self._value_edit_multiline, 1)  # stretch: equal width
 
-            self._delete_btn = QPushButton("Delete")
+            self._delete_btn = QPushButton("Delete", self)
             self._delete_btn.setMaximumWidth(60)
             self._delete_btn.clicked.connect(self._on_delete)
             layout.addWidget(self._delete_btn, 0)  # no stretch: fixed width

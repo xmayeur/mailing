@@ -213,7 +213,7 @@ def _on_yaml_changed(self) -> None:
 ✓ All changes backward compatible
 ✓ No API changes
 ✓ No new dependencies
-✓ Existing YAML editor still works
+✓ Visual filter builder is now the primary interface
 ✓ All 28 unit tests passing
 ✓ All 5 integration tests passing
 

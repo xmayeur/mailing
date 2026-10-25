@@ -61,25 +61,24 @@ _FILTER_OPS = [
 
 ---
 
-## R003: Visual-to-YAML Synchronization
+## R003: Visual Filter Builder Architecture
 
-**Question**: Real-time sync or deferred (apply button)?
+**Question**: How to implement visual filter builder?
 
 **Spec Requirement**: "Filter table updates reflect changes immediately (latency <100ms)" — mandates real-time.
 
 **Qt Architecture**:
 - FilterTableWidget emits `filter_changed()` signal on any row edit
-- _SendDialog slot receives signal, calls `visual_editor.to_dict()` to get updated filter
-- Update `filter_text_edit.setPlainText()` with new YAML
-- Text editor emits `textChanged` signal
+- FilterBuilder receives signal and updates internal state
+- FilterBuilder emits `filter_changed(dict)` signal to notify _SendDialog
 - _SendDialog updates `_session_filter` dict
 
-**Validation**: Qt signal/slot is O(1) per edit. YAML generation via dict→YAML is O(n) where n = number of rows (typically <20). Total latency <10ms on modern hardware, well under 100ms target.
+**Validation**: Qt signal/slot is O(1) per edit. Filter generation from table is O(n) where n = number of rows (typically <20). Total latency <10ms on modern hardware, well under 100ms target.
 
-**Decision**: Implement real-time bidirectional sync:
-- Visual editor change → trigger YAML update
-- YAML text change → parse and update visual table (with validation)
-- Both remain visible; changes propagate instantly
+**Decision**: Implement visual editor with:
+- Real-time updates from table changes
+- Filter dict stored internally and emitted via signal
+- No YAML text editor (removed to avoid buggy tab switching)
 
 ---
 
@@ -132,7 +131,7 @@ Internal representation: Use canonical form (prefer long form for clarity).
 |---------------|----------|--------|
 | **R001** | Categorize operators by field type; show all unless field type known | Operator dropdown adapts as field selection changes |
 | **R002** | Default all fields to "text" (can extend with type hints later) | Safe, simple; some numeric operators may be unused |
-| **R003** | Real-time bidirectional sync with <10ms latency | Filter updates instantly; YAML editor always in sync with visual |
+| **R003** | Real-time filter updates with <10ms latency | Filter updates instantly from visual editor |
 | **R004** | User-friendly display names; map to canonical operators at save | Dropdown shows "Greater than", internally stored as "gt" |
 
 All findings are compatible with existing filter infrastructure (sendMail.filter, FilterValidator, FilterMatcher).
@@ -144,4 +143,4 @@ All findings are compatible with existing filter infrastructure (sendMail.filter
 - Subscriber databases consist primarily of text fields (no type hints needed for MVP)
 - Filter performance not critical (rows typically <20 conditions)
 - PyQt6 signal/slot performance sufficient for real-time updates
-- YAML round-trip (dict → YAML → dict) preserves filter semantics
+- Filters stored as dicts compatible with YAML serialization

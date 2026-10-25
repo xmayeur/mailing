@@ -5,7 +5,7 @@
 
 ## Summary
 
-Add visual table-based filter editor to Send Mailing dialog (`_SendDialog` in editor.py). Current YAML text editor will be augmented with a visual interface allowing non-technical users to build filters via dropdown selection of fields/operators/values. Both editors remain available and stay synchronized—changes in one reflect in the other. Integrates with existing filter validation and database schema detection.
+Add visual table-based filter editor to Send Mailing dialog (`_SendDialog` in editor.py). The visual interface allows non-technical users to build filters via dropdown selection of fields/operators/values. Integrates with existing filter validation and database schema detection. The YAML text editor has been removed to avoid the buggy tab-switching behavior.
 
 ## Technical Context
 
@@ -142,10 +142,10 @@ tests/
   - Fields: `fields: list[str]`, `field_types: dict[str, str]` (inferred via R002 heuristic)
   - Methods: `get_operators_for_field(field_name) -> list[str]`
 
-- **FilterBuilder** (Qt widget): Visual editor combining table + YAML text
-  - Composition: FilterTableWidget (visual) + QPlainTextEdit (YAML) in tabs or splitter
+- **FilterBuilder** (Qt widget): Visual editor using FilterTableWidget
+  - Composition: FilterTableWidget (visual)
   - Signals: `filter_changed(dict[str, str])` — emitted when filter changes
-  - Methods: `set_filter_from_yaml(text)`, `get_filter_as_yaml() -> str`
+  - Methods: `set_filter_from_yaml(dict)`, `get_filter_as_yaml() -> dict`
 
 ### 1.2 Qt Dialog Contract
 
@@ -178,7 +178,6 @@ Example structure:
 Cover:
 - How to launch and use visual filter editor in Send Mailing dialog
 - Example workflow: add filter row, select field from dropdown, select operator, enter value
-- How visual and YAML editors stay in sync
 - Supported operators and field types
 
 ### 1.5 Agent Context Update

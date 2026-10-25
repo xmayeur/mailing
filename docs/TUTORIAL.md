@@ -21,7 +21,7 @@ Welcome to the sendMail Editor tutorial. This guide covers how to use the standa
 
 **For source installation:**
 - Python 3.10 or later
-- PyQt6 and PyQt6-WebEngine (installed via the repository's dependencies)
+- PySide6 and QtWebEngine (installed via the repository's dependencies)
 
 **For pre-built executable:**
 - No installation required, just download and run
@@ -124,27 +124,34 @@ The editor includes advanced filtering capabilities for conditional content deli
 
 ### Opening the Send Dialog
 
-1. Click **File** → **Send** or use Ctrl+S (or Cmd+S on macOS)
+1. Click **File** → **Send...** or use Ctrl+Enter (or Cmd+Enter on macOS)
 2. This opens the Send Dialog with filter options
 3. The dialog shows your current sendMail profiles
 
+Note: Ctrl+S (Cmd+S) saves the newsletter; it does not open the send dialog.
+
 ### Setting Up Filters
 
-1. In the **Filters** section, enter YAML syntax:
+The send dialog uses a **visual filter builder**: each filter row is a
+combination of a field dropdown, an operator dropdown, and a value input.
 
-```yaml
-country: USA
-subscription_level: premium
-```
+1. Click **Add Row** to add a filter row
+2. Pick a **field** from the dropdown (populated from your database schema)
+3. Pick an **operator** (e.g. *is equal to*, *is not empty*, *one of*)
+4. Enter the expected **value** (a larger text box appears for list operators)
+5. Click **Apply Filter** to activate the filter
+6. Click **Reset Filter** to fall back to the profile's configured filter
+7. The editor validates the filter in real-time; a status line under the
+   builder shows errors (red) or validity (green)
 
-1. Click **Apply Filter** to activate the filter
-2. The editor validates the filter syntax in real-time
-3. A visual indicator shows if the filter is valid (green) or invalid (red)
+When the **Test** checkbox is enabled, the dialog edits the profile's
+`filter_test` rules instead of `filter`.
 
 ### Database Preview
 
-1. Select a subscriber database (CSV or Google Sheets)
-2. Click **Load Database** to preview records
+1. Enter a subscriber database path (CSV or Excel) via the **Database**
+   **Browse** button, or leave it empty to use the profile's Google Sheets
+2. Matching records load automatically (a **Retry** button appears if loading fails)
 3. The editor shows matching records based on your filter
 4. See exactly which subscribers will receive the filtered content
 
@@ -162,19 +169,21 @@ Filter fields depend on your subscriber database schema. Common fields include:
 
 ### Adding sendMail Profiles
 
-The editor reads profiles from your `config.yml`:
+The editor reads profiles from your `config.yml`. Each top-level key is a
+profile name:
 
 ```yaml
-profiles:
-  newsletter:
-    smtp_server: smtp.gmail.com
-    from_address: newsletters@example.com
-    rate_limit: 100
+newsletter:
+  sender: newsletters@example.com
+  sendername: "Example Newsletters"
+  max_mails_per_hour: 100
+  filter:
+    subscription_level: premium
 ```
 
 ### Selecting a Profile
 
-1. Open the Send Dialog (File → Send)
+1. Open the Send Dialog (File → Send...)
 2. The **Profile** dropdown shows all available profiles
 3. Select the profile to use for sending
 4. The filter fields are validated against that profile's database
@@ -186,7 +195,7 @@ Profiles are managed in your sendMail configuration file:
 ```bash
 # Edit your configuration
 python src/editor.py
-# Then: File → Settings
+# Then: Settings → Edit Config...
 ```
 
 ## Saving Your Work
@@ -233,20 +242,33 @@ python src/sendMail.py --profile newsletter \
 
 ### With Filters
 
-Apply the same filter used in the editor:
+Filters are not passed on the command line. They come either from the
+profile's `filter` key in `config.yml`, or from a filter applied in the
+editor's Send Dialog. To send to a filtered group:
+
+1. Set the filter in `config.yml` (profile `filter` key), or set it in the
+   editor's Send Dialog before sending
+2. Send as usual:
 
 ```bash
 python src/sendMail.py --profile newsletter \
   -s "Premium Subscribers Newsletter" \
-  -f 'subscription_level: premium' \
+  newsletters/2026-05-17.html
+```
+
+Use `-t` to send in test mode (applies the profile's `filter_test` rules):
+
+```bash
+python src/sendMail.py --profile newsletter -t \
+  -s "Test Send" \
   newsletters/2026-05-17.html
 ```
 
 ### Using Database Preview Filter
 
-1. Set up filter in editor
-2. Copy the filter from the editor
-3. Use the same filter in sendMail command
+1. Set up the filter in the editor's Send Dialog and click **Apply Filter**
+2. The preview shows exactly which records match
+3. Send directly from the dialog — the applied filter is used for the send
 
 ## Tips and Tricks
 
@@ -282,14 +304,13 @@ python src/sendMail.py --profile newsletter \
 
 Before sending to your full list:
 
-1. Create a test filter in the editor
-2. Use database preview to see matching records
+1. Create a test filter in the editor and use database preview to see matching records
+2. Configure the profile's `filter_test` rules in `config.yml`
 3. Test with a small group first:
 
 ```bash
 python src/sendMail.py --profile newsletter \
   -s "Test Newsletter" \
-  -f 'test_user: true' \
   -t \
   newsletters/test.html
 ```
@@ -339,8 +360,9 @@ python src/sendMail.py --profile default \
 ```bash
 # 1. Create and edit newsletter, save as newsletters/premium-offer.html
 
-# 2. Set up filter in editor
-# Filter: subscription_level: premium
+# 2. Set up filter in editor's Send Dialog (or in the profile's
+#    "filter" key in config.yml)
+# Filter: subscription_level is equal to premium
 
 # 3. Test with preview
 # (Verify matching records in database preview)
@@ -348,7 +370,6 @@ python src/sendMail.py --profile default \
 # 4. Send to filtered group
 python src/sendMail.py --profile default \
   -s "Exclusive Premium Offer" \
-  -f 'subscription_level: premium' \
   newsletters/premium-offer.html
 ```
 
@@ -371,15 +392,17 @@ python src/sendMail.py --profile newsletter \
 
 ### Editor Won't Launch
 
-- Verify PyQt6 is installed: `pip install PyQt6 PyQt6-WebEngine`
+- Verify PySide6 is installed (it comes with the repository's dependencies)
 - Check Python version: `python --version` (requires 3.10+)
 - On Linux without display: Use xvfb or set `QT_QPA_PLATFORM=offscreen`
 
 ### Filter Not Validating
 
-- Check YAML syntax (proper indentation with spaces, not tabs)
-- Ensure field names match your database schema
-- Look for validation error message in red
+- Pick field names from the dropdown so they match your database schema
+- Check the error message shown under the filter builder
+- Operators requiring a value must have one (e.g. *is equal to*)
+- For `filter`/`filter_test` keys edited in config.yml, check YAML syntax
+  (proper indentation with spaces, not tabs)
 
 ### Images Not Embedding
 
@@ -395,6 +418,4 @@ python src/sendMail.py --profile newsletter \
 ## See Also
 
 - [sendMail Main Documentation](../README.md)
-- [Configuration Guide](docs/configuration.md)
-- [Filtering Reference](docs/filtering.md)
-- [sendMail Command Reference](docs/cli.md)
+- [Profiles Configuration Guide](PROFILES.md)
