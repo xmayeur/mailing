@@ -12,13 +12,23 @@ permissions:
 
 jobs:
   gate:
-    # Only proceed when the Tests workflow succeeded on the same commit
-    # (workflow_dispatch always proceeds)
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Build only the trusted master revision for this run. Ignore PR/fork runs
+    # and stale Tests results; a newer master commit must pass its own Tests.
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_branch == 'master' &&
+        github.event.workflow_run.head_sha == github.sha))
     runs-on: ubuntu-latest
     steps:
-      - name: Verify upstream Tests result
-        run: echo "Tests passed for ${{ github.event.workflow_run.head_sha || github.sha }}; proceeding with build & release"
+      - name: Report trusted build revision
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: echo "Building trusted master revision $BUILD_SHA"
 
   version:
     needs: gate
@@ -30,7 +40,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Extract version from pyproject.toml
         id: extract
@@ -51,7 +62,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
         timeout-minutes: 10
 
       - name: Set up Python
@@ -140,6 +152,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Download all build artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -167,6 +182,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: Release ${{ needs.version.outputs.version }}
           draft: false
           prerelease: false
