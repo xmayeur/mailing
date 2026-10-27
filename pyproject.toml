@@ -5,7 +5,7 @@ description = "An application to create a mass mailing message and send it to a 
 requires-python = ">=3.12, <3.15"
 dependencies = [
     "beautifulsoup4>=4.14.3",
-    "google-api-python-client>=2.187.0",
+    "google-api-python-client>=2.201.0",
     "gspread",
     "spamcheck>=1.0.4",
     "get-hc-secrets>=1.5.27",
