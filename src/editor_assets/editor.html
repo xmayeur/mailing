@@ -942,6 +942,83 @@
       });
 
       // ----------------------------------------------------------------
+      // Copy/paste preserving visual sizes. Quill's clipboard pipeline
+      // serializes through the Delta model, which drops unregistered
+      // attributes (style="width:…") from resized table cells and
+      // images. Copy: write the live DOM range directly. Paste: run
+      // Quill's converter, then copy attributes from the source
+      // fragment onto the freshly inserted nodes via a DOM diff.
+      // ----------------------------------------------------------------
+      quill.root.addEventListener('copy', function(e) {
+        if (!e.clipboardData) return;
+        var sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+        var html = '';
+        for (var i = 0; i < sel.rangeCount; i += 1) {
+          var clip = document.createElement('div');
+          clip.appendChild(sel.getRangeAt(i).cloneContents());
+          html += clip.innerHTML;
+        }
+        if (!html.trim()) return;
+        e.clipboardData.setData('text/html', html);
+        e.clipboardData.setData('text/plain', sel.toString());
+        e.preventDefault();
+      });
+
+      // Paste is intercepted on document in the capture phase: capture
+      // listeners on ancestors always run before target/bubble listeners,
+      // so Quill's own paste pipeline can never race or duplicate ours.
+      document.addEventListener('paste', function(e) {
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        var anchor = sel.getRangeAt(0).commonAncestorContainer;
+        if (anchor.nodeType === Node.TEXT_NODE) anchor = anchor.parentElement;
+        if (!anchor || !quill.root.contains(anchor)) return;
+        var clipHtml = '';
+        try { clipHtml = (e.clipboardData && e.clipboardData.getData('text/html')) || ''; } catch (err) { clipHtml = ''; }
+        if (!clipHtml.trim()) return;
+        e.preventDefault();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+        // Insert through Quill's own converter (index = caret position).
+        // The converter only keeps registered formats/attributes, so
+        // cell and image sizes are absent from the inserted nodes —
+        // they are restored below from the parsed clipboard fragment.
+        quill.clipboard.dangerouslyPasteHTML(quill.getSelection(true).index, clipHtml, Quill.sources.USER);
+
+        // Diff the live DOM against the clipboard fragment: every table,
+        // row, cell, and image that Quill just created is paired with its
+        // source counterpart (same document order, counts guarded by
+        // min()), and the source's attributes are copied across.
+        var fragBody = new DOMParser().parseFromString(clipHtml, 'text/html').body;
+        var beforeTables = Array.prototype.slice.call(quill.root.querySelectorAll('table'));
+        var beforeImgs = Array.prototype.slice.call(quill.root.querySelectorAll('img'));
+
+        var addedTables = Array.prototype.slice.call(quill.root.querySelectorAll('table'))
+          .filter(function(table) { return beforeTables.indexOf(table) === -1; });
+        var srcTables = fragBody.querySelectorAll('table');
+        for (var t = 0; t < srcTables.length && t < addedTables.length; t += 1) {
+          _copyAttributes(srcTables[t], addedTables[t]);
+          var srcRows = srcTables[t].querySelectorAll('tr');
+          var dstRows = addedTables[t].querySelectorAll('tr');
+          for (var r = 0; r < srcRows.length && r < dstRows.length; r += 1) {
+            var srcCells = srcRows[r].querySelectorAll('td, th');
+            var dstCells = dstRows[r].querySelectorAll('td, th');
+            for (var c = 0; c < srcCells.length && c < dstCells.length; c += 1) {
+              _copyAttributes(srcCells[c], dstCells[c]);
+            }
+          }
+        }
+
+        var srcImgs = fragBody.querySelectorAll('img');
+        var addedImgs = Array.prototype.slice.call(quill.root.querySelectorAll('img'))
+          .filter(function(img) { return beforeImgs.indexOf(img) === -1; });
+        for (var g = 0; g < srcImgs.length && g < addedImgs.length; g += 1) {
+          _copyAttributes(srcImgs[g], addedImgs[g]);
+        }
+      }, true);
+
+      // ----------------------------------------------------------------
       // Image resize floating toolbar
       // ----------------------------------------------------------------
       var _selectedImg = null;
