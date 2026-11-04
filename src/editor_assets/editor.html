@@ -809,6 +809,139 @@
       });
 
       // ----------------------------------------------------------------
+      // Table row/column drag-resize (Excel-style cell-edge handles)
+      // ----------------------------------------------------------------
+      // Hovering a cell's right/left boundary offers a column drag on the
+      // adjacent column; hovering a bottom/top boundary offers a row drag.
+      // Widths/heights are written as inline styles on the affected cells —
+      // the same DOM-mutation pattern as setVAlign/_applyImgWidth — then
+      // quill.update(USER) folds the change into the model so it saves and
+      // lands on the undo stack like any other edit.
+      var _TABLE_EDGE_PX = 7;
+      var _TABLE_MIN_WIDTH = 40;   // matches .ql-editor td/th min-width
+      var _TABLE_MIN_HEIGHT = 24;  // matches .ql-editor td/th min-height
+      var _tableResize = null;
+
+      function _tableEdgeHit(x, y) {
+        var el = document.elementFromPoint(x, y);
+        if (!el || !quill.root.contains(el)) return null;
+        var cell = el.closest ? el.closest('td, th') : null;
+        if (!cell || !quill.root.contains(cell)) return null;
+        var table = cell.closest('table');
+        if (!table || !quill.root.contains(table)) return null;
+        var rect = cell.getBoundingClientRect();
+
+        // Column boundary — right edge resizes this cell's column, left
+        // edge the previous one; both map onto the same boundary line.
+        if (rect.right - x <= _TABLE_EDGE_PX && cell.cellIndex >= 0) {
+          return { kind: 'col', cursor: 'col-resize', table: table, colIndex: cell.cellIndex };
+        }
+        if (x - rect.left <= _TABLE_EDGE_PX && cell.cellIndex > 0) {
+          return { kind: 'col', cursor: 'col-resize', table: table, colIndex: cell.cellIndex - 1 };
+        }
+
+        // Row boundary — bottom edge resizes this row, top edge the previous.
+        var row = cell.parentElement;
+        if (!row || row.tagName !== 'TR') return null;
+        if (rect.bottom - y <= _TABLE_EDGE_PX) {
+          return { kind: 'row', cursor: 'row-resize', table: table, row: row };
+        }
+        if (y - rect.top <= _TABLE_EDGE_PX && row.previousElementSibling &&
+            row.previousElementSibling.tagName === 'TR') {
+          return { kind: 'row', cursor: 'row-resize', table: table, row: row.previousElementSibling };
+        }
+        return null;
+      }
+
+      function _startTableResize(hit, e) {
+        if (hit.kind === 'col') {
+          var targetCells = [];
+          var baseWidths = [];
+          for (var i = 0; i < hit.table.rows.length; i += 1) {
+            var c = hit.table.rows[i].cells[hit.colIndex];
+            if (c) {
+              targetCells.push(c);
+              baseWidths.push(c.getBoundingClientRect().width);
+            }
+          }
+          if (!targetCells.length) return;
+          _tableResize = { kind: 'col', cells: targetCells, baseWidths: baseWidths, startX: e.clientX };
+        } else {
+          var rowCells = hit.row.querySelectorAll('td, th');
+          if (!rowCells.length) return;
+          _tableResize = {
+            kind: 'row',
+            rowCells: rowCells,
+            baseHeight: hit.row.getBoundingClientRect().height,
+            startY: e.clientY
+          };
+        }
+        document.body.style.cursor = hit.cursor;
+        document.body.style.userSelect = 'none';
+      }
+
+      function _handleTableResizeMove(e) {
+        var i, w, h;
+        if (_tableResize.kind === 'col') {
+          var dx = e.clientX - _tableResize.startX;
+          for (i = 0; i < _tableResize.cells.length; i += 1) {
+            w = Math.max(_TABLE_MIN_WIDTH, Math.round(_tableResize.baseWidths[i] + dx));
+            _tableResize.cells[i].style.width = w + 'px';
+          }
+        } else {
+          var dy = e.clientY - _tableResize.startY;
+          h = Math.max(_TABLE_MIN_HEIGHT, Math.round(_tableResize.baseHeight + dy));
+          for (i = 0; i < _tableResize.rowCells.length; i += 1) {
+            _tableResize.rowCells[i].style.height = h + 'px';
+          }
+        }
+      }
+
+      function _endTableResize() {
+        _tableResize = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        try {
+          quill.update(Quill.sources.USER);
+        } catch(e) {
+          quill.root.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        _syncEditorHtml();
+        document.getElementById('status').textContent = 'Modified';
+      }
+
+      // Hover feedback: col/row resize cursors near cell edges.
+      quill.root.addEventListener('mousemove', function(e) {
+        if (_tableResize) return;
+        var hit = _tableEdgeHit(e.clientX, e.clientY);
+        document.body.style.cursor = hit ? hit.cursor : '';
+      });
+      quill.root.addEventListener('mouseleave', function() {
+        if (!_tableResize) document.body.style.cursor = '';
+      });
+
+      // Start a drag only on a left-button press on a cell edge. Capture
+      // phase + stopPropagation so Quill's own mousedown handling (caret
+      // placement) does not fight the resize gesture.
+      quill.root.addEventListener('mousedown', function(e) {
+        if (e.button !== 0 || _tableResize) return;
+        var hit = _tableEdgeHit(e.clientX, e.clientY);
+        if (!hit) return;
+        e.preventDefault();
+        e.stopPropagation();
+        _startTableResize(hit, e);
+      }, true);
+
+      // Track and finish the drag at document level so resizing keeps
+      // working when the pointer travels beyond the editor canvas mid-drag.
+      document.addEventListener('mousemove', function(e) {
+        if (_tableResize) _handleTableResizeMove(e);
+      });
+      document.addEventListener('mouseup', function() {
+        if (_tableResize) _endTableResize();
+      });
+
+      // ----------------------------------------------------------------
       // Image resize floating toolbar
       // ----------------------------------------------------------------
       var _selectedImg = null;
