@@ -980,6 +980,11 @@
         e.preventDefault();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 
+        // Snapshot the live DOM BEFORE the insert so the diff below can
+        // identify newly pasted nodes.
+        var beforeTables = Array.prototype.slice.call(quill.root.querySelectorAll('table'));
+        var beforeImgs = Array.prototype.slice.call(quill.root.querySelectorAll('img'));
+
         // Insert through Quill's own converter (index = caret position).
         // The converter only keeps registered formats/attributes, so
         // cell and image sizes are absent from the inserted nodes —
@@ -991,8 +996,6 @@
         // source counterpart (same document order, counts guarded by
         // min()), and the source's attributes are copied across.
         var fragBody = new DOMParser().parseFromString(clipHtml, 'text/html').body;
-        var beforeTables = Array.prototype.slice.call(quill.root.querySelectorAll('table'));
-        var beforeImgs = Array.prototype.slice.call(quill.root.querySelectorAll('img'));
 
         var addedTables = Array.prototype.slice.call(quill.root.querySelectorAll('table'))
           .filter(function(table) { return beforeTables.indexOf(table) === -1; });
