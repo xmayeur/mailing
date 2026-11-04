@@ -2841,13 +2841,13 @@ certifi = ["certifi"]
 
 [[package]]
 name = "nuitka"
-version = "4.3.1"
+version = "4.3.4"
 description = "Python compiler with full language support and CPython compatibility"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "nuitka-4.3.1.tar.gz", hash = "sha256:b9c87a694acc424cfffa06abf149fddbdfa85f6daac998df67411b5f4269df0f"},
+    {file = "nuitka-4.3.4.tar.gz", hash = "sha256:e98e0c9a3224b581cf8ec0fab92b039b90fb7fa78673550c22833a82de444b25"},
 ]
 
 [package.extras]
