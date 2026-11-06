@@ -82,12 +82,14 @@ Plus the false-positive guard: a `content: "}"` rule appended to `css/styles.css
 **SC-003 gate-surface evidence (T030)**
 
 - Seeded defects fail the commit-gate and pre-push pytest steps (see above); every one of the feature's commits was itself gated by the full commit-time suite (pymarkdown, black, ruff, vulture, pyright, mypy, pytest) with the new checks active — 41+ full gate runs green on the clean tree.
-- CI matrix evidence is pending the branch's first PR run against master; all static prerequisites verified (see T018 record).
+- CI matrix evidence: GREEN. Run [42292090479](https://github.com/xmayeur/mailing/actions/runs/42292090479) — all 18 checks pass, including `test (windows-latest, 3.12/3.13/3.14)` at 475 passed with **zero skips** on every leg (all static prerequisites from T018 held).
 
-**Windows matrix findings (PR rounds 1-3)**
+**Windows matrix findings (PR rounds 1-4)**
 
 - Round 1: `which("bash")` on windows runners resolves to the System32 WSL stub ("WSL has no installed distributions", exit 1) — fixed by probe-resolving bash and falling back to Git for Windows bash (fafe9ff0).
-- Round 2: shellcheck ran (absolutized path) but read the CRLF-converted on-disk files, flagging SC1017 literal-carriage-return on every line; the bash stdin pipe also tripped cp1252 on scripts' check-mark characters. Both fixed by linting the committed LF content through stdin with UTF-8 encoding — validated locally by converting a script to CRLF on disk and confirming both checks stay green.
-- Takeaway recorded for the extension recipe: shell-class checks must always validate normalized committed content, never the local checkout mode.
+- Round 2: shellcheck ran (absolutized path) but read the CRLF-converted on-disk files, flagging SC1017 literal-carriage-return on every line; the bash stdin pipe also tripped cp1252 on scripts' check-mark characters. Fixed by linting the committed LF content through stdin with UTF-8 (40f2bfdc).
+- Round 3: carriage returns STILL reached shellcheck — subprocess text-mode wraps stdin in `TextIOWrapper(newline=None)`, which re-translates LF to CRLF when writing the pipe on Windows, undoing the caller's normalization in flight. Fixed by feeding committed LF content as raw UTF-8 bytes through a shared stdin-bytes runner (c6a3db7f) — no text layer exists to touch line endings.
+- Round 4: all three Windows legs green, 475 passed, zero SKIPPED — FR-008's all-platforms guarantee holds in evidence.
+- Takeaway recorded for the extension recipe: shell-class checks must always validate normalized committed content, never the local checkout mode, and must never trust a text-mode pipe to carry it.
 
 Seed one defect per class (each in a scratch checkout, each expected to fail the suite with file-naming messages): missing editor reference (delete `quill.js`), removed bootstrap component (delete `#editor-container`), broken inline JS (delete a brace in the inline script), shell syntax error (stray `)` in a script), unquoted expansion (add unquoted `$1` usage), unset variable use (reference an undefined lowercase `$unset_var` with no default — all-caps names read as environment-provided and shellcheck suppresses SC2154 for them), masked command failure (a nonzero-exit command swallowed in a pipeline or unchecked fallback — construct per shellcheck's masked-exit class), unparseable config (tab-indent a YAML mapping), duplicate config key (paste an existing top-level key), unbalanced stylesheet (delete a closing brace). All ten must be caught — this trial doubles as the acceptance test for the user stories in `spec.md`.
