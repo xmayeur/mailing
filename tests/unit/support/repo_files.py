@@ -78,6 +78,23 @@ def inventory_class_files(class_id: str) -> list[Path]:
     raise LookupError(f"unknown coverage inventory class: {class_id}")
 
 
+def classify_tracked_file(rel: str, inventory: dict) -> tuple[str, str]:
+    """Classify one tracked file: exclusion precedence per FR-009.
+
+    Returns ("excluded", pattern) — exclusions win over class matches — else
+    ("covered", class_id), else ("unclassified", ""). New asset classes that
+    appear without a cover-or-exclude decision land here, which the
+    self-audit turns into a failure naming the file.
+    """
+    for entry in inventory["exclusions"]:
+        if matches_any(rel, [entry["pattern"]]):
+            return ("excluded", entry["pattern"])
+    for cls in inventory["classes"]:
+        if matches_any(rel, cls["patterns"]):
+            return ("covered", cls["id"])
+    return ("unclassified", "")
+
+
 class _StrictSafeLoader(yaml.SafeLoader):
     """SafeLoader that rejects duplicate mapping keys at any level."""
 

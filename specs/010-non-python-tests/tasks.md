@@ -123,8 +123,8 @@
 
 ### Implementation for User Story 6
 
-- [ ] T025 [US6] Extend `tests/unit/test_coverage_inventory.py` (pattern-level, via `tmp_path` fixture copies of the registry — never by committing files to excluded trees): files matching FR-009 exclusions (`release/**`, `dist_nuitka/**`, binary/cert/diagram families, `.specify` scripts) are never enumerated by any class check
-- [ ] T026 [US6] Assert vendor semantics in `tests/unit/test_editor_assets.py` and document in `tests/unit/coverage_inventory.md`: shipped-vendor JS parse-checked only (no style lint), `quill.snow.css` checked for existence only (FR-006 bounds balance checks to first-party CSS)
+- [x] T025 [US6] Extend `tests/unit/test_coverage_inventory.py` (pattern-level, via `tmp_path` fixture copies of the registry — never by committing files to excluded trees): files matching FR-009 exclusions (`release/**`, `dist_nuitka/**`, binary/cert/diagram families, `.specify` scripts) are never enumerated by any class check
+- [x] T026 [US6] Assert vendor semantics in `tests/unit/test_editor_assets.py` and document in `tests/unit/coverage_inventory.md`: shipped-vendor JS parse-checked only (no style lint), `quill.snow.css` checked for existence only (FR-006 bounds balance checks to first-party CSS)
 
 **Checkpoint**: Boundary discipline is itself tested; misclassification becomes a visible gate failure.
 
