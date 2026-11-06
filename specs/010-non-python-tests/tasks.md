@@ -109,8 +109,8 @@
 
 ### Implementation for User Story 5
 
-- [ ] T023 [US5] Create `tests/unit/test_stylesheets.py`: comment- and string-aware brace tokenizer over the first-party-css inventory patterns (`css/**/*.css`); assert rule-block balance and non-truncation, per research R-07
-- [ ] T024 [US5] Defect-injection verification in a scratch clone: unbalanced rule fails naming `css/styles.css`; a content-string containing `}` passes (false-positive guard); update the US5 section of `tests/unit/coverage_inventory.md`
+- [x] T023 [US5] Create `tests/unit/test_stylesheets.py`: comment- and string-aware brace tokenizer over the first-party-css inventory patterns (`css/**/*.css`); assert rule-block balance and non-truncation, per research R-07
+- [x] T024 [US5] Defect-injection verification in a scratch clone: unbalanced rule fails naming `css/styles.css`; a content-string containing `}` passes (false-positive guard); update the US5 section of `tests/unit/coverage_inventory.md`
 
 **Checkpoint**: Stylesheet class gated with zero false positives on current assets.
 
