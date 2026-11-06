@@ -32,10 +32,17 @@ def test_shell_scripts_are_syntactically_valid() -> None:
 
 
 def test_shell_scripts_pass_shellcheck() -> None:
-    """Static analysis at the FR-004 defect severity fails naming file and finding."""
-    result = run_shellcheck(_scripts())
-    findings = result.stdout.strip()
-    assert result.returncode == 0, (
+    """Static analysis at the FR-004 defect severity fails naming file and finding.
+
+    Each script is linted through its committed LF content (stdin), so a
+    CRLF checkout on Windows cannot manufacture SC1017 noise; every verdict
+    is tied to the file that produced it.
+    """
+    findings_by_file: list[str] = []
+    for script, result in run_shellcheck(_scripts()):
+        if result.returncode != 0:
+            findings_by_file.append(f"{script}:\n{result.stdout.strip()}")
+    assert not findings_by_file, (
         "shellcheck flagged repo-authored scripts (unquoted expansions, unset "
-        f"variable use, masked failures, or parse defects):\n{findings}"
+        "variable use, masked failures, or parse defects):\n\n" + "\n\n".join(findings_by_file)
     )

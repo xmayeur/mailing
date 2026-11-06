@@ -174,9 +174,11 @@ def _find_bash() -> str | None:
 def bash_syntax_check(script_text: str) -> subprocess.CompletedProcess[str]:
     """Parse shell script text with ``bash -n`` on line endings normalized to LF.
 
-    CI may check LF-committed scripts out with CRLF endings (Windows
-    autocrlf), and ``bash -n`` on CRLF text reports spurious syntax errors.
-    Normalizing validates the committed content, not the local checkout mode.
+    Windows checkouts convert LF to CRLF (autocrlf), and ``bash -n`` on CRLF
+    text reports spurious syntax errors; normalizing validates the committed
+    content, not the local checkout mode. Input is encoded as UTF-8 — scripts
+    legitimately contain non-cp1252 characters (check marks, emoji), and the
+    Windows text-mode default (cp1252) cannot encode them.
     """
     bash = _find_bash()
     if bash is None:
@@ -187,41 +189,53 @@ def bash_syntax_check(script_text: str) -> subprocess.CompletedProcess[str]:
         input=normalized,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=SHELL_TIMEOUT_S,
     )
 
 
-def run_shellcheck(files: list[Path]) -> subprocess.CompletedProcess[str]:
-    """Run shellcheck through its absolute executable path; skip when absent.
+def run_shellcheck(files: list[Path]) -> list[tuple[Path, subprocess.CompletedProcess[str]]]:
+    """Lint each script's committed (LF-normalized) content via ``shellcheck -``.
 
-    The absolute path (from ``shutil.which``) bypasses Windows executable
-    resolution quirks — PATH aliases and System32 stubs — so the lint check
-    runs the exact binary the environment provides, with UTF-8 decoding of
-    its findings. If the platform ever returns no captured streams the check
-    fails loudly with the full result instead of masking a silent pass
-    (FR-008 forbids silent passes).
+    Feeding normalized content on stdin — never the on-disk file — keeps the
+    check immune to the Windows autocrlf checkout: on disk the scripts carry
+    literal carriage returns there, and shellcheck would flag every line with
+    SC1017. One invocation per script keeps each verdict tied to a file name
+    in the calling assertion (FR-002).
 
     Severity is ``info`` or worse (error, warning, info; style excluded):
     unquoted expansions (SC2086) and masked assignments (SC2155) are
     classified as info in shellcheck, and FR-004 names them as required
     defect classes — warning-only severity would miss them.
+
+    Returns one (script, result) pair per input file.
+
+    Skips with a reason when the analyzer is absent locally; never in CI.
+    If a platform ever returns no captured streams, the caller's failure
+    carries the full result — no silent passes (FR-008).
     """
     executable = shutil.which("shellcheck")
     if executable is None:
         pytest.skip("shellcheck is not installed: cannot run shell lint check")
     if not files:
         pytest.skip("no tracked files matched the shell check patterns")
-    result = subprocess.run(
-        [executable, "--severity=info", *(str(f) for f in files)],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=SHELLCHECK_TIMEOUT_S,
-    )
-    if result.stdout is None or result.stderr is None:
-        pytest.fail(
-            f"shellcheck produced no captured output streams (executable={executable!r}, "
-            f"result={result!r}): refusing to pass silently"
+    results: list[tuple[Path, subprocess.CompletedProcess[str]]] = []
+    for script in files:
+        normalized = script.read_text(encoding="utf-8").replace("\r\n", "\n")
+        result = subprocess.run(
+            [executable, "--severity=info", "-"],
+            input=normalized,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=SHELLCHECK_TIMEOUT_S,
         )
-    return result
+        if result.stdout is None or result.stderr is None:
+            pytest.fail(
+                f"shellcheck produced no captured output streams for {script} "
+                f"(executable={executable!r}, result={result!r}): refusing to pass silently"
+            )
+        results.append((script, result))
+    return results
