@@ -1,7 +1,6 @@
 #!/bin/sh
 
 FILE='/Users/xavier/Documents/I Cambristi/mailing/20260611'
-SUBJECT="I CAMBRISTI - avril 2026"
 
 # rm sendMail.log
 # python src/sendMail.py --md2html "$FILE.md"
@@ -70,8 +69,8 @@ with open(dst_css, 'w', encoding='utf-8') as f:
 print(f"Extracted {len(css_parts)} CSS rules ({len(seen)} from inline styles)")
 PYEOF
 
-scp -P 5210 "$TMPHTML" contabo:/var/www/html/news/${BASENAME}.html
-scp -P 5210 "$TMPCSS"  contabo:/var/www/html/css/${BASENAME}.css
+scp -P 5210 "$TMPHTML" contabo:/var/www/html/news/"${BASENAME}".html
+scp -P 5210 "$TMPCSS"  contabo:/var/www/html/css/"${BASENAME}".css
 ssh -p 5210 contabo "chmod 644 /var/www/html/news/${BASENAME}.html /var/www/html/css/${BASENAME}.css"
 
 rm "$TMPHTML" "$TMPCSS"

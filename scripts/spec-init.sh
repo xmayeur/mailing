@@ -1,1 +1,2 @@
+#!/bin/sh
   specify init --here --force --integration claude --ai-skills --script sh --ignore-agent-tools

@@ -1,1 +1,2 @@
+#!/bin/sh
 specify init --here --force --integration vibe --ai-skills --script sh --ignore-agent-tools
