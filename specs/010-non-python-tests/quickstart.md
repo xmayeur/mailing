@@ -50,4 +50,10 @@ The checks run inside the existing `Tests` workflow steps — no workflow edits.
 
 ## Defect-injection trial (SC-002 verification, post-implementation)
 
+**Recorded verification evidence (T016-T018)**
+
+- Commit gate: a seeded shell-syntax defect fails the exact commit-time pytest step (`pre-commit-checks.sh` → `pytest tests/unit/ -q --cov=src`) naming `scripts/build_doc.sh`; full commit-gate runs with the new checks active passed on a clean tree (41+ gate runs this development session).
+- Pre-push: the same seed fails the pre-push pytest step (`pytest tests/unit --cov-fail-under=60 --cov=src`) naming the file; the integration suite runs green locally (36 passed), and the Python coverage ratio is unchanged at 91% (the new tests contribute no `src/` modules).
+- CI: no workflow edits required — the new modules run inside the existing pytest steps (`Tests` matrix, Sonar, and badge jobs all run `tests/unit`). All three OS images preinstall node and bash; `shellcheck` ships through the exported testing requirements (`shellcheck-py` bundles per-platform shells, including `shellcheck.exe`). Matrix-run evidence will be captured from the first CI run of this branch's PR to master.
+
 Seed one defect per class (each in a scratch checkout, each expected to fail the suite with file-naming messages): missing editor reference (delete `quill.js`), removed bootstrap component (delete `#editor-container`), broken inline JS (delete a brace in the inline script), shell syntax error (stray `)` in a script), unquoted expansion (add unquoted `$1` usage), unset variable use (reference an undefined lowercase `$unset_var` with no default — all-caps names read as environment-provided and shellcheck suppresses SC2154 for them), masked command failure (a nonzero-exit command swallowed in a pipeline or unchecked fallback — construct per shellcheck's masked-exit class), unparseable config (tab-indent a YAML mapping), duplicate config key (paste an existing top-level key), unbalanced stylesheet (delete a closing brace). All ten must be caught — this trial doubles as the acceptance test for the user stories in `spec.md`.

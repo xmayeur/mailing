@@ -78,10 +78,10 @@
 **Independent Test**: A seeded defect in a covered asset fails at each gate surface with no extra invocation or setup.
 **Note**: T016–T019 verify with the US1/US2 checks in place; config/style classes from later phases re-verify collectively in Phase 9 (T030).
 
-- [ ] T016 [US3] Commit-gate verification: run `scripts/pre-commit-checks.sh` against a seeded defect on a scratch clone — the existing `.githooks/pre-commit` flow fails naming the file with zero script edits (record evidence in `specs/010-non-python-tests/quickstart.md`)
-- [ ] T017 [US3] Pre-push verification: same seeded defect fails via `scripts/pre_push_checks.sh` including the coverage-gated pytest invocation; confirm the `--cov=src` ratio is unaffected by the new test modules
-- [ ] T018 [US3] CI verification: confirm `.github/workflows/tests.yml` needs no edit — the pytest steps pick up the new modules; verify (and record) that all three operating systems provide `bash` and `node`, and that `shellcheck` arrives via the exported testing requirements, so no check skips on any matrix leg
-- [ ] T019 [US3] Skip-transparency verification: every new module reports skips only as `SKIPPED (reason)` (tool absent), surfaced via `pytest -rs`; assert the helper contract in `tests/unit/support/repo_files.py` (skip-with-reason, never silent pass — FR-008)
+- [x] T016 [US3] Commit-gate verification: run `scripts/pre-commit-checks.sh` against a seeded defect on a scratch clone — the existing `.githooks/pre-commit` flow fails naming the file with zero script edits (record evidence in `specs/010-non-python-tests/quickstart.md`)
+- [x] T017 [US3] Pre-push verification: same seeded defect fails via `scripts/pre_push_checks.sh` including the coverage-gated pytest invocation; confirm the `--cov=src` ratio is unaffected by the new test modules
+- [x] T018 [US3] CI verification: confirm `.github/workflows/tests.yml` needs no edit — the pytest steps pick up the new modules; verify (and record) that all three operating systems provide `bash` and `node`, and that `shellcheck` arrives via the exported testing requirements, so no check skips on any matrix leg
+- [x] T019 [US3] Skip-transparency verification: every new module reports skips only as `SKIPPED (reason)` (tool absent), surfaced via `pytest -rs`; assert the helper contract in `tests/unit/support/repo_files.py` (skip-with-reason, never silent pass — FR-008)
 
 **Checkpoint**: Wiring proven end-to-end; every asset class added by later stories inherits the same surfaces automatically.
 
