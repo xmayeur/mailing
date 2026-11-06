@@ -19,8 +19,8 @@
 
 **Purpose**: Dependency and helper groundwork, no behavior change to any gate yet.
 
-- [ ] T001 Add `"shellcheck-py"` to the `[dependency-groups] testing` list in `pyproject.toml` and regenerate `poetry.lock` (`poetry lock`); the CI lockfile-check job must stay green
-- [ ] T002 [P] Create `tests/unit/support/repo_files.py`: repo root resolution, `git ls-files` tracked-file enumeration with glob-pattern matching per class (R-02), and a not-a-git-repo guard that skips with reason
+- [x] T001 Add `"shellcheck-py"` to the `[dependency-groups] testing` list in `pyproject.toml` and regenerate `poetry.lock` (`poetry lock`); the CI lockfile-check job must stay green
+- [x] T002 [P] Create `tests/unit/support/repo_files.py`: repo root resolution, `git ls-files` tracked-file enumeration with glob-pattern matching per class (R-02), and a not-a-git-repo guard that skips with reason
 
 **Checkpoint**: `poetry run pytest tests/unit -q` unchanged-green; `shellcheck --version` resolves inside the poetry env.
 
