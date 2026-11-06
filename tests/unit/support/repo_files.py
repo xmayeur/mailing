@@ -134,13 +134,19 @@ def bash_syntax_check(script_text: str) -> subprocess.CompletedProcess[str]:
 
 
 def run_shellcheck(files: list[Path]) -> subprocess.CompletedProcess[str]:
-    """Run shellcheck at warning-or-worse severity; skip with reason when absent locally."""
+    """Run shellcheck; skip with reason when absent locally.
+
+    Severity is ``info`` or worse (error, warning, info; style excluded):
+    unquoted expansions (SC2086) and masked assignments (SC2155) are
+    classified as info in shellcheck, and FR-004 names them as required
+    defect classes — warning-only severity would miss them.
+    """
     if shutil.which("shellcheck") is None:
         pytest.skip("shellcheck is not installed: cannot run shell lint check")
     if not files:
         pytest.skip("no tracked files matched the shell check patterns")
     return subprocess.run(
-        ["shellcheck", "--severity=warning", *(str(f) for f in files)],
+        ["shellcheck", "--severity=info", *(str(f) for f in files)],
         capture_output=True,
         text=True,
         timeout=SHELLCHECK_TIMEOUT_S,

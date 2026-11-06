@@ -63,10 +63,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Create `tests/unit/test_shell_scripts.py`: `bash -n` syntax check for every file matched by the automation-scripts inventory patterns (`scripts/*.sh`, `.githooks/pre-commit`), using the CRLF-normalizing stdin runner and which-guard from `tests/unit/support/repo_files.py`
-- [ ] T013 [US2] Extend `tests/unit/test_shell_scripts.py`: shellcheck static-analysis pass (error and warning severities fail) for the same pattern set, skip-with-reason when `shellcheck` is absent locally, never on CI
-- [ ] T014 [US2] Baseline and remediation: run shellcheck across all inventory automation scripts; fix flagged findings behavior-preservingly (quoting, `--` guards, explicit error handling) in `scripts/*.sh` and `.githooks/pre-commit`, one finding-group per commit (research R-11)
-- [ ] T015 [US2] Defect-injection verification in a scratch clone: seeded syntax error plus one defect per FR-004 lint class — unquoted expansion, unset variable use, masked command failure — each fails naming file + finding; update the US2 section of `tests/unit/coverage_inventory.md`
+- [x] T012 [US2] Create `tests/unit/test_shell_scripts.py`: `bash -n` syntax check for every file matched by the automation-scripts inventory patterns (`scripts/*.sh`, `.githooks/pre-commit`), using the CRLF-normalizing stdin runner and which-guard from `tests/unit/support/repo_files.py`
+- [x] T013 [US2] Extend `tests/unit/test_shell_scripts.py`: shellcheck static-analysis pass (error and warning severities fail) for the same pattern set, skip-with-reason when `shellcheck` is absent locally, never on CI
+- [x] T014 [US2] Baseline and remediation: run shellcheck across all inventory automation scripts; fix flagged findings behavior-preservingly (quoting, `--` guards, explicit error handling) in `scripts/*.sh` and `.githooks/pre-commit`, one finding-group per commit (research R-11)
+- [x] T015 [US2] Defect-injection verification in a scratch clone: seeded syntax error plus one defect per FR-004 lint class — unquoted expansion, unset variable use, masked command failure — each fails naming file + finding; update the US2 section of `tests/unit/coverage_inventory.md`
 
 **Checkpoint**: All repo-authored shell scripts parse, lint clean, and are gated everywhere.
 
