@@ -570,12 +570,21 @@
         });
       }
 
+      // Presentation-only attributes that may be carried from pasted
+      // markup onto live editor nodes. Everything else (handlers, hrefs,
+      // ids, data-*) is dropped so untrusted clipboard content can never
+      // inject an executable attribute. Kept in sync with the size-restore
+      // paths, which copy widths/heights and table geometry.
+      var _PASTE_SAFE_ATTRS = ['colspan', 'rowspan', 'width', 'height',
+                               'align', 'valign', 'style'];
+
       function _copyAttributes(sourceNode, targetNode) {
         Array.from(targetNode.attributes).forEach(function(attr) {
           targetNode.removeAttribute(attr.name);
         });
-        Array.from(sourceNode.attributes).forEach(function(attr) {
-          targetNode.setAttribute(attr.name, attr.value);
+        _PASTE_SAFE_ATTRS.forEach(function(name) {
+          var value = sourceNode.getAttribute(name);
+          if (value !== null) targetNode.setAttribute(name, value);
         });
       }
 
