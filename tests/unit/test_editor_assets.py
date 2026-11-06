@@ -34,7 +34,7 @@ def test_editor_html_javascript_is_syntactically_valid() -> None:
     commit time yet would have crashed the editor at start-up.
     """
     html = EDITOR_HTML.read_text(encoding="utf-8")
-    inline_scripts = re.findall(r"<script>(.*?)</script>", html, re.DOTALL)
+    inline_scripts = re.findall(r"<script>(.*?)</script>", html, re.DOTALL | re.IGNORECASE)
     assert inline_scripts, "editor.html contains no inline <script> block"
 
     with tempfile.TemporaryDirectory() as tmp:
