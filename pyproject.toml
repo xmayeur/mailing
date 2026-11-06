@@ -60,6 +60,7 @@ testing = [# runtime tooling required to exercise the test suite
     "pytest-httpx>=0.24.0,<1.0.0",
     "httpx>=0.27.0,<0.32.0",
     "defusedxml>=0.7.1,<1.0.0",
+    "shellcheck-py>=0.9.0,<1.0.0",
 ]
 
 lint = [

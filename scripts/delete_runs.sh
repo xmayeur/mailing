@@ -5,7 +5,6 @@ set -e
 # export GITHUB_TOKEN="your_github_personal_access_token"
 OWNER="xmayeur"
 REPO="mailing"
-WORKFLOW_ID="$1"
 PER_PAGE=100
 NETWORK_TIMEOUT=30
 

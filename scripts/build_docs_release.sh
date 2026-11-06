@@ -183,15 +183,17 @@ validate_build() {
     log_success "No warnings"
   fi
 
-  return $([ "$has_errors" = false ] && echo 0 || echo 1)
+  return "$([ "$has_errors" = false ] && echo 0 || echo 1)"
 }
 
 # Display build statistics
 show_statistics() {
   log_section "Build Statistics"
 
-  local file_count=$(find "${HTML_DIR}" -name "*.html" | wc -l)
-  local total_size=$(du -sh "${HTML_DIR}" | cut -f1)
+  local file_count
+  local total_size
+  file_count=$(find "${HTML_DIR}" -name "*.html" | wc -l)
+  total_size=$(du -sh "${HTML_DIR}" | cut -f1)
 
   log_info "HTML files generated: ${file_count}"
   log_info "Build size: ${total_size}"
