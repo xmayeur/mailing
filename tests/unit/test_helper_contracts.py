@@ -16,7 +16,7 @@ from tests.unit.support import repo_files
 
 
 def test_bash_absent_skips_with_reason(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(repo_files.shutil, "which", lambda name: None)
+    monkeypatch.setattr(repo_files, "_find_bash", lambda: None)
     with pytest.raises(pytest.skip.Exception, match="bash is not installed"):
         repo_files.bash_syntax_check("true")
 

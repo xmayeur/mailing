@@ -13,9 +13,11 @@ passed. Hosted CI provides every tool, so nothing skips there.
 from __future__ import annotations
 
 import fnmatch
+import functools
 import json
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
@@ -131,6 +133,44 @@ def strict_json_loads(text: str) -> Any:
     return json.loads(text, object_pairs_hook=_reject_duplicate_json_keys)
 
 
+GIT_BASH_LOCATIONS = (
+    r"C:\Program Files\Git\bin\bash.exe",
+    r"C:\Program Files\Git\usr\bin\bash.exe",
+    r"C:\Program Files (x86)\Git\bin\bash.exe",
+)
+
+
+@functools.lru_cache(maxsize=1)
+def _find_bash() -> str | None:
+    """Resolve a working bash executable, probing candidates.
+
+    On GitHub Windows runners ``shutil.which("bash")`` resolves to
+    ``C:\\Windows\\System32\\bash.exe`` — the WSL stub, which exits nonzero
+    with "Windows Subsystem for Linux has no installed distributions" and
+    cannot parse anything. Probing candidates and falling back to Git for
+    Windows bash keeps the syntax check running on every CI platform
+    (FR-008) instead of silently shipping broken results.
+    """
+    candidates: list[str] = []
+    found = shutil.which("bash")
+    if found:
+        candidates.append(found)
+    if sys.platform == "win32":
+        candidates.extend(GIT_BASH_LOCATIONS)
+    for candidate in dict.fromkeys(candidates):
+        try:
+            probe = subprocess.run(
+                [candidate, "-c", "exit 0"],
+                capture_output=True,
+                timeout=SHELL_TIMEOUT_S,
+            )
+        except OSError:
+            continue
+        if probe.returncode == 0:
+            return candidate
+    return None
+
+
 def bash_syntax_check(script_text: str) -> subprocess.CompletedProcess[str]:
     """Parse shell script text with ``bash -n`` on line endings normalized to LF.
 
@@ -138,11 +178,12 @@ def bash_syntax_check(script_text: str) -> subprocess.CompletedProcess[str]:
     autocrlf), and ``bash -n`` on CRLF text reports spurious syntax errors.
     Normalizing validates the committed content, not the local checkout mode.
     """
-    if shutil.which("bash") is None:
+    bash = _find_bash()
+    if bash is None:
         pytest.skip("bash is not installed: cannot run shell syntax check")
     normalized = script_text.replace("\r\n", "\n")
     return subprocess.run(
-        ["bash", "-n"],
+        [bash, "-n"],
         input=normalized,
         capture_output=True,
         text=True,
@@ -151,20 +192,36 @@ def bash_syntax_check(script_text: str) -> subprocess.CompletedProcess[str]:
 
 
 def run_shellcheck(files: list[Path]) -> subprocess.CompletedProcess[str]:
-    """Run shellcheck; skip with reason when absent locally.
+    """Run shellcheck through its absolute executable path; skip when absent.
+
+    The absolute path (from ``shutil.which``) bypasses Windows executable
+    resolution quirks — PATH aliases and System32 stubs — so the lint check
+    runs the exact binary the environment provides, with UTF-8 decoding of
+    its findings. If the platform ever returns no captured streams the check
+    fails loudly with the full result instead of masking a silent pass
+    (FR-008 forbids silent passes).
 
     Severity is ``info`` or worse (error, warning, info; style excluded):
     unquoted expansions (SC2086) and masked assignments (SC2155) are
     classified as info in shellcheck, and FR-004 names them as required
     defect classes — warning-only severity would miss them.
     """
-    if shutil.which("shellcheck") is None:
+    executable = shutil.which("shellcheck")
+    if executable is None:
         pytest.skip("shellcheck is not installed: cannot run shell lint check")
     if not files:
         pytest.skip("no tracked files matched the shell check patterns")
-    return subprocess.run(
-        ["shellcheck", "--severity=info", *(str(f) for f in files)],
+    result = subprocess.run(
+        [executable, "--severity=info", *(str(f) for f in files)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=SHELLCHECK_TIMEOUT_S,
     )
+    if result.stdout is None or result.stderr is None:
+        pytest.fail(
+            f"shellcheck produced no captured output streams (executable={executable!r}, "
+            f"result={result!r}): refusing to pass silently"
+        )
+    return result
