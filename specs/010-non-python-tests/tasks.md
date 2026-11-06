@@ -66,7 +66,7 @@
 - [ ] T012 [US2] Create `tests/unit/test_shell_scripts.py`: `bash -n` syntax check for every file matched by the automation-scripts inventory patterns (`scripts/*.sh`, `.githooks/pre-commit`), using the CRLF-normalizing stdin runner and which-guard from `tests/unit/support/repo_files.py`
 - [ ] T013 [US2] Extend `tests/unit/test_shell_scripts.py`: shellcheck static-analysis pass (error and warning severities fail) for the same pattern set, skip-with-reason when `shellcheck` is absent locally, never on CI
 - [ ] T014 [US2] Baseline and remediation: run shellcheck across all inventory automation scripts; fix flagged findings behavior-preservingly (quoting, `--` guards, explicit error handling) in `scripts/*.sh` and `.githooks/pre-commit`, one finding-group per commit (research R-11)
-- [ ] T015 [US2] Defect-injection verification in a scratch clone: seeded syntax error and unquoted-expansion defect each fail naming file + finding; update the US2 section of `tests/unit/coverage_inventory.md`
+- [ ] T015 [US2] Defect-injection verification in a scratch clone: seeded syntax error plus one defect per FR-004 lint class — unquoted expansion, unset variable use, masked command failure — each fails naming file + finding; update the US2 section of `tests/unit/coverage_inventory.md`
 
 **Checkpoint**: All repo-authored shell scripts parse, lint clean, and are gated everywhere.
 
@@ -136,7 +136,7 @@
 
 - [ ] T027 [P] Harden `tests/unit/test_coverage_inventory.py` per the data-model rule: every class's `owning_test` path must exist on disk (all five owning modules now present) and every exclusion entry must carry a reason
 - [ ] T028 [P] Runtime budget (FR-010/SC-004): measure `poetry run pytest tests/unit -q --durations=10` before and after the feature on the same machine; record both values in `specs/010-non-python-tests/quickstart.md`
-- [ ] T029 Run the full SC-002 defect-injection trial — all eight defect classes listed in `specs/010-non-python-tests/quickstart.md` — and record 100%-caught evidence in that file
+- [ ] T029 Run the full SC-002 defect-injection trial — all ten defect classes listed in `specs/010-non-python-tests/quickstart.md` — and record 100%-caught evidence in that file
 - [ ] T030 Final SC-003 gate-surface run: repeat the seeded-defect verification across commit-time, pre-push, and CI matrix evidence; record results in `specs/010-non-python-tests/quickstart.md`
 - [ ] T031 Final consistency pass: `tests/unit/coverage_inventory.md` matches `tests/unit/coverage_inventory.json`; run the `specs/010-non-python-tests/quickstart.md` steps end-to-end
 
