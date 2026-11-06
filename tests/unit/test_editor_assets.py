@@ -157,3 +157,46 @@ def test_editor_bridge_object_names_match_host_registration() -> None:
         f"page references unregistered objects {sorted(unregistered)}; "
         f"host registers unreferenced objects {sorted(unused)}"
     )
+
+
+_PASTE_SAFE_ATTRS_DECLARATION = re.compile(r"_PASTE_SAFE_ATTRS\s*=\s*\[(.*?)\]", re.DOTALL)
+_ATTRIBUTE_NAME = re.compile(r"[\"']([^\"']+)[\"']")
+
+# Security-reviewed paste attribute allowlist (CodeQL alert #18 analysis):
+# constant-name presentation attributes only. `style` is accepted: it is CSS
+# (inert for script execution in Qt WebEngine), the mail pipeline strips
+# inline styles at send time for CSP, and inserted nodes still pass through
+# Quill's clipboard converter. Any change to this set must re-open the
+# js/xss review for the paste size-restore path.
+REVIEWED_SAFE_PASTE_ATTRIBUTES = frozenset({"colspan", "rowspan", "width", "height", "align", "valign", "style"})
+FORBIDDEN_PASTE_ATTRIBUTES = frozenset({"src", "href", "xlink:href", "srcdoc", "data"})
+
+
+def test_paste_attribute_allowlist_is_locked() -> None:
+    """The paste size-restore path may only copy reviewed, inert attributes.
+
+    The paste handler parses clipboard HTML and copies attributes onto live
+    editor nodes; CodeQL flags that taint flow (js/xss, alert #18) and the
+    reviewed mitigation is this constant-name allowlist plus Quill's
+    clipboard converter. This pin makes the allowlist a gate: adding any
+    attribute — above all event handlers or URL-bearing ones — fails the
+    suite until the security review is consciously repeated here.
+    """
+    html = _editor_html()
+    declaration = _PASTE_SAFE_ATTRS_DECLARATION.search(html)
+    assert declaration, "editor.html no longer declares _PASTE_SAFE_ATTRS"
+
+    declared = frozenset(name.lower() for name in _ATTRIBUTE_NAME.findall(declaration.group(1)))
+    assert declared == REVIEWED_SAFE_PASTE_ATTRIBUTES, (
+        "the paste attribute allowlist in editor.html diverges from the "
+        "security-reviewed set (CodeQL alert #18 review): "
+        f"unexpected additions {sorted(declared - REVIEWED_SAFE_PASTE_ATTRIBUTES)}, "
+        f"missing {sorted(REVIEWED_SAFE_PASTE_ATTRIBUTES - declared)}"
+    )
+    assert not declared & FORBIDDEN_PASTE_ATTRIBUTES and not any(
+        name.startswith("on") for name in declared
+    ), "the paste attribute allowlist must never contain URL-bearing or event-handler attributes"
+    assert "_PASTE_SAFE_ATTRS.forEach" in html, (
+        "_copyAttributes must copy attributes through the _PASTE_SAFE_ATTRS "
+        "allowlist loop, not by iterating source attributes directly"
+    )

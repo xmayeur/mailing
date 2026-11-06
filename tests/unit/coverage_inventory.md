@@ -10,7 +10,7 @@ exclusion below; an unclassified file fails the gate naming the file.
 
 | Class | Patterns (fnmatch, `*` spans directories) | Defect classes checked | Owning test |
 |---|---|---|---|
-| editor-markup | `src/editor_assets/editor.html` | missing-reference, missing-bootstrap-component, invalid-inline-javascript, bridge-object-mismatch | `test_editor_assets.py` |
+| editor-markup | `src/editor_assets/editor.html` | missing-reference, missing-bootstrap-component, invalid-inline-javascript, bridge-object-mismatch, unsafe-paste-attributes | `test_editor_assets.py` |
 | shipped-vendor-js | `src/editor_assets/*.js` | syntax-corruption (parse-level only, never style-linted) | `test_editor_assets.py` |
 | shipped-vendor-css | `src/editor_assets/*.css` | missing-reference (existence via markup references only, no balance lint) | `test_editor_assets.py` |
 | first-party-css | `css/*.css` | unbalanced-rule, truncated-file | `test_stylesheets.py` |
