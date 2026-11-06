@@ -171,28 +171,37 @@ def _find_bash() -> str | None:
     return None
 
 
+def _run_with_stdin_bytes(argv: list[str], data: bytes, timeout: float) -> subprocess.CompletedProcess[str]:
+    """Run a subprocess fed raw stdin bytes; capture and decode deterministically.
+
+    Text-mode pipes wrap stdin in TextIOWrapper(newline=None), which on
+    Windows re-translates LF back to CRLF on write — silently undoing the
+    caller's normalization and smuggling carriage returns into shellcheck
+    (SC1017) and bash input. Feeding bytes bypasses the text layer entirely;
+    committed LF content reaches the tool unmangled on every platform.
+    """
+    raw = subprocess.run(argv, input=data, capture_output=True, timeout=timeout)
+    return subprocess.CompletedProcess(
+        args=raw.args,
+        returncode=raw.returncode,
+        stdout=(raw.stdout or b"").decode("utf-8", errors="replace"),
+        stderr=(raw.stderr or b"").decode("utf-8", errors="replace"),
+    )
+
+
 def bash_syntax_check(script_text: str) -> subprocess.CompletedProcess[str]:
     """Parse shell script text with ``bash -n`` on line endings normalized to LF.
 
     Windows checkouts convert LF to CRLF (autocrlf), and ``bash -n`` on CRLF
-    text reports spurious syntax errors; normalizing validates the committed
-    content, not the local checkout mode. Input is encoded as UTF-8 — scripts
-    legitimately contain non-cp1252 characters (check marks, emoji), and the
-    Windows text-mode default (cp1252) cannot encode them.
+    text is unreliable; normalizing validates the committed content, not the
+    local checkout mode. Input travels as UTF-8 bytes so no platform text
+    layer can re-translate line endings.
     """
     bash = _find_bash()
     if bash is None:
         pytest.skip("bash is not installed: cannot run shell syntax check")
     normalized = script_text.replace("\r\n", "\n")
-    return subprocess.run(
-        [bash, "-n"],
-        input=normalized,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=SHELL_TIMEOUT_S,
-    )
+    return _run_with_stdin_bytes([bash, "-n"], normalized.encode("utf-8"), SHELL_TIMEOUT_S)
 
 
 def run_shellcheck(files: list[Path]) -> list[tuple[Path, subprocess.CompletedProcess[str]]]:
@@ -201,8 +210,10 @@ def run_shellcheck(files: list[Path]) -> list[tuple[Path, subprocess.CompletedPr
     Feeding normalized content on stdin — never the on-disk file — keeps the
     check immune to the Windows autocrlf checkout: on disk the scripts carry
     literal carriage returns there, and shellcheck would flag every line with
-    SC1017. One invocation per script keeps each verdict tied to a file name
-    in the calling assertion (FR-002).
+    SC1017. Content travels as UTF-8 bytes so no platform text layer can
+    re-translate line endings on the way into the tool. One invocation per
+    script keeps each verdict tied to a file name in the calling assertion
+    (FR-002).
 
     Severity is ``info`` or worse (error, warning, info; style excluded):
     unquoted expansions (SC2086) and masked assignments (SC2155) are
@@ -212,8 +223,6 @@ def run_shellcheck(files: list[Path]) -> list[tuple[Path, subprocess.CompletedPr
     Returns one (script, result) pair per input file.
 
     Skips with a reason when the analyzer is absent locally; never in CI.
-    If a platform ever returns no captured streams, the caller's failure
-    carries the full result — no silent passes (FR-008).
     """
     executable = shutil.which("shellcheck")
     if executable is None:
@@ -222,20 +231,11 @@ def run_shellcheck(files: list[Path]) -> list[tuple[Path, subprocess.CompletedPr
         pytest.skip("no tracked files matched the shell check patterns")
     results: list[tuple[Path, subprocess.CompletedProcess[str]]] = []
     for script in files:
-        normalized = script.read_text(encoding="utf-8").replace("\r\n", "\n")
-        result = subprocess.run(
+        normalized = script.read_bytes().replace(b"\r\n", b"\n")
+        result = _run_with_stdin_bytes(
             [executable, "--severity=info", "-"],
-            input=normalized,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=SHELLCHECK_TIMEOUT_S,
+            normalized,
+            SHELLCHECK_TIMEOUT_S,
         )
-        if result.stdout is None or result.stderr is None:
-            pytest.fail(
-                f"shellcheck produced no captured output streams for {script} "
-                f"(executable={executable!r}, result={result!r}): refusing to pass silently"
-            )
         results.append((script, result))
     return results
