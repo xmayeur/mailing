@@ -4,6 +4,7 @@ test_data/
 *.log
 *.json
 !pyrightconfig.json
+!tests/unit/coverage_inventory.json
 
 ### Python template
 # Byte-compiled / optimized / DLL files

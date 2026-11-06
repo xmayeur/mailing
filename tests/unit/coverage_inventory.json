@@ -1,0 +1,124 @@
+{
+  "version": "1",
+  "classes": [
+    {
+      "id": "editor-markup",
+      "description": "Editor markup: local references, bootstrap components, inline JavaScript, host bridge contract",
+      "patterns": [
+        "src/editor_assets/editor.html"
+      ],
+      "defect_classes": [
+        "missing-reference",
+        "missing-bootstrap-component",
+        "invalid-inline-javascript",
+        "bridge-object-mismatch"
+      ],
+      "owning_test": "tests/unit/test_editor_assets.py"
+    },
+    {
+      "id": "shipped-vendor-js",
+      "description": "Shipped vendor scripts loaded locally by the editor (parse-level only, never style-linted)",
+      "patterns": [
+        "src/editor_assets/*.js"
+      ],
+      "defect_classes": [
+        "syntax-corruption"
+      ],
+      "owning_test": "tests/unit/test_editor_assets.py"
+    },
+    {
+      "id": "shipped-vendor-css",
+      "description": "Shipped vendor stylesheet validated for existence through editor markup references only (no balance lint)",
+      "patterns": [
+        "src/editor_assets/*.css"
+      ],
+      "defect_classes": [
+        "missing-reference"
+      ],
+      "owning_test": "tests/unit/test_editor_assets.py"
+    },
+    {
+      "id": "first-party-css",
+      "description": "First-party stylesheets (vendor CSS is reference-checked only)",
+      "patterns": [
+        "css/*.css"
+      ],
+      "defect_classes": [
+        "unbalanced-rule",
+        "truncated-file"
+      ],
+      "owning_test": "tests/unit/test_stylesheets.py"
+    },
+    {
+      "id": "automation-scripts",
+      "description": "Repo-authored shell scripts including the local git hook entry",
+      "patterns": [
+        "scripts/*.sh",
+        ".githooks/pre-commit",
+        "sendCambristi"
+      ],
+      "defect_classes": [
+        "syntax-error",
+        "lint-unquoted-expansion",
+        "lint-unset-variable",
+        "lint-masked-command-failure"
+      ],
+      "owning_test": "tests/unit/test_shell_scripts.py"
+    },
+    {
+      "id": "declarative-configs",
+      "description": "Every tracked YAML/JSON/TOML file regardless of purpose, including IDE and tool-installed configuration",
+      "patterns": [
+        "*.yml",
+        "*.yaml",
+        "*.json",
+        "*.toml",
+        "poetry.lock"
+      ],
+      "defect_classes": [
+        "unparseable-content",
+        "duplicate-key"
+      ],
+      "owning_test": "tests/unit/test_declarative_configs.py"
+    }
+  ],
+  "exclusions": [
+    { "pattern": "release/*", "family": "release-bundle", "reason": "Signed app bundle and vendored frameworks; FR-009 excludes release trees" },
+    { "pattern": "dist_nuitka/*", "family": "build-output", "reason": "Nuitka build output (also gitignored)" },
+    { "pattern": "*.md", "family": "documentation", "reason": "Prose and agent instructions; not machine-parsed code" },
+    { "pattern": "*.rst", "family": "documentation", "reason": "Prose documentation" },
+    { "pattern": "*.txt", "family": "documentation", "reason": "Text notes and reports" },
+    { "pattern": "docs/*", "family": "documentation", "reason": "Docs subtree including its Makefile, make.bat, and diagrams" },
+    { "pattern": "data/*", "family": "fixtures", "reason": "Input fixtures" },
+    { "pattern": "*.png", "family": "binary-media", "reason": "Binary image" },
+    { "pattern": "*.icns", "family": "binary-media", "reason": "Binary icon" },
+    { "pattern": "*.ico", "family": "binary-media", "reason": "Binary icon" },
+    { "pattern": "*.psd", "family": "binary-media", "reason": "Binary image source" },
+    { "pattern": "*.jpeg", "family": "binary-media", "reason": "Binary image" },
+    { "pattern": "*.webp", "family": "binary-media", "reason": "Binary image" },
+    { "pattern": "*.zip", "family": "binary-archive", "reason": "Binary archive" },
+    { "pattern": "*.dylib", "family": "binary-library", "reason": "Binary shared library" },
+    { "pattern": "*.xml", "family": "xml", "reason": "XML family deliberately uncovered until an XML checker is adopted (IDE metadata, framework resources)" },
+    { "pattern": "*.plist", "family": "xml", "reason": "XML property list; see xml family note" },
+    { "pattern": "*.metainfo", "family": "xml", "reason": "Qt metainfo file; see xml family note" },
+    { "pattern": "*.entitlements", "family": "xml", "reason": "Codesigning entitlements manifest (XML plist); see xml family note" },
+    { "pattern": "*.ui", "family": "xml", "reason": "Qt Designer UI file (XML); see xml family note" },
+    { "pattern": "*.qrc", "family": "xml", "reason": "Qt resource file (XML); see xml family note" },
+    { "pattern": "*.puml", "family": "diagram", "reason": "Diagram-as-code; no adopted checker yet" },
+    { "pattern": ".sonar/*", "family": "scanner-artifacts", "reason": "SonarCloud scanner working artifacts" },
+    { "pattern": ".junie/*", "family": "agent-memory", "reason": "Tool-maintained agent memory" },
+    { "pattern": ".idea/*", "family": "ide-metadata", "reason": "JetBrains project metadata" },
+    { "pattern": "*.DS_Store", "family": "finder-metadata", "reason": "macOS Finder metadata binary" },
+    { "pattern": ".specify/extensions/.registry", "family": "tool-installed", "reason": "Spec Kit extension registry data; not a structured config format" },
+    { "pattern": "*.properties", "family": "line-oriented-config", "reason": "Java-style properties files; line-oriented, outside the YAML/JSON/TOML scope" },
+    { "pattern": "wget-log", "family": "local-tool-output", "reason": "Accidental wget log at repo root; not source" },
+    { "pattern": ".specify/scripts/*", "family": "tool-installed-code", "reason": "Spec Kit installed shell framework; not repo-authored" },
+    { "pattern": ".specify/extensions/*/scripts/*", "family": "tool-installed-code", "reason": "Spec Kit installed shell framework; not repo-authored" },
+    { "pattern": ".specify/integrations/*/scripts/*", "family": "tool-installed-code", "reason": "Spec Kit installed shell framework; not repo-authored" },
+    { "pattern": "*.ps1", "family": "powershell", "reason": "Windows entry scripts; the shell class is POSIX-only" },
+    { "pattern": ".gitignore", "family": "tool-dotfile", "reason": "Line-oriented git config, not a structured format" },
+    { "pattern": ".claudeignore", "family": "tool-dotfile", "reason": "Line-oriented agent config" },
+    { "pattern": "LICENSE", "family": "documentation", "reason": "License text" },
+    { "pattern": "editor.spec", "family": "python-artifact", "reason": "PyInstaller spec is Python code; the Python gates own it" }
+  ]
+}
