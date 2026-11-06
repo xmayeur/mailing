@@ -65,6 +65,19 @@ def tracked_files(*patterns: str, exclude: Iterable[str] = ()) -> list[Path]:
     return [REPO_ROOT / rel for rel in require_git() if matches_any(rel, patterns) and not matches_any(rel, excluded)]
 
 
+INVENTORY_PATH = REPO_ROOT / "tests" / "unit" / "coverage_inventory.json"
+
+
+def inventory_class_files(class_id: str) -> list[Path]:
+    """Tracked files of one inventory class, exclusions applied (FR-009)."""
+    inventory = strict_json_loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    exclusions = [entry["pattern"] for entry in inventory["exclusions"]]
+    for cls in inventory["classes"]:
+        if cls["id"] == class_id:
+            return tracked_files(*cls["patterns"], exclude=exclusions)
+    raise LookupError(f"unknown coverage inventory class: {class_id}")
+
+
 class _StrictSafeLoader(yaml.SafeLoader):
     """SafeLoader that rejects duplicate mapping keys at any level."""
 

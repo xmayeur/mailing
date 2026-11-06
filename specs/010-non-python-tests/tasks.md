@@ -46,11 +46,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Extend `tests/unit/test_editor_assets.py`: reference-existence check — every local `<script src=...>`/`<link href=...>` in `src/editor_assets/editor.html` resolves to a file under `src/editor_assets/` (today: `quill.js`, `qwebchannel.js`, `quill.snow.css`)
-- [ ] T008 [US1] Extend `tests/unit/test_editor_assets.py`: bootstrap-component invariants — `#editor-container` and `#toolbar` present, exactly one `new QWebChannel(qt.webChannelTransport...` and one `new Quill(` in `src/editor_assets/editor.html`
-- [ ] T009 [US1] Extend `tests/unit/test_editor_assets.py`: shipped-vendor script syntax — `node --check` over `src/editor_assets/quill.js` and `src/editor_assets/qwebchannel.js`, same skip-with-reason guard as the existing inline-script test
-- [ ] T010 [US1] Extend `tests/unit/test_editor_assets.py`: host↔editor bridge contract — object names from `registerObject(...)` in `src/editor.py` must appear as `channel.objects.<name>` in `src/editor_assets/editor.html` (research R-08)
-- [ ] T011 [US1] Defect-injection verification (SC-002 subset) in a scratch clone: missing reference, removed bootstrap component, broken inline JS, corrupted vendor JS — each fails naming the file; update the US1 section of `tests/unit/coverage_inventory.md`
+- [x] T007 [US1] Extend `tests/unit/test_editor_assets.py`: reference-existence check — every local `<script src=...>`/`<link href=...>` in `src/editor_assets/editor.html` resolves to a file under `src/editor_assets/` (today: `quill.js`, `qwebchannel.js`, `quill.snow.css`)
+- [x] T008 [US1] Extend `tests/unit/test_editor_assets.py`: bootstrap-component invariants — `#editor-container` and `#toolbar` present, exactly one `new QWebChannel(qt.webChannelTransport...` and one `new Quill(` in `src/editor_assets/editor.html`
+- [x] T009 [US1] Extend `tests/unit/test_editor_assets.py`: shipped-vendor script syntax — `node --check` over `src/editor_assets/quill.js` and `src/editor_assets/qwebchannel.js`, same skip-with-reason guard as the existing inline-script test
+- [x] T010 [US1] Extend `tests/unit/test_editor_assets.py`: host↔editor bridge contract — object names from `registerObject(...)` in `src/editor.py` must appear as `channel.objects.<name>` in `src/editor_assets/editor.html` (research R-08)
+- [x] T011 [US1] Defect-injection verification (SC-002 subset) in a scratch clone: missing reference, removed bootstrap component, broken inline JS, corrupted vendor JS — each fails naming the file; update the US1 section of `tests/unit/coverage_inventory.md`
 
 **Checkpoint**: MVP — editor bundle guarded on commit, push, and CI; remaining stories can proceed in parallel.
 
