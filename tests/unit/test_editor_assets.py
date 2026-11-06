@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.unit.support.repo_files import inventory_class_files
+from tests.unit.support.repo_files import inventory_class_files, strict_yaml_load
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EDITOR_HTML = REPO_ROOT / "src" / "editor_assets" / "editor.html"
@@ -68,17 +68,19 @@ def test_editor_html_javascript_is_syntactically_valid() -> None:
 
 
 def test_github_workflows_are_valid_yaml() -> None:
-    """Every workflow file must be parseable YAML, not just well-indented text.
+    """Every workflow file must be strictly parseable YAML.
 
     A malformed workflow either fails as a startup_failure in the Actions
-    UI (easy to miss) or silently drops the intended run.
+    UI (easy to miss) or silently drops the intended run. Duplicate keys are
+    ambiguous and fail too: a pasted step key would silently override its
+    predecessor.
     """
     workflow_files = sorted(WORKFLOWS_DIR.glob("*.yml")) + sorted(WORKFLOWS_DIR.glob("*.yaml"))
     assert workflow_files, "no workflow files found under .github/workflows"
 
     for workflow in workflow_files:
         try:
-            yaml.safe_load(workflow.read_text(encoding="utf-8"))
+            strict_yaml_load(workflow.read_text(encoding="utf-8"))
         except yaml.YAMLError as exc:
             raise AssertionError(f"{workflow.name} is not valid YAML: {exc}") from exc
 

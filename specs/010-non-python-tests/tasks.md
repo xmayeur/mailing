@@ -94,9 +94,9 @@
 
 ### Implementation for User Story 4
 
-- [ ] T020 [P] [US4] Create `tests/unit/test_declarative_configs.py`: strict YAML, strict JSON, and `tomllib` parsing for every file matched by the declarative-configs inventory patterns; failures name file and offending entry (helpers from `tests/unit/support/repo_files.py`)
-- [ ] T021 [US4] Migrate the existing `test_github_workflows_are_valid_yaml` in `tests/unit/test_editor_assets.py` onto the strict loader so duplicate workflow keys are caught too
-- [ ] T022 [US4] Defect-injection verification in a scratch clone: truncated YAML in `.codecov.yml` and a duplicated top-level key each fail naming file + entry; update the US4 section of `tests/unit/coverage_inventory.md`
+- [x] T020 [P] [US4] Create `tests/unit/test_declarative_configs.py`: strict YAML, strict JSON, and `tomllib` parsing for every file matched by the declarative-configs inventory patterns; failures name file and offending entry (helpers from `tests/unit/support/repo_files.py`)
+- [x] T021 [US4] Migrate the existing `test_github_workflows_are_valid_yaml` in `tests/unit/test_editor_assets.py` onto the strict loader so duplicate workflow keys are caught too
+- [x] T022 [US4] Defect-injection verification in a scratch clone: truncated YAML in `.codecov.yml` and a duplicated top-level key each fail naming file + entry; update the US4 section of `tests/unit/coverage_inventory.md`
 
 **Checkpoint**: The full declarative config surface (~15 files: `.codecov.yml`, `.github/build.yml`, `.github/dependabot.yml`, `.github/workflows/*.yml`, `.pre-commit-config.yaml`, `.readthedocs.yaml`, `poetry.toml`, `pyproject.toml`, `pyrightconfig.json`, `src/config.yml`, `.specify/*.yml`, `.specify/*.json`) is gated.
 
