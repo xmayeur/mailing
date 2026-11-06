@@ -56,4 +56,32 @@ The checks run inside the existing `Tests` workflow steps — no workflow edits.
 - Pre-push: the same seed fails the pre-push pytest step (`pytest tests/unit --cov-fail-under=60 --cov=src`) naming the file; the integration suite runs green locally (36 passed), and the Python coverage ratio is unchanged at 91% (the new tests contribute no `src/` modules).
 - CI: no workflow edits required — the new modules run inside the existing pytest steps (`Tests` matrix, Sonar, and badge jobs all run `tests/unit`). All three OS images preinstall node and bash; `shellcheck` ships through the exported testing requirements (`shellcheck-py` bundles per-platform shells, including `shellcheck.exe`). Matrix-run evidence will be captured from the first CI run of this branch's PR to master.
 
+**Runtime budget (FR-010 / SC-004, T028)**
+
+- Baseline (pre-feature, with coverage instrumentation): 438 passed in ~2.2s.
+- After (with coverage instrumentation, across 41+ commit-gate runs): 475 passed in ~3.2-3.5s — delta ≈ +1.1s, well within the 30-second budget. Slowest added checks: shellcheck sweep 0.18s, vendor JS node parse 0.14s, bash -n sweep 0.14s.
+
+**Full defect-injection trial (SC-002, T029) — 10/10 caught**
+
+| # | Seed | Result |
+|---|------|--------|
+| 1 | Missing editor reference (`quill.snow.css` renamed to a nonexistent file) | Caught — names editor.html and the missing asset |
+| 2 | Removed bootstrap component (`#editor-container` renamed) | Caught — names editor.html and the component |
+| 3 | Broken inline JS (stray paren in the inline script) | Caught — names inline `<script>` block |
+| 4 | Corrupted shipped-vendor script (truncated `quill.js`) | Caught — names src/editor_assets/quill.js |
+| 5 | Shell syntax error (unterminated `if`) | Caught — names scripts/build_doc.sh (bash -n) |
+| 6 | Unquoted expansion (`ls ${HOME}`) | Caught — SC2086 named |
+| 7 | Unset variable (lowercase `$definitely_unset_var_xyz`) | Caught — SC2154 named |
+| 8 | Masked command failure (`export VAR=$(false)`) | Caught — masked-exit class named |
+| 9 | Unparseable config (tab-indented YAML `.codecov.yml`) | Caught — names .codecov.yml |
+| 10a | Duplicate top-level config key (second `coverage:` block) | Caught — duplicate mapping key 'coverage' named |
+| 10b | Unbalanced stylesheet (removed closing brace) | Caught — names css/styles.css with line and depth |
+
+Plus the false-positive guard: a `content: "}"` rule appended to `css/styles.css` still passes. Every seeded defect failed naming the file; each injection was restored, tree verified clean afterwards.
+
+**SC-003 gate-surface evidence (T030)**
+
+- Seeded defects fail the commit-gate and pre-push pytest steps (see above); every one of the feature's commits was itself gated by the full commit-time suite (pymarkdown, black, ruff, vulture, pyright, mypy, pytest) with the new checks active — 41+ full gate runs green on the clean tree.
+- CI matrix evidence is pending the branch's first PR run against master; all static prerequisites verified (see T018 record).
+
 Seed one defect per class (each in a scratch checkout, each expected to fail the suite with file-naming messages): missing editor reference (delete `quill.js`), removed bootstrap component (delete `#editor-container`), broken inline JS (delete a brace in the inline script), shell syntax error (stray `)` in a script), unquoted expansion (add unquoted `$1` usage), unset variable use (reference an undefined lowercase `$unset_var` with no default — all-caps names read as environment-provided and shellcheck suppresses SC2154 for them), masked command failure (a nonzero-exit command swallowed in a pipeline or unchecked fallback — construct per shellcheck's masked-exit class), unparseable config (tab-indent a YAML mapping), duplicate config key (paste an existing top-level key), unbalanced stylesheet (delete a closing brace). All ten must be caught — this trial doubles as the acceptance test for the user stories in `spec.md`.

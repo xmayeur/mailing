@@ -21,10 +21,6 @@ from tests.unit.support.repo_files import (
 
 INVENTORY_PATH = Path(__file__).parent / "coverage_inventory.json"
 
-# NOTE (T027 hardening): assertions here currently validate registry shape and
-# file mapping only. Owning-test existence enforcement lands once every
-# owning test module exists.
-
 
 def load_inventory() -> dict:
     """Load the registry through the strict loader, so it gates itself."""
@@ -132,3 +128,12 @@ def test_shipped_vendor_classes_are_parse_or_existence_only() -> None:
     vendor_assets += [f.name for f in vendor_css]
     for asset in vendor_assets:
         assert f'"{asset}"' in html, f"editor.html no longer references shipped asset {asset}"
+
+
+def test_every_class_owning_test_exists() -> None:
+    """T027: a registered class must point at an existing owning test module."""
+    for cls in load_inventory()["classes"]:
+        owning = REPO_ROOT / cls["owning_test"]
+        assert owning.is_file(), (
+            f"coverage inventory class {cls['id']} names an owning test that does not exist: " f"{cls['owning_test']}"
+        )

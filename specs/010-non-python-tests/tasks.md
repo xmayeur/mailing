@@ -134,11 +134,11 @@
 
 **Purpose**: Invariant hardening and the feature's own acceptance measures.
 
-- [ ] T027 [P] Harden `tests/unit/test_coverage_inventory.py` per the data-model rule: every class's `owning_test` path must exist on disk (all five owning modules now present) and every exclusion entry must carry a reason
-- [ ] T028 [P] Runtime budget (FR-010/SC-004): measure `poetry run pytest tests/unit -q --durations=10` before and after the feature on the same machine; record both values in `specs/010-non-python-tests/quickstart.md`
-- [ ] T029 Run the full SC-002 defect-injection trial — all ten defect classes listed in `specs/010-non-python-tests/quickstart.md` — and record 100%-caught evidence in that file
-- [ ] T030 Final SC-003 gate-surface run: repeat the seeded-defect verification across commit-time, pre-push, and CI matrix evidence; record results in `specs/010-non-python-tests/quickstart.md`
-- [ ] T031 Final consistency pass: `tests/unit/coverage_inventory.md` matches `tests/unit/coverage_inventory.json`; run the `specs/010-non-python-tests/quickstart.md` steps end-to-end
+- [x] T027 [P] Harden `tests/unit/test_coverage_inventory.py` per the data-model rule: every class's `owning_test` path must exist on disk (all five owning modules now present) and every exclusion entry must carry a reason
+- [x] T028 [P] Runtime budget (FR-010/SC-004): measure `poetry run pytest tests/unit -q --durations=10` before and after the feature on the same machine; record both values in `specs/010-non-python-tests/quickstart.md`
+- [x] T029 Run the full SC-002 defect-injection trial — all ten defect classes listed in `specs/010-non-python-tests/quickstart.md` — and record 100%-caught evidence in that file
+- [x] T030 Final SC-003 gate-surface run: repeat the seeded-defect verification across commit-time, pre-push, and CI matrix evidence; record results in `specs/010-non-python-tests/quickstart.md`
+- [x] T031 Final consistency pass: `tests/unit/coverage_inventory.md` matches `tests/unit/coverage_inventory.json`; run the `specs/010-non-python-tests/quickstart.md` steps end-to-end
 
 ---
 
