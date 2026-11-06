@@ -168,3 +168,13 @@ cython_debug/
 #.idea/
 
 .vibe/
+# Local self-signed codesigning material (generated on demand by scripts/sign_app.sh)
+cert.crt
+cert.key
+cert.p12
+cert_config.cnf
+cert_pk*.der
+sendMailEditor_new*.p12
+
+# Nuitka build output
+dist_nuitka/
