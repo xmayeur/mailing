@@ -12,3 +12,4 @@ git branch -a
 
 echo "Updating dependencies to latest compatible versions..."
 poetry update
+poetry lock
