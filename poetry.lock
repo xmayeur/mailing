@@ -3534,14 +3534,14 @@ files = [
 
 [[package]]
 name = "pylint"
-version = "4.1.3"
+version = "4.1.4"
 description = "python code static checker"
 optional = false
 python-versions = ">=3.10.0"
 groups = ["lint"]
 files = [
-    {file = "pylint-4.1.3-py3-none-any.whl", hash = "sha256:a85357cae24f33ad8d86c8f3daaa92c600ae4012b54a57299cee76000e9364cf"},
-    {file = "pylint-4.1.3.tar.gz", hash = "sha256:9928603068edfa0d1a3c167f174b099d4b97c3db75d32d0fcdd029770b4713a9"},
+    {file = "pylint-4.1.4-py3-none-any.whl", hash = "sha256:b39fcc762ec4a7fe385d01b8e170fd996847297cdc0e3850bdda1435c74cfd95"},
+    {file = "pylint-4.1.4.tar.gz", hash = "sha256:4c9176dc6c9f1b98b742195f01899b290369d5a27b4b41d1014c17f2f96b26f1"},
 ]
 
 [package.dependencies]
@@ -5014,14 +5014,14 @@ test = ["argcomplete (>=3.0.3) ; python_version < \"3.12\"", "argcomplete (>=3.5
 
 [[package]]
 name = "types-pyyaml"
-version = "6.0.12.20261103"
+version = "6.0.12.20261122"
 description = "Typing stubs for PyYAML"
 optional = false
 python-versions = ">=3.10"
 groups = ["dev", "lint"]
 files = [
-    {file = "types_pyyaml-6.0.12.20261103-py3-none-any.whl", hash = "sha256:444654c61f635dab82c092a511aa96a0ce31164810784b9a37314e3e56532ac8"},
-    {file = "types_pyyaml-6.0.12.20261103.tar.gz", hash = "sha256:7a1b5f837881dd35d5448b5f18275164f89f206185e31e8eae6e0b42607bc001"},
+    {file = "types_pyyaml-6.0.12.20261122-py3-none-any.whl", hash = "sha256:689fbbe883b60471166dede9dba6ac0dbdbcf0ea98062d7ec195430f5bbdb009"},
+    {file = "types_pyyaml-6.0.12.20261122.tar.gz", hash = "sha256:7fa577c893a1db255cbb02320884ffcb97b7a219fe515bec6c5f15d5d3af41ed"},
 ]
 
 [[package]]
@@ -5418,4 +5418,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12, <3.15"
-content-hash = "dd06d5b38aa2e1399d44a93d24e41be3cd3340245d761357180d95204b5643be"
+content-hash = "bd2acf8bd724b17ffc14cc2614161ff7e5885045992750123339bd4cf3857ced"
