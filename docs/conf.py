@@ -104,12 +104,16 @@ class _FakeQMainWindow(_FakeQObject):
 
 
 MOCK_MODULES = [
-    "PyQt6",
-    "PyQt6.QtCore",
-    "PyQt6.QtGui",
-    "PyQt6.QtWidgets",
-    "PyQt6.QtWebEngineWidgets",
-    "PyQt6.QtWebChannel",
+    # Qt binding: the project uses PySide6 (>=6.12); not installed on RTD
+    "PySide6",
+    "PySide6.QtCore",
+    "PySide6.QtGui",
+    "PySide6.QtWidgets",
+    "PySide6.QtWebEngineCore",
+    "PySide6.QtWebEngineWidgets",
+    "PySide6.QtWebChannel",
+    "shiboken6",
+    "python_calamine",
     "gspread",
     "yaml",
     "bs4",
@@ -135,43 +139,56 @@ MOCK_MODULES = [
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-sys.modules["PyQt6.QtCore"].pyqtSlot = _make_pyqtSlot
-sys.modules["PyQt6.QtCore"].pyqtSignal = _make_pyqtSignal
-sys.modules["PyQt6.QtCore"].QObject = _FakeQObject
-sys.modules["PyQt6.QtCore"].QUrl = MagicMock()
-sys.modules["PyQt6.QtCore"].QSize = MagicMock()
-sys.modules["PyQt6.QtCore"].Qt = MagicMock()
+sys.modules["PySide6.QtCore"].Signal = _make_pyqtSignal
+sys.modules["PySide6.QtCore"].Slot = _make_pyqtSlot
+sys.modules["PySide6.QtCore"].pyqtSlot = _make_pyqtSlot
+sys.modules["PySide6.QtCore"].pyqtSignal = _make_pyqtSignal
+sys.modules["PySide6.QtCore"].QObject = _FakeQObject
+sys.modules["PySide6.QtCore"].QByteArray = MagicMock()
+sys.modules["PySide6.QtCore"].QThread = MagicMock()
+sys.modules["PySide6.QtCore"].QTimer = MagicMock()
+sys.modules["PySide6.QtCore"].QUrl = MagicMock()
+sys.modules["PySide6.QtCore"].QSize = MagicMock()
+sys.modules["PySide6.QtCore"].Qt = MagicMock()
 
-sys.modules["PyQt6.QtWidgets"].QDialog = _FakeQDialog
-sys.modules["PyQt6.QtWidgets"].QDialog.DialogCode = _FakeQDialog.DialogCode
-sys.modules["PyQt6.QtWidgets"].QMainWindow = _FakeQMainWindow
-sys.modules["PyQt6.QtWidgets"].QFileDialog = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QApplication = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QCheckBox = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QDialogButtonBox = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QInputDialog = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QFormLayout = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QComboBox = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QLabel = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QLineEdit = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QMessageBox = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QPlainTextEdit = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QPushButton = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QStyle = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QToolBar = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QSpinBox = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QStatusBar = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QTabWidget = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QTextBrowser = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QHBoxLayout = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QVBoxLayout = MagicMock()
-sys.modules["PyQt6.QtWidgets"].QWidget = MagicMock()
+sys.modules["PySide6.QtWidgets"].QDialog = _FakeQDialog
+sys.modules["PySide6.QtWidgets"].QDialog.DialogCode = _FakeQDialog.DialogCode
+sys.modules["PySide6.QtWidgets"].QMainWindow = _FakeQMainWindow
+sys.modules["PySide6.QtWidgets"].QFileDialog = MagicMock()
+sys.modules["PySide6.QtWidgets"].QApplication = MagicMock()
+sys.modules["PySide6.QtWidgets"].QApplication.setAttribute = MagicMock()
+sys.modules["PySide6.QtWidgets"].QListWidget = MagicMock()
+sys.modules["PySide6.QtWidgets"].QListWidgetItem = MagicMock()
+sys.modules["PySide6.QtWidgets"].QTableWidget = MagicMock()
+sys.modules["PySide6.QtWidgets"].QTableWidgetItem = MagicMock()
+sys.modules["PySide6.QtWidgets"].QCheckBox = MagicMock()
+sys.modules["PySide6.QtWidgets"].QDialogButtonBox = MagicMock()
+sys.modules["PySide6.QtWidgets"].QInputDialog = MagicMock()
+sys.modules["PySide6.QtWidgets"].QFormLayout = MagicMock()
+sys.modules["PySide6.QtWidgets"].QComboBox = MagicMock()
+sys.modules["PySide6.QtWidgets"].QLabel = MagicMock()
+sys.modules["PySide6.QtWidgets"].QLineEdit = MagicMock()
+sys.modules["PySide6.QtWidgets"].QMessageBox = MagicMock()
+sys.modules["PySide6.QtWidgets"].QPlainTextEdit = MagicMock()
+sys.modules["PySide6.QtWidgets"].QPushButton = MagicMock()
+sys.modules["PySide6.QtWidgets"].QStyle = MagicMock()
+sys.modules["PySide6.QtWidgets"].QStyle.StandardPixmap = MagicMock()
+sys.modules["PySide6.QtWidgets"].QToolBar = MagicMock()
+sys.modules["PySide6.QtWidgets"].QSpinBox = MagicMock()
+sys.modules["PySide6.QtWidgets"].QStatusBar = MagicMock()
+sys.modules["PySide6.QtWidgets"].QTabWidget = MagicMock()
+sys.modules["PySide6.QtWidgets"].QTextBrowser = MagicMock()
+sys.modules["PySide6.QtWidgets"].QHBoxLayout = MagicMock()
+sys.modules["PySide6.QtWidgets"].QVBoxLayout = MagicMock()
+sys.modules["PySide6.QtWidgets"].QWidget = MagicMock()
 
-sys.modules["PyQt6.QtGui"].QIcon = MagicMock()
-sys.modules["PyQt6.QtGui"].QPixmap = MagicMock()
+sys.modules["PySide6.QtGui"].QIcon = MagicMock()
+sys.modules["PySide6.QtGui"].QPixmap = MagicMock()
+sys.modules["PySide6.QtGui"].QCursor = MagicMock()
 
-sys.modules["PyQt6.QtWebChannel"].QWebChannel = MagicMock()
-sys.modules["PyQt6.QtWebEngineWidgets"].QWebEngineView = MagicMock()
+sys.modules["PySide6.QtWebChannel"].QWebChannel = MagicMock()
+sys.modules["PySide6.QtWebEngineCore"].QWebEnginePage = MagicMock()
+sys.modules["PySide6.QtWebEngineWidgets"].QWebEngineView = MagicMock()
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -232,7 +249,7 @@ intersphinx_mapping = {
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_rtd_theme"
-html_static_path = ["_static"]
+html_static_path = []  # no static assets yet; avoids a warning for a missing _static dir
 
 # ReadTheDocs theme options
 html_theme_options = {
