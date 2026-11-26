@@ -1010,7 +1010,9 @@ def build_email(
 
     _attach_body(msg, msg_related, message, all_inline_images)
 
-    recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
+    # None → "" so the header swap (_set_email_headers may set bcc=None)
+    # never leaks a literal "None" entry into the recipient list.
+    recipients = [r.strip() for r in f"{to or ''},{cc or ''},{bcc or ''}".split(",") if r.strip()]
     msg._temp_dirs = temp_dirs  # type: ignore
 
     return msg, recipients

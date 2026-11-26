@@ -271,9 +271,8 @@ class TestMergeFieldHtmlAttachment:
         body = self._payload(msg)
         assert "Bonjour cher Alice  — a@b.com" in body
         assert "${" not in body
-        # Pre-existing quirk (out of scope here): with max_addr_per_mail == 1 the
-        # headers swap leaves bcc=None and the recipient list gains a "None" entry.
-        assert recipients[0] == "a@b.com"
+        # A2 fix: the to/bcc swap must not leak a literal "None" into recipients
+        assert recipients == ["a@b.com"]
 
     def test_html_attachment_blank_multi_recipient(self, tmp_path: Any) -> None:
         """Multi-recipient batch: HTML attachment markers blanked (I4)."""

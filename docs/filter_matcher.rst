@@ -27,6 +27,7 @@ FilterMatcher
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Usage Examples
 --------------
