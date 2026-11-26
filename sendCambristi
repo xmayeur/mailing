@@ -1,6 +1,6 @@
 #!/bin/sh
 
-FILE='/Users/xavier/Documents/I Cambristi/mailing/20260611'
+FILE='/Users/xavier/Documents/I Cambristi/mailing/20260907'
 
 # rm sendMail.log
 # python src/sendMail.py --md2html "$FILE.md"

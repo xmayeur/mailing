@@ -45,6 +45,7 @@ them through `sendMail`.
 - 🔒 **Secure credential management** via secrets vault
 - ✍️ **Standalone newsletter editor** with live HTML preview and sendMail-compatible output
 - 🔍 **Advanced filter validation** with real-time syntax checking and field verification
+- 🏷️ **Database merge fields** — personalize each email with subscriber data (`${FIELD}`)
 
 ## Editor
 
@@ -58,12 +59,28 @@ The editor is a separate desktop app for creating and editing newsletter content
 - Edit content with Quill-based rich text formatting
 - Insert inline images from local files
 - Insert links, tables, horizontal rules, and named anchors
+- Insert database merge fields (`${FIELD}`) from a picker of your subscriber database
 - Apply custom CSS to preview and exported HTML
 - Preserve sendMail-ready HTML output for direct campaign use
 - **Profile dropdown** to switch email profiles and load SMTP settings
 - Advanced filter validation with real-time syntax checking
 - Database preview showing filtered subscriber records
 - Google Sheets and CSV database integration
+
+### Database Merge Fields
+
+Personalize each newsletter with data from the subscriber database. Use the
+**Insert field** toolbar button to pick a database field — the marker (e.g.
+`${Prénom}`) is inserted at the cursor as plain text and is replaced at send
+time:
+
+- When the mailing is sent **one recipient at a time**, each marker is replaced
+  by that recipient's value for the field (empty value → empty string, unknown
+  field → blank)
+- Replacement also applies to the message **subject line**
+- If a merge field is present, the mailing is automatically forced to
+  **one recipient per message** so every marker always resolves to
+  per-recipient values
 
 ### Launching the Editor
 

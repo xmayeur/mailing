@@ -155,3 +155,323 @@ class TestSendMailStateManagement:
         batches_needed = (total_to_send + rate_limit_per_second - 1) // rate_limit_per_second
 
         assert batches_needed == 20
+
+
+class TestMergeFieldBatching:
+    """_build_and_send merge-field semantics: 1 addressee -> values, >=2 -> blank (011)."""
+
+    def _make_param(self) -> Any:
+        """Full param mock as used by _build_and_send."""
+        from unittest.mock import Mock
+
+        param = Mock()
+        param.donotsend = False
+        param.verbose = False
+        param.subject = "Order ${id}"
+        param.message = "Hello ${name}, hello ${typo}"
+        param.file = []
+        param.attachment = None
+        param.smtp_host = "smtp.test.com"
+        return param
+
+    def _capture_build_email(self, param: Any, addressees: list[str], row: list[str], header: list[str]) -> dict:
+        """Run _build_and_send with a mocked build_email; return its kwargs."""
+        captured: dict = {}
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            captured.update(kwargs)
+            return (MagicMock(), list(addressees))
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            sm._build_and_send(param, addressees, row, header)
+        return captured
+
+    def test_single_recipient_passes_merge_context(self) -> None:
+        """One addressee: build_email receives the recipient's row (US2, FR-005/FR-012)."""
+        param = self._make_param()
+        captured = self._capture_build_email(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
+        assert captured["merge_row"] == ["42", "Alice"]
+        assert captured["merge_header"] == ["id", "name"]
+        assert captured["blank_merge"] is False
+        assert captured["subject"] == "Order ${id}"
+
+    def test_multiple_recipients_blank_merge(self) -> None:
+        """Two addressees: blank_merge=True and no merge_row (US3, FR-006, I4)."""
+        param = self._make_param()
+        captured = self._capture_build_email(param, ["a@b.com", "c@d.com"], ["42", "Alice"], ["id", "name"])
+        assert captured["blank_merge"] is True
+        assert captured["merge_row"] is None
+        assert captured["merge_header"] is None
+
+    def test_stored_param_not_mutated(self) -> None:
+        """param.message / param.subject keep their markers after a send (FR-007, SC-004)."""
+        param = self._make_param()
+        self._capture_build_email(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
+        assert param.message == "Hello ${name}, hello ${typo}"
+        assert param.subject == "Order ${id}"
+
+    def test_donotsend_skips_build(self) -> None:
+        """donotsend still short-circuits before any substitution."""
+
+        param = self._make_param()
+        param.donotsend = True
+        with (
+            patch("sendMail.build_email") as mock_build,
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm._build_and_send(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
+        assert result is False
+        mock_build.assert_not_called()
+
+
+class TestMergeFieldHtmlAttachment:
+    """Real build_email with the editor's HTML file as attachment (reported bug)."""
+
+    def _make_param(self) -> Any:
+        from unittest.mock import Mock
+
+        param = Mock()
+        param.sendername = "Sender"
+        param.sender = "sender@example.com"
+        param.max_addr_per_mail = 1
+        param.styles = None
+        return param
+
+    def _html_file(self, tmp_path: Any, body: str) -> str:
+        html_file = tmp_path / "test.html"
+        html_file.write_text(f"<!DOCTYPE html><html><body><p>{body}</p></body></html>", encoding="utf-8")
+        return str(html_file)
+
+    def _payload(self, msg: Any) -> str:
+        """Extract the decoded body text from the MIME tree (mixed → related → text)."""
+        part = msg
+        while part.is_multipart():
+            part = part.get_payload(0)
+        decoded = part.get_payload(decode=True)
+        charset = part.get_content_charset() or "utf-8"
+        return decoded.decode(charset) if decoded is not None else str(part.get_payload())
+
+    def test_html_attachment_substituted_single_recipient(self, tmp_path: Any) -> None:
+        """Markers in an HTML attachment are replaced by the recipient's values."""
+        param = self._make_param()
+        html_file = self._html_file(tmp_path, "Bonjour cher ${Prénom} ${Nom} — ${email}")
+        msg, recipients = sm.build_email(
+            param=param,
+            subject="Order ${id}",
+            message="",
+            bcc="a@b.com",
+            attachments=[html_file],
+            merge_row=["42", "Alice", "a@b.com"],
+            merge_header=["id", "Prénom", "email"],
+            blank_merge=False,
+        )
+        body = self._payload(msg)
+        assert "Bonjour cher Alice  — a@b.com" in body
+        assert "${" not in body
+        # A2 fix: the to/bcc swap must not leak a literal "None" into recipients
+        assert recipients == ["a@b.com"]
+
+    def test_html_attachment_blank_multi_recipient(self, tmp_path: Any) -> None:
+        """Multi-recipient batch: HTML attachment markers blanked (I4)."""
+        param = self._make_param()
+        param.max_addr_per_mail = 2
+        html_file = self._html_file(tmp_path, "Bonjour cher ${Prénom} — ${email}")
+        msg, recipients = sm.build_email(
+            param=param,
+            subject="Order ${id}",
+            message="",
+            bcc="a@b.com,c@d.com",
+            attachments=[html_file],
+            merge_row=None,
+            merge_header=None,
+            blank_merge=True,
+        )
+        body = self._payload(msg)
+        assert "Bonjour cher  — " in body
+        assert "${" not in body
+        assert "Alice" not in body
+        assert len(recipients) == 2
+
+    def test_subject_substituted_single_recipient(self, tmp_path: Any) -> None:
+        """Subject markers replaced for a single recipient (FR-012)."""
+        param = self._make_param()
+        html_file = self._html_file(tmp_path, "Body ${name}")
+        msg, _recipients = sm.build_email(
+            param=param,
+            subject="Your order ${id}",
+            message="Body",
+            bcc="a@b.com",
+            attachments=[html_file],
+            merge_row=["42", "Alice"],
+            merge_header=["id", "name"],
+            blank_merge=False,
+        )
+        assert str(msg["Subject"]) == "Your order 42"
+
+    def test_subject_blank_multi_recipient(self, tmp_path: Any) -> None:
+        """Subject markers blanked for a multi-recipient message (FR-006)."""
+        param = self._make_param()
+        html_file = self._html_file(tmp_path, "Body")
+        msg, _recipients = sm.build_email(
+            param=param,
+            subject="Your order ${id}",
+            message="Body",
+            bcc="a@b.com,c@d.com",
+            attachments=[html_file],
+            merge_row=None,
+            merge_header=None,
+            blank_merge=True,
+        )
+        assert str(msg["Subject"]) == "Your order "
+
+
+class TestMergeFieldRowAssociation:
+    """Regression (011): the batch must use the matched recipient's row, not the last row read."""
+
+    def test_filtered_row_not_last_row(self, tmp_path: Any) -> None:
+        """Filter matches the first row; substitution must use THAT row, not the
+        last row of the file (reported: ${email} resolved to the last CSV row)."""
+        from unittest.mock import Mock
+
+        csv_file = tmp_path / "subscribers.csv"
+        csv_file.write_text(
+            "id,Ville,email\n"
+            "1,Bruxelles,xavier@mayeur.be\n"
+            "2,Anvers,other1@example.com\n"
+            "3,Bruxelles,other2@example.com\n"
+            "4,Anvers,longreef1@gmail.com\n",
+            encoding="utf-8",
+        )
+
+        param = Mock()
+        param.max_addr_per_mail = 5
+        param.pause = 0
+        param.max_mails_per_hour = 1000
+        param.from_index = None
+        param.to_index = None
+        param.database = str(csv_file)
+        param.filter = {"email": "is equal to xavier@mayeur.be", "Ville": "is equal to Bruxelles"}
+        param.test = False
+        param.selected = False
+        param.donotsend = False
+        param.subject = "Hi ${id}"
+        param.message = "Hello ${email}"
+        param.file = []
+        param.profile = "test"
+
+        captured: dict = {}
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            captured.update(kwargs)
+            return (MagicMock(), ["xavier@mayeur.be"])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert captured["merge_row"] == ["1", "Bruxelles", "xavier@mayeur.be"]
+        assert captured["merge_header"] == ["id", "Ville", "email"]
+        assert captured["blank_merge"] is False
+
+
+class TestForceSingleRecipientWithMergeFields:
+    """Safety: markers present → max_addr_per_mail forced to 1 (011 user request)."""
+
+    def _make_param(self, csv_file: Any, message: str, max_addr: int) -> Any:
+        from unittest.mock import Mock
+
+        param = Mock()
+        param.max_addr_per_mail = max_addr
+        param.pause = 0
+        param.max_mails_per_hour = 1000
+        param.from_index = None
+        param.to_index = None
+        param.database = str(csv_file)
+        param.filter = {}
+        param.test = False
+        param.selected = False
+        param.donotsend = False
+        param.subject = "Sub"
+        param.message = message
+        param.file = []
+        param.profile = "test"
+        return param
+
+    @staticmethod
+    def _two_row_csv(tmp_path: Any) -> str:
+        csv_file = tmp_path / "subscribers.csv"
+        csv_file.write_text("email\na@example.com\nb@example.com\n", encoding="utf-8")
+        return str(csv_file)
+
+    def test_markers_force_single_recipient_batches(self, tmp_path: Any) -> None:
+        """Two recipients, batch size 5, markers in message → 2 separate sends,
+        each with its own row (no blank mode)."""
+        param = self._make_param(self._two_row_csv(tmp_path), "Hello ${email}", 5)
+
+        calls: list[dict] = []
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            calls.append(kwargs)
+            return (MagicMock(), [kwargs["bcc"]])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert len(calls) == 2  # one message per recipient, not one shared message
+        assert all(call["blank_merge"] is False for call in calls)
+        assert calls[0]["merge_row"] == ["a@example.com"]
+        assert calls[1]["merge_row"] == ["b@example.com"]
+
+    def test_no_markers_keep_batching(self, tmp_path: Any) -> None:
+        """Without markers the batch behavior is unchanged (one shared message)."""
+        param = self._make_param(self._two_row_csv(tmp_path), "Plain announcement", 5)
+
+        calls: list[dict] = []
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            calls.append(kwargs)
+            return (MagicMock(), [kwargs["bcc"]])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert len(calls) == 1  # single shared message
+        assert calls[0]["blank_merge"] is True
+
+    def test_markers_in_html_attachment_force_single(self, tmp_path: Any) -> None:
+        """Editor flow: markers only in the attached HTML file (param.message empty)."""
+        html_file = tmp_path / "test.html"
+        html_file.write_text("<p>Bonjour ${email}</p>", encoding="utf-8")
+
+        param = self._make_param(self._two_row_csv(tmp_path), "", 5)
+        param.file = [str(html_file)]
+
+        calls: list[dict] = []
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            calls.append(kwargs)
+            return (MagicMock(), [kwargs["bcc"]])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert len(calls) == 2
+        assert all(call["blank_merge"] is False for call in calls)
