@@ -1106,6 +1106,37 @@ def _flush_batch(
             sleep(3600)
 
 
+def _contains_merge_marker(text: str | None) -> bool:
+    """True if *text* contains at least one well-formed ${FIELD} marker."""
+    if not text:
+        return False
+    return re.search(r"\${(.*?)}", text) is not None
+
+
+def _message_has_merge_fields(param: Any) -> bool:
+    """True if any merge-field marker appears in the outgoing message content.
+
+    Scans the message body, the subject, and any HTML/Markdown attachment file
+    (the editor sends its composed page as an attachment with an empty
+    message). Malformed constructs are not markers and do not count.
+    """
+    candidates: list[str] = []
+    for attr in ("message", "subject"):
+        value = getattr(param, attr, None)
+        if isinstance(value, str):
+            candidates.append(value)
+    files = getattr(param, "file", None)
+    paths = files if isinstance(files, list) else ([files] if files else [])
+    for path in paths:
+        if isinstance(path, str) and path.endswith(("htm", "html", "md")) and os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8", errors="replace") as f:
+                    candidates.append(f.read())
+            except OSError:
+                log.debug("Could not read attachment for merge-field scan: %s", path)
+    return any(_contains_merge_marker(text) for text in candidates)
+
+
 def generate_mailing(param: Any) -> str:
     """
     Generates and sends emails to a list of subscribers based on provided parameters and subscriber information.
@@ -1131,6 +1162,12 @@ def generate_mailing(param: Any) -> str:
     except AttributeError as e:
         log.critical(f"Clé de configuration manquante : {e}")
         return "Config Key Error"
+
+    # Safety (011): markers require per-recipient substitution; a shared
+    # message would blank them (or, historically, leak another row's values).
+    if max_add > 1 and _message_has_merge_fields(param):
+        log.info("Merge fields detected in message; forcing max_addr_per_mail=1 " "(per-recipient substitution)")
+        max_add = 1
 
     reader, file_object = get_subscriber_reader(param)
     if not reader:

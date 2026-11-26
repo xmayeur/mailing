@@ -1580,23 +1580,15 @@ def test_generate_mailing_batching_and_filtering():
                 ) as mock_build_email,
             ):
                 sendMail.generate_mailing(param)
-                # Two batches: 2-addressee (blank_merge=True) and 1-addressee
-                # (merge_row passed, FR-005/FR-006/FR-012). 011 feature.
-                assert mock_build_email.call_count == 2
-                blank_kwargs = mock_build_email.call_args_list[0].kwargs
-                per_recipient_kwargs = mock_build_email.call_args_list[1].kwargs
-                assert blank_kwargs["blank_merge"] is True
-                assert blank_kwargs["merge_row"] is None
-                assert per_recipient_kwargs["blank_merge"] is False
-                assert per_recipient_kwargs["merge_row"] == [
-                    "active",
-                    "White",
-                    "Alice",
-                    "4@ex.com",
-                    "",
-                    "Test",
-                    "",
-                ]
+                # Markers in the message force per-recipient sends (011
+                # safety): 3 recipients → 3 single-addressee batches, each
+                # with its own row and blank_merge=False.
+                assert mock_build_email.call_count == 3
+                assert all(call.kwargs["blank_merge"] is False for call in mock_build_email.call_args_list)
+                rows_sent = [call.kwargs["merge_row"] for call in mock_build_email.call_args_list]
+                assert rows_sent[0][3] == "1@ex.com"
+                assert rows_sent[1][3] == "3@ex.com"
+                assert rows_sent[2][3] == "4@ex.com"
 
 
 def test_process_artscroises_wait_and_cleanup():

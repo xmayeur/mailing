@@ -379,3 +379,100 @@ class TestMergeFieldRowAssociation:
         assert captured["merge_row"] == ["1", "Bruxelles", "xavier@mayeur.be"]
         assert captured["merge_header"] == ["id", "Ville", "email"]
         assert captured["blank_merge"] is False
+
+
+class TestForceSingleRecipientWithMergeFields:
+    """Safety: markers present → max_addr_per_mail forced to 1 (011 user request)."""
+
+    def _make_param(self, csv_file: Any, message: str, max_addr: int) -> Any:
+        from unittest.mock import Mock
+
+        param = Mock()
+        param.max_addr_per_mail = max_addr
+        param.pause = 0
+        param.max_mails_per_hour = 1000
+        param.from_index = None
+        param.to_index = None
+        param.database = str(csv_file)
+        param.filter = {}
+        param.test = False
+        param.selected = False
+        param.donotsend = False
+        param.subject = "Sub"
+        param.message = message
+        param.file = []
+        param.profile = "test"
+        return param
+
+    @staticmethod
+    def _two_row_csv(tmp_path: Any) -> str:
+        csv_file = tmp_path / "subscribers.csv"
+        csv_file.write_text("email\na@example.com\nb@example.com\n", encoding="utf-8")
+        return str(csv_file)
+
+    def test_markers_force_single_recipient_batches(self, tmp_path: Any) -> None:
+        """Two recipients, batch size 5, markers in message → 2 separate sends,
+        each with its own row (no blank mode)."""
+        param = self._make_param(self._two_row_csv(tmp_path), "Hello ${email}", 5)
+
+        calls: list[dict] = []
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            calls.append(kwargs)
+            return (MagicMock(), [kwargs["bcc"]])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert len(calls) == 2  # one message per recipient, not one shared message
+        assert all(call["blank_merge"] is False for call in calls)
+        assert calls[0]["merge_row"] == ["a@example.com"]
+        assert calls[1]["merge_row"] == ["b@example.com"]
+
+    def test_no_markers_keep_batching(self, tmp_path: Any) -> None:
+        """Without markers the batch behavior is unchanged (one shared message)."""
+        param = self._make_param(self._two_row_csv(tmp_path), "Plain announcement", 5)
+
+        calls: list[dict] = []
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            calls.append(kwargs)
+            return (MagicMock(), [kwargs["bcc"]])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert len(calls) == 1  # single shared message
+        assert calls[0]["blank_merge"] is True
+
+    def test_markers_in_html_attachment_force_single(self, tmp_path: Any) -> None:
+        """Editor flow: markers only in the attached HTML file (param.message empty)."""
+        html_file = tmp_path / "test.html"
+        html_file.write_text("<p>Bonjour ${email}</p>", encoding="utf-8")
+
+        param = self._make_param(self._two_row_csv(tmp_path), "", 5)
+        param.file = [str(html_file)]
+
+        calls: list[dict] = []
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            calls.append(kwargs)
+            return (MagicMock(), [kwargs["bcc"]])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert len(calls) == 2
+        assert all(call["blank_merge"] is False for call in calls)

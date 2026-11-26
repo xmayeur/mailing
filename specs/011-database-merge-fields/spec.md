@@ -10,6 +10,7 @@
 ### Session 2026-11-26
 
 - Q: Which parts of the outgoing message get merge-field replacement? → A: All parts that exist (rich text, plain text, subject) — no part may leak a literal marker to a recipient.
+- Q: What if the batch size allows several recipients per message while markers are present? → A: For safety, the batch size is forced to 1 (one message per recipient) whenever a well-formed marker is present in the body, subject, or HTML/Markdown attachment — markers always resolve to per-recipient values.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -106,6 +107,7 @@ The user needs to know which field names are valid. The insertion UI lists the f
 - **FR-011**: The system MUST replace with an empty string any marker whose field name does not exist in the subscriber database, so that a mistake never leaks a literal marker into a sent email.
 - **FR-012**: The system MUST apply the same replacement rules to the message subject line when one is defined (including the blank rule for multi-recipient messages).
 - **FR-013**: The system MUST apply the same replacement rules to every part of the outgoing message that exists (rich text, plain text, subject), so that no part of the sent email displays a literal marker.
+- **FR-014**: The system MUST force one recipient per message (batch size 1) whenever the message content (body, subject, or HTML/Markdown attachment) contains at least one well-formed merge-field marker, so that every marker resolves to per-recipient values.
 
 ### Key Entities *(include if feature involves data)*
 
