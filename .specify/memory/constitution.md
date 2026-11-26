@@ -42,6 +42,18 @@ defaults preserving existing callers.
 
 ## Additional Constraints
 
+- **Dual documentation (mandatory for every change)**: each change MUST be
+  documented from both perspectives before it is complete:
+  - **Coding perspective (technical documentation)**: docstrings for new/changed
+    public functions and classes, and updates to the Sphinx sources under
+    `docs/*.rst` / module API references when the module surface changes.
+  - **User perspective (user guide)**: updates to `README.md` and
+    `docs/TUTORIAL.md` (or the relevant user guide) whenever behavior,
+    UI, or workflow visible to the user changes.
+- **Sphinx before PR**: the Sphinx documentation (`docs/`) MUST be updated and
+  build without errors before any PR is created (`python -m sphinx -b html
+  docs docs/_build/html`; existing warnings are tolerated, new ones are
+  regressions to fix).
 - **Language/versions**: Python 3.12–3.14, PySide6 ≥6.12; typing enforced via
   pyright strict and mypy strict (tool config in `pyproject.toml` is the source
   of truth).
@@ -59,6 +71,8 @@ defaults preserving existing callers.
 
 - Feature branches named `NNN-short-name` (spec-kit git extension); work lands
   on `beta`, merges to `master` via PR.
+- **PR gate**: all pre-commit checks pass AND the Sphinx documentation is
+  up to date (dual documentation rule above) before a PR may be opened.
 - Commits follow commitizen conventional-commit format with the Mistral Vibe
   trailer.
 - External actions with shared blast radius (push, force-push, release, publish)
@@ -72,4 +86,4 @@ Conflicts are resolved in favor of the NON-NEGOTIABLE principles; amendments
 require editing this file explicitly (with version bump) — never silently
 reinterpreted in specs or reviews.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-26 | **Last Amended**: 2026-11-26
+**Version**: 1.1.0 | **Ratified**: 2026-11-26 | **Last Amended**: 2026-11-26
