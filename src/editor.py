@@ -4301,8 +4301,14 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         for name in fields:
             action = menu.addAction(self._merge_field_marker(name))
             if action:
-                action.triggered.connect(lambda f=name: self.insert_field_marker(f))
+                action.triggered.connect(self._make_insert_slot(name))
         return menu
+
+    def _make_insert_slot(self, field_name: str) -> Any:
+        """Zero-argument slot for the triggered signal (Qt fills zero-param
+        callables with no args; a one-parameter lambda would receive the
+        ``checked`` bool instead of the field name)."""
+        return lambda: self.insert_field_marker(field_name)
 
     def _show_merge_field_selector(self) -> None:
         """Open the merge-field picker; insert the chosen marker at the cursor."""

@@ -2315,6 +2315,48 @@ class TestFieldPicker:
         slot()
         win._run_js.assert_called_once_with('insertMergeField("${ID}")')  # pyright: ignore
 
+    def test_insert_slot_is_zero_argument(self):
+        """Regression (011): the triggered signal must connect a zero-argument
+        slot — a one-parameter lambda would receive Qt's `checked: bool`,
+        crashing insert_field_marker with a str/bool TypeError."""
+        import inspect
+
+        win = self._make_window()
+        captured: list = []
+
+        action = MagicMock()
+        action.triggered.connect.side_effect = lambda slot: captured.append(slot)
+        menu = MagicMock()
+        menu.addAction.return_value = action
+
+        with patch.object(editor, "QMenu", return_value=menu):
+            win._build_merge_field_menu(["ID"])
+
+        slot = captured[0]
+        assert len(inspect.signature(slot).parameters) == 0
+        slot()  # exactly how Qt invokes it
+        win._run_js.assert_called_with('insertMergeField("${ID}")')  # pyright: ignore
+
+    def test_each_field_gets_its_own_slot(self):
+        """Slots are per-field: no late-binding mix-ups between menu items."""
+        win = self._make_window()
+        slots: list = []
+
+        action = MagicMock()
+        action.triggered.connect.side_effect = lambda slot: slots.append(slot)
+        menu = MagicMock()
+        menu.addAction.return_value = action
+
+        with patch.object(editor, "QMenu", return_value=menu):
+            win._build_merge_field_menu(["ID", "NAME"])
+
+        slots[0]()
+        slots[1]()
+        assert [c.args[0] for c in win._run_js.call_args_list] == [  # pyright: ignore
+            'insertMergeField("${ID}")',
+            'insertMergeField("${NAME}")',
+        ]
+
     def test_picker_exec_positional(self):
         """The built menu is exec'd (modal picker) when fields exist."""
         win = self._make_window()
