@@ -327,3 +327,55 @@ class TestMergeFieldHtmlAttachment:
             blank_merge=True,
         )
         assert str(msg["Subject"]) == "Your order "
+
+
+class TestMergeFieldRowAssociation:
+    """Regression (011): the batch must use the matched recipient's row, not the last row read."""
+
+    def test_filtered_row_not_last_row(self, tmp_path: Any) -> None:
+        """Filter matches the first row; substitution must use THAT row, not the
+        last row of the file (reported: ${email} resolved to the last CSV row)."""
+        from unittest.mock import Mock
+
+        csv_file = tmp_path / "subscribers.csv"
+        csv_file.write_text(
+            "id,Ville,email\n"
+            "1,Bruxelles,xavier@mayeur.be\n"
+            "2,Anvers,other1@example.com\n"
+            "3,Bruxelles,other2@example.com\n"
+            "4,Anvers,longreef1@gmail.com\n",
+            encoding="utf-8",
+        )
+
+        param = Mock()
+        param.max_addr_per_mail = 5
+        param.pause = 0
+        param.max_mails_per_hour = 1000
+        param.from_index = None
+        param.to_index = None
+        param.database = str(csv_file)
+        param.filter = {"email": "is equal to xavier@mayeur.be", "Ville": "is equal to Bruxelles"}
+        param.test = False
+        param.selected = False
+        param.donotsend = False
+        param.subject = "Hi ${id}"
+        param.message = "Hello ${email}"
+        param.file = []
+        param.profile = "test"
+
+        captured: dict = {}
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            captured.update(kwargs)
+            return (MagicMock(), ["xavier@mayeur.be"])
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm.generate_mailing(param)
+
+        assert result == "OK"
+        assert captured["merge_row"] == ["1", "Bruxelles", "xavier@mayeur.be"]
+        assert captured["merge_header"] == ["id", "Ville", "email"]
+        assert captured["blank_merge"] is False

@@ -1146,7 +1146,7 @@ def generate_mailing(param: Any) -> str:
         if param.from_index:
             current_row_idx = _skip_to_index(reader, int(param.from_index))
 
-        addressees, recipient_count, mail_batch_count = [], 0, 0
+        addressees, batch_rows, recipient_count, mail_batch_count = [], [], 0, 0
         start_time = time()
         row = None
         cancel_event = _get_cancel_event(param)
@@ -1163,19 +1163,20 @@ def generate_mailing(param: Any) -> str:
                 continue
 
             addressees.append(row[indices["email"]])
+            batch_rows.append(row)
             recipient_count += 1
             if len(addressees) >= max_add:
                 log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
                 _flush_batch(
                     param,
                     addressees,
-                    row,
+                    batch_rows[-1],
                     header,
                     pause,
                     recipient_count,
                     max_mail_per_hour,
                 )
-                addressees, mail_batch_count = [], mail_batch_count + 1
+                addressees, batch_rows, mail_batch_count = [], [], mail_batch_count + 1
                 if cancel_event is not None and cancel_event.is_set():
                     cancelled = True
                     break
@@ -1188,7 +1189,9 @@ def generate_mailing(param: Any) -> str:
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
-            _build_and_send(param, addressees, row, header)  # type: ignore
+            # 011 fix: use the last batched recipient's row — `row` here is the
+            # last row READ, which may have been filtered out entirely.
+            _build_and_send(param, addressees, batch_rows[-1], header)
             mail_batch_count += 1
 
         log.info(
