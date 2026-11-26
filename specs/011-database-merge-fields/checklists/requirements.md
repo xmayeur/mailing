@@ -32,3 +32,4 @@
 ## Notes
 
 - All items pass. The 2 clarifications (unknown-field behavior; subject-line scope) were resolved on 2026-11-26: unknown-field markers are replaced with a blank value; replacement applies to the subject line as well.
+- Implementation complete on branch `011-database-merge-fields` (2026-11-26). SC-002/SC-003/SC-004 verified by automated tests (`tests/unit/test_sendmail_core.py`, `tests/unit/test_sendmail_sending.py`, `tests/integration/test_sendmail_integration.py::TestMergeFieldBatching`); SC-005 verified by picker tests; SC-001 (insert time) is a manual UI measure for the user after a GUI smoke test.

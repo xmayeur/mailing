@@ -51,20 +51,74 @@ class TestFormatMessage:
         assert result == "Hello Alice, your email is alice@example.com"
 
     def test_missing_variable(self):
-        """Return original template if variable not in header."""
+        """Unknown fields become blank; other markers still replaced (FR-011)."""
         template = "Hello ${name}, age ${age}"
         row = ["Alice"]
         header = ["name"]
         result = sm.format_message(template, row, header)
-        assert result == template  # Original unchanged
+        assert result == "Hello Alice, age "
 
     def test_empty_row(self):
-        """Handle empty row gracefully."""
+        """Marker with no row data resolves to blank (FR-010)."""
         template = "Hello ${name}"
         row = []
         header = ["name"]
         result = sm.format_message(template, row, header)
-        assert result == template  # Original unchanged
+        assert result == "Hello "
+
+    def test_empty_value(self):
+        """Empty cell value resolves to blank (FR-010)."""
+        template = "Hello ${name}!"
+        row = [""]
+        header = ["name"]
+        result = sm.format_message(template, row, header)
+        assert result == "Hello !"
+
+    def test_none_value(self):
+        """None cell value resolves to blank (FR-010)."""
+        template = "Status: ${status}"
+        row = [None]
+        header = ["status"]
+        result = sm.format_message(template, row, header)
+        assert result == "Status: "
+
+    def test_unknown_and_known_mixed(self):
+        """Known fields still substitute when an unknown field coexists (FR-011)."""
+        template = "ID=${id}, typo=${iDd}, name=${name}"
+        row = ["42", "Alice"]
+        header = ["id", "name"]
+        result = sm.format_message(template, row, header)
+        assert result == "ID=42, typo=, name=Alice"
+
+    def test_malformed_markers_untouched(self):
+        """Malformed constructs are left as literal text (FR-009)."""
+        template = "Unclosed: ${id, dollar: 100$ total"
+        row = ["42"]
+        header = ["id"]
+        result = sm.format_message(template, row, header)
+        assert "100$" in result
+        assert "Unclosed: ${id" in result
+
+    def test_all_occurrences_replaced(self):
+        """Every occurrence of a marker is replaced (FR-008)."""
+        template = "${name} and ${name} again"
+        row = ["Alice"]
+        header = ["name"]
+        result = sm.format_message(template, row, header)
+        assert result == "Alice and Alice again"
+
+    def test_template_not_mutated(self):
+        """Template argument is left unchanged (FR-007)."""
+        template = "Hello ${name}"
+        row = ["Alice"]
+        header = ["name"]
+        sm.format_message(template, row, header)
+        assert template == "Hello ${name}"
+
+    def test_never_raises_for_data_shapes(self):
+        """No exception for mismatched row/header shapes (invariant I1)."""
+        assert sm.format_message("${a}${b}", [], ["a", "b"]) == ""
+        assert sm.format_message("${a}", [1, 2, 3], ["b"]) == ""
 
     def test_no_placeholders(self):
         """Return template unchanged if no placeholders."""
@@ -273,12 +327,12 @@ class TestEmailEngineEdgeCases:
     """Test email engine edge cases."""
 
     def test_empty_subscriber_row(self):
-        """Handle empty subscriber row."""
+        """Handle empty subscriber row: markers blank (FR-010)."""
         template = "Hello ${name}"
         row = []
         header = ["name"]
         result = sm.format_message(template, row, header)
-        assert result == template
+        assert result == "Hello "
 
     def test_special_characters_in_data(self):
         """Handle special characters in subscriber data."""

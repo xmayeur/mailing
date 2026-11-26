@@ -2207,3 +2207,125 @@ class TestEditorWindowOpenFile:
         win._bridge.css_changed = MagicMock()
         editor.EditorWindow._load_default_stylesheet(win)
         win._bridge.css_changed.emit.assert_called_once_with(str(css_file))
+
+
+# ---------------------------------------------------------------------------
+# Merge-field insertion and field picker tests (011-database-merge-fields)
+# ---------------------------------------------------------------------------
+
+
+class TestInsertFieldMarker:
+    """Verify insert_field_marker builds the marker and fires the bridge."""
+
+    def _make_window(self):
+        win = object.__new__(editor.EditorWindow)
+        win._run_js = MagicMock()
+        return win
+
+    def test_marker_syntax(self):
+        """Marker uses ${FIELDNAME} syntax."""
+        assert editor.EditorWindow._merge_field_marker("ID") == "${ID}"
+
+    def test_insert_fires_bridge_with_marker(self):
+        """insert_field_marker pushes insertMergeField() through _run_js."""
+        win = self._make_window()
+        win.insert_field_marker("ID")
+        win._run_js.assert_called_once_with('insertMergeField("${ID}")')  # pyright: ignore
+
+    def test_insert_field_with_braces_in_name(self):
+        """Special characters in field names are safely JSON-encoded."""
+        win = self._make_window()
+        win.insert_field_marker('a"b')
+        win._run_js.assert_called_once_with('insertMergeField("${a\\"b}")')  # pyright: ignore
+
+    def test_noop_without_view(self):
+        """No view (WebEngine failure fallback) — insertion is a silent no-op."""
+        win = object.__new__(editor.EditorWindow)
+        win._view = None
+        win.insert_field_marker("ID")  # Must not raise
+
+
+class TestFieldPicker:
+    """Verify the merge-field picker and get_field_names (US4)."""
+
+    def _make_window(self):
+        win = object.__new__(editor.EditorWindow)
+        win._run_js = MagicMock()
+        return win
+
+    def test_get_field_names_returns_schema(self):
+        """get_field_names returns the current database schema."""
+        win = self._make_window()
+        win._get_database_schema = MagicMock(return_value=["ID", "FIRSTNAME"])
+        assert win.get_field_names() == ["ID", "FIRSTNAME"]
+
+    def test_get_field_names_coerces_to_str(self):
+        """Header entries are coerced to str."""
+        win = self._make_window()
+        win._get_database_schema = MagicMock(return_value=["ID", 42])
+        assert win.get_field_names() == ["ID", "42"]
+
+    def test_get_field_names_unreadable_database(self):
+        """Schema failure yields an empty list instead of raising (US4-2)."""
+        win = self._make_window()
+        win._get_database_schema = MagicMock(side_effect=OSError("no db"))
+        assert win.get_field_names() == []
+
+    def test_picker_no_fields_shows_information(self):
+        """No fields available: information dialog, no insertion (US4-2)."""
+        win = self._make_window()
+        win.get_field_names = MagicMock(return_value=[])
+        with patch.object(editor, "QMessageBox") as mock_box:
+            win._show_merge_field_selector()
+        mock_box.information.assert_called_once()
+        win._run_js.assert_not_called()  # pyright: ignore
+
+    def test_picker_lists_all_fields(self):
+        """Picker contains one action per database field (SC-005)."""
+        win = self._make_window()
+        fields = ["ID", "FIRSTNAME", "LASTNAME"]
+        win.get_field_names = MagicMock(return_value=fields)
+        actions: list[tuple] = []
+
+        def _capture(text, slot=None):
+            actions.append((text, slot))
+            return MagicMock()
+
+        menu = MagicMock()
+        menu.addAction.side_effect = _capture
+        with patch.object(editor, "QMenu", return_value=menu):
+            win._build_merge_field_menu(fields)
+        assert len(actions) == len(fields)
+        assert [t for t, _ in actions] == ["${ID}", "${FIRSTNAME}", "${LASTNAME}"]
+
+    def test_picker_action_inserts_marker(self):
+        """Choosing a field inserts the corresponding marker."""
+        win = self._make_window()
+        captured: list = []
+
+        action = MagicMock()
+        action.triggered.connect.side_effect = lambda slot: captured.append(("${ID}", slot))
+        menu = MagicMock()
+        menu.addAction.return_value = action
+
+        with patch.object(editor, "QMenu", return_value=menu):
+            win._build_merge_field_menu(["ID"])
+
+        _marker, slot = captured[0]
+        slot()
+        win._run_js.assert_called_once_with('insertMergeField("${ID}")')  # pyright: ignore
+
+    def test_picker_exec_positional(self):
+        """The built menu is exec'd (modal picker) when fields exist."""
+        win = self._make_window()
+        win.cursor = MagicMock(return_value=MagicMock())
+        win.get_field_names = MagicMock(return_value=["ID"])
+        menu = MagicMock()
+        menu.addAction.return_value = MagicMock()
+        with (
+            patch.object(editor, "QMenu", return_value=menu),
+            patch.object(editor, "QCursor", MagicMock()),
+            patch.object(editor.EditorWindow, "cursor", create=True, return_value=MagicMock()),
+        ):
+            win._show_merge_field_selector()
+        menu.exec.assert_called_once()

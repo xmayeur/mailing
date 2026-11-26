@@ -646,7 +646,10 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
     """Format message by replacing ${field} placeholders with row values.
 
     Substitutes template placeholders with subscriber data. Placeholders use
-    syntax ${column_name} which maps to header column names.
+    syntax ${column_name} which maps to header column names. Markers are
+    resolved independently: a marker for an unknown header or a missing/empty
+    value is replaced by an empty string; text that is not a well-formed
+    marker is left untouched.
 
     Args:
         template: Template string with ${field_name} placeholders
@@ -654,17 +657,34 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
         header: List of column/field names (indices match row)
 
     Returns:
-        Formatted message with values substituted, or original template on error
+        Formatted message (a new string; the template is never modified)
     """
-    try:
 
-        def _replace(m: re.Match[str]) -> str:
-            key = m.group(1)
-            return str(row[header.index(key)])
+    def _replace(m: re.Match[str]) -> str:
+        key = m.group(1)
+        try:
+            value = row[header.index(key)]
+        except (ValueError, IndexError):
+            return ""
+        return "" if value is None else str(value)
 
-        return re.sub(r"\${(.*?)}", _replace, template)
-    except (ValueError, IndexError):
-        return template
+    return re.sub(r"\${(.*?)}", _replace, template)
+
+
+def format_message_blank(template: str) -> str:
+    """Replace every well-formed ${field} marker with an empty string.
+
+    Used when one message covers several recipients: no single recipient's
+    value may be chosen, so markers blank out instead. Non-marker text is
+    left untouched and the template is never modified.
+
+    Args:
+        template: Template string possibly containing ${field_name} markers
+
+    Returns:
+        New string with all markers replaced by empty strings
+    """
+    return re.sub(r"\${(.*?)}", "", template)
 
 
 def _process_file_attachments(args: Any) -> list[str]:
@@ -976,13 +996,23 @@ def build_email(
 def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: list[str]) -> bool:
     """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs.
 
+    Merge-field substitution: with a single addressee, ``${FIELD}`` markers in
+    the body and subject are replaced by the recipient's values; with several
+    addressees sharing one message, markers are replaced by an empty string so
+    no subscriber's data reaches the other recipients.
+
     :return: True if the message was sent, False if sending was skipped or failed.
     :rtype: bool
     """
-    msg_body = format_message(param.message, row, header)
     if param.donotsend:
         log.info("do not sent activated")
         return False
+    if len(addressees) <= 1:
+        msg_body = format_message(param.message, row, header)
+        subject = format_message(str(param.subject or ""), row, header)
+    else:
+        msg_body = format_message_blank(param.message)
+        subject = format_message_blank(str(param.subject or ""))
     # Combine HTML file + user-selected attachments (T016: Integrate attachments)
     # param.file is already a list (from editor.py line 1332)
     all_attachments: list[str] = list(param.file) if param.file else []
@@ -993,7 +1023,7 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
             all_attachments.append(param.attachment)
     msg, recipients = build_email(
         param=param,
-        subject=param.subject,
+        subject=subject,
         message=msg_body,
         bcc=",".join(addressees),
         attachments=all_attachments if all_attachments else None,

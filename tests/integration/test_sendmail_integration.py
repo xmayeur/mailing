@@ -155,3 +155,73 @@ class TestSendMailStateManagement:
         batches_needed = (total_to_send + rate_limit_per_second - 1) // rate_limit_per_second
 
         assert batches_needed == 20
+
+
+class TestMergeFieldBatching:
+    """_build_and_send merge-field semantics: 1 addressee → values, ≥2 → blank (011)."""
+
+    def _make_param(self) -> Any:
+        """Full param mock as used by _build_and_send."""
+        from unittest.mock import Mock
+
+        param = Mock()
+        param.donotsend = False
+        param.verbose = False
+        param.subject = "Order ${id}"
+        param.message = "Hello ${name}, hello ${typo}"
+        param.file = []
+        param.attachment = None
+        param.smtp_host = "smtp.test.com"
+        return param
+
+    def _capture_build_email(self, param: Any, addressees: list[str], row: list[str], header: list[str]) -> dict:
+        """Run _build_and_send with a mocked build_email; return its kwargs."""
+        captured: dict = {}
+
+        def _fake_build_email(param: Any, subject: str, message: str, **kwargs: Any) -> tuple:
+            captured["subject"] = subject
+            captured["message"] = message
+            return (MagicMock(), list(addressees))
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            sm._build_and_send(param, addressees, row, header)
+        return captured
+
+    def test_single_recipient_body_and_subject_substituted(self) -> None:
+        """One addressee: body and subject use that recipient's values (US2, FR-005/FR-012)."""
+        param = self._make_param()
+        captured = self._capture_build_email(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
+        assert captured["message"] == "Hello Alice, hello "
+        assert captured["subject"] == "Order 42"
+
+    def test_multiple_recipients_blank(self) -> None:
+        """Two addressees: every marker blank, no row value leaks (US3, FR-006, I4)."""
+        param = self._make_param()
+        captured = self._capture_build_email(param, ["a@b.com", "c@d.com"], ["42", "Alice"], ["id", "name"])
+        assert captured["message"] == "Hello , hello "
+        assert captured["subject"] == "Order "
+        assert "Alice" not in captured["message"]
+        assert "42" not in captured["message"]
+
+    def test_stored_param_not_mutated(self) -> None:
+        """param.message / param.subject keep their markers after a send (FR-007, SC-004)."""
+        param = self._make_param()
+        self._capture_build_email(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
+        assert param.message == "Hello ${name}, hello ${typo}"
+        assert param.subject == "Order ${id}"
+
+    def test_donotsend_skips_build(self) -> None:
+        """donotsend still short-circuits before any substitution."""
+
+        param = self._make_param()
+        param.donotsend = True
+        with (
+            patch("sendMail.build_email") as mock_build,
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            result = sm._build_and_send(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
+        assert result is False
+        mock_build.assert_not_called()
