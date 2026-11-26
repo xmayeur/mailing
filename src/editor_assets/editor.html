@@ -578,6 +578,21 @@
       var _PASTE_SAFE_ATTRS = ['colspan', 'rowspan', 'width', 'height',
                                'align', 'valign', 'style'];
 
+      // Attribute iteration remains forbidden: only _PASTE_SAFE_ATTRS is
+      // ever copied. Images additionally restore their source because the
+      // clipboard converter re-embeds it, and _copyAttributes wipes then
+      // rebuilds the target's attributes (CodeQL alert #18: fixed name,
+      // scheme-allowlisted value, no attribute iteration).
+      function _safeImageSrc(value) {
+        var src = String(value || '').trim();
+        if (!src) return null;
+        var lower = src.toLowerCase();
+        if (lower.indexOf('data:image/') === 0) return src;      // open-file path inlines images
+        if (lower.indexOf('http://') === 0 || lower.indexOf('https://') === 0) return src;
+        if (lower.indexOf(':') === -1) return src;               // scheme-less relative path
+        return null;                                             // javascript:, vbscript:, other data: …
+      }
+
       function _copyAttributes(sourceNode, targetNode) {
         Array.from(targetNode.attributes).forEach(function(attr) {
           targetNode.removeAttribute(attr.name);
@@ -586,6 +601,12 @@
           var value = sourceNode.getAttribute(name);
           if (value !== null) targetNode.setAttribute(name, value);
         });
+        if (sourceNode.tagName === 'IMG') {
+          var src = _safeImageSrc(sourceNode.getAttribute('src'));
+          if (src !== null) targetNode.setAttribute('src', src);
+          var alt = sourceNode.getAttribute('alt');
+          if (alt !== null) targetNode.setAttribute('alt', alt);
+        }
       }
 
       function _restoreImportedState(sourceBody) {

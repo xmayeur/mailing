@@ -200,3 +200,28 @@ def test_paste_attribute_allowlist_is_locked() -> None:
         "_copyAttributes must copy attributes through the _PASTE_SAFE_ATTRS "
         "allowlist loop, not by iterating source attributes directly"
     )
+
+
+def test_image_src_restore_is_fixed_name_and_sanitized() -> None:
+    """The image restore path pins src/alt by name and scheme-checks the src.
+
+    Images lost their source when restore was reduced to presentation-only
+    attributes (the size-restore paths wipe and rebuild the target's
+    attributes), so _copyAttributes re-adds src by fixed name through
+    _safeImageSrc. This pin holds the same review invariant as the
+    allowlist lock above: fixed attribute names only, no
+    attribute iteration, and no script-executable scheme in the value.
+    """
+    html = _editor_html()
+    assert _PASTE_SAFE_ATTRS_DECLARATION.search(html), "editor.html no longer declares _PASTE_SAFE_ATTRS"
+
+    assert "function _safeImageSrc" in html, "editor.html must scheme-check restored image sources"
+    assert (
+        "_safeImageSrc(sourceNode.getAttribute('src'))" in html
+    ), "the img src restore must go through the _safeImageSrc sanitizer, not copy raw clipboard values"
+    assert (
+        "targetNode.setAttribute('src', src)" in html
+    ), "the img src restore must use a fixed attribute name, not iterate source attributes"
+    assert (
+        "targetNode.setAttribute('alt', alt)" in html
+    ), "the img alt restore must use a fixed attribute name, not iterate source attributes"
