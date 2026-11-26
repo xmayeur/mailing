@@ -522,9 +522,8 @@ class TestBatchModeInBuildAndSend:
         param.smtp_host = "smtp.test.com"
         captured: dict = {}
 
-        def _fake_build_email(param: Any, subject: str, message: str, **kwargs: Any) -> tuple:
-            captured["subject"] = subject
-            captured["message"] = message
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            captured.update(kwargs)
             return (MagicMock(), list(addressees))
 
         with (
@@ -535,13 +534,16 @@ class TestBatchModeInBuildAndSend:
         return captured
 
     def test_one_addressee_uses_row_values(self) -> None:
-        """1 addressee → per-recipient substitution (I3 guard, no flow change)."""
+        """1 addressee → per-recipient merge context (I3 guard, no flow change)."""
         result = self._run(["a@b.com"])
-        assert result["message"] == "M Alice"
-        assert result["subject"] == "S 42"
+        assert result["merge_row"] == ["42", "Alice"]
+        assert result["merge_header"] == ["id", "name"]
+        assert result["blank_merge"] is False
 
     def test_two_addressees_blank_values(self) -> None:
-        """2 addressees → blanks, row values must not leak (I4)."""
+        """2 addressees → blank mode, row values must not reach build_email (I4)."""
         result = self._run(["a@b.com", "c@d.com"])
-        assert result["message"] == "M "
-        assert result["subject"] == "S "
+        assert result["blank_merge"] is True
+        assert result["merge_row"] is None
+        assert result["merge_header"] is None
+        assert "Alice" not in str(result.get("message", ""))

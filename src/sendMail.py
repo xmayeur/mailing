@@ -946,7 +946,10 @@ def build_email(
     bcc: str | None = None,
     message: str = "",
     images: str | list[str] | None = None,
-    attachments: str | list[str] | None = None,
+    attachments: list[str] | str | None = None,
+    merge_row: list[Any] | None = None,
+    merge_header: list[str] | None = None,
+    blank_merge: bool = False,
 ) -> tuple[MIMEMultipart, list[str]]:
     """Build MIME email message with attachments and inline images.
 
@@ -963,10 +966,22 @@ def build_email(
         message: HTML or text email body
         images: File path(s) of inline images (str or list)
         attachments: File path(s) of attachments (str or list)
+        merge_row: Subscriber row for merge-field substitution (single-recipient
+            batches); None to skip substitution
+        merge_header: Header names matching merge_row (same order)
+        blank_merge: Replace all merge-field markers with empty strings
+            (multi-recipient batches) instead of using merge_row/merge_header
 
     Returns:
         Tuple of (MIME message object, list of recipient addresses)
     """
+    # Merge-field substitution on the subject (011-database-merge-fields):
+    # per-recipient values for single-recipient batches, blank otherwise.
+    if blank_merge:
+        subject = format_message_blank(subject)
+    elif merge_row is not None and merge_header is not None:
+        subject = format_message(subject, merge_row, merge_header)
+
     msg = MIMEMultipart("mixed")
     to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)  # type: ignore
 
@@ -985,6 +1000,14 @@ def build_email(
         else:
             _process_binary_attachment(att, msg)
 
+    # Merge-field substitution on the final body content (011): must run here,
+    # after an HTML/Markdown attachment has supplied the actual body, otherwise
+    # markers composed in the editor (sent as an HTML file) are never replaced.
+    if blank_merge:
+        message = format_message_blank(message)
+    elif merge_row is not None and merge_header is not None:
+        message = format_message(message, merge_row, merge_header)
+
     _attach_body(msg, msg_related, message, all_inline_images)
 
     recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
@@ -996,10 +1019,11 @@ def build_email(
 def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: list[str]) -> bool:
     """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs.
 
-    Merge-field substitution: with a single addressee, ``${FIELD}`` markers in
-    the body and subject are replaced by the recipient's values; with several
-    addressees sharing one message, markers are replaced by an empty string so
-    no subscriber's data reaches the other recipients.
+    Merge-field substitution happens inside :func:`build_email` (on the final
+    body and subject): with a single addressee, ``${FIELD}`` markers are
+    replaced by the recipient's values; with several addressees sharing one
+    message, markers are blanked so no subscriber's data reaches the other
+    recipients.
 
     :return: True if the message was sent, False if sending was skipped or failed.
     :rtype: bool
@@ -1007,12 +1031,7 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
     if param.donotsend:
         log.info("do not sent activated")
         return False
-    if len(addressees) <= 1:
-        msg_body = format_message(param.message, row, header)
-        subject = format_message(str(param.subject or ""), row, header)
-    else:
-        msg_body = format_message_blank(param.message)
-        subject = format_message_blank(str(param.subject or ""))
+    blank_merge = len(addressees) > 1
     # Combine HTML file + user-selected attachments (T016: Integrate attachments)
     # param.file is already a list (from editor.py line 1332)
     all_attachments: list[str] = list(param.file) if param.file else []
@@ -1023,10 +1042,13 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
             all_attachments.append(param.attachment)
     msg, recipients = build_email(
         param=param,
-        subject=subject,
-        message=msg_body,
+        subject=str(param.subject or ""),
+        message=param.message or "",
         bcc=",".join(addressees),
         attachments=all_attachments if all_attachments else None,
+        merge_row=None if blank_merge else row,
+        merge_header=None if blank_merge else header,
+        blank_merge=blank_merge,
     )
     try:
         if hasattr(param, "smtp_host"):

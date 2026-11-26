@@ -1574,15 +1574,29 @@ def test_generate_mailing_batching_and_filtering():
             # (1 addressee → per-recipient). 011 feature.
             with (
                 patch("sendMail.send_mail", return_value=True),
-                patch("sendMail.build_email", return_value=(MagicMock(), MagicMock())),
-                patch("sendMail.format_message") as mock_sm,
-                patch("sendMail.format_message_blank") as mock_blank_sub,
+                patch(
+                    "sendMail.build_email",
+                    return_value=(MagicMock(), MagicMock()),
+                ) as mock_build_email,
             ):
                 sendMail.generate_mailing(param)
-                # 1-addressee batch: format called for body + subject
-                assert mock_sm.call_count == 2
-                # 2-addressee batch: blank mode for body + subject
-                assert mock_blank_sub.call_count == 2
+                # Two batches: 2-addressee (blank_merge=True) and 1-addressee
+                # (merge_row passed, FR-005/FR-006/FR-012). 011 feature.
+                assert mock_build_email.call_count == 2
+                blank_kwargs = mock_build_email.call_args_list[0].kwargs
+                per_recipient_kwargs = mock_build_email.call_args_list[1].kwargs
+                assert blank_kwargs["blank_merge"] is True
+                assert blank_kwargs["merge_row"] is None
+                assert per_recipient_kwargs["blank_merge"] is False
+                assert per_recipient_kwargs["merge_row"] == [
+                    "active",
+                    "White",
+                    "Alice",
+                    "4@ex.com",
+                    "",
+                    "Test",
+                    "",
+                ]
 
 
 def test_process_artscroises_wait_and_cleanup():

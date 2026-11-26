@@ -158,7 +158,7 @@ class TestSendMailStateManagement:
 
 
 class TestMergeFieldBatching:
-    """_build_and_send merge-field semantics: 1 addressee → values, ≥2 → blank (011)."""
+    """_build_and_send merge-field semantics: 1 addressee -> values, >=2 -> blank (011)."""
 
     def _make_param(self) -> Any:
         """Full param mock as used by _build_and_send."""
@@ -178,9 +178,8 @@ class TestMergeFieldBatching:
         """Run _build_and_send with a mocked build_email; return its kwargs."""
         captured: dict = {}
 
-        def _fake_build_email(param: Any, subject: str, message: str, **kwargs: Any) -> tuple:
-            captured["subject"] = subject
-            captured["message"] = message
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            captured.update(kwargs)
             return (MagicMock(), list(addressees))
 
         with (
@@ -190,21 +189,22 @@ class TestMergeFieldBatching:
             sm._build_and_send(param, addressees, row, header)
         return captured
 
-    def test_single_recipient_body_and_subject_substituted(self) -> None:
-        """One addressee: body and subject use that recipient's values (US2, FR-005/FR-012)."""
+    def test_single_recipient_passes_merge_context(self) -> None:
+        """One addressee: build_email receives the recipient's row (US2, FR-005/FR-012)."""
         param = self._make_param()
         captured = self._capture_build_email(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
-        assert captured["message"] == "Hello Alice, hello "
-        assert captured["subject"] == "Order 42"
+        assert captured["merge_row"] == ["42", "Alice"]
+        assert captured["merge_header"] == ["id", "name"]
+        assert captured["blank_merge"] is False
+        assert captured["subject"] == "Order ${id}"
 
-    def test_multiple_recipients_blank(self) -> None:
-        """Two addressees: every marker blank, no row value leaks (US3, FR-006, I4)."""
+    def test_multiple_recipients_blank_merge(self) -> None:
+        """Two addressees: blank_merge=True and no merge_row (US3, FR-006, I4)."""
         param = self._make_param()
         captured = self._capture_build_email(param, ["a@b.com", "c@d.com"], ["42", "Alice"], ["id", "name"])
-        assert captured["message"] == "Hello , hello "
-        assert captured["subject"] == "Order "
-        assert "Alice" not in captured["message"]
-        assert "42" not in captured["message"]
+        assert captured["blank_merge"] is True
+        assert captured["merge_row"] is None
+        assert captured["merge_header"] is None
 
     def test_stored_param_not_mutated(self) -> None:
         """param.message / param.subject keep their markers after a send (FR-007, SC-004)."""
@@ -225,3 +225,105 @@ class TestMergeFieldBatching:
             result = sm._build_and_send(param, ["a@b.com"], ["42", "Alice"], ["id", "name"])
         assert result is False
         mock_build.assert_not_called()
+
+
+class TestMergeFieldHtmlAttachment:
+    """Real build_email with the editor's HTML file as attachment (reported bug)."""
+
+    def _make_param(self) -> Any:
+        from unittest.mock import Mock
+
+        param = Mock()
+        param.sendername = "Sender"
+        param.sender = "sender@example.com"
+        param.max_addr_per_mail = 1
+        param.styles = None
+        return param
+
+    def _html_file(self, tmp_path: Any, body: str) -> str:
+        html_file = tmp_path / "test.html"
+        html_file.write_text(f"<!DOCTYPE html><html><body><p>{body}</p></body></html>", encoding="utf-8")
+        return str(html_file)
+
+    def _payload(self, msg: Any) -> str:
+        """Extract the decoded body text from the MIME tree (mixed → related → text)."""
+        part = msg
+        while part.is_multipart():
+            part = part.get_payload(0)
+        decoded = part.get_payload(decode=True)
+        charset = part.get_content_charset() or "utf-8"
+        return decoded.decode(charset) if decoded is not None else str(part.get_payload())
+
+    def test_html_attachment_substituted_single_recipient(self, tmp_path: Any) -> None:
+        """Markers in an HTML attachment are replaced by the recipient's values."""
+        param = self._make_param()
+        html_file = self._html_file(tmp_path, "Bonjour cher ${Prénom} ${Nom} — ${email}")
+        msg, recipients = sm.build_email(
+            param=param,
+            subject="Order ${id}",
+            message="",
+            bcc="a@b.com",
+            attachments=[html_file],
+            merge_row=["42", "Alice", "a@b.com"],
+            merge_header=["id", "Prénom", "email"],
+            blank_merge=False,
+        )
+        body = self._payload(msg)
+        assert "Bonjour cher Alice  — a@b.com" in body
+        assert "${" not in body
+        # Pre-existing quirk (out of scope here): with max_addr_per_mail == 1 the
+        # headers swap leaves bcc=None and the recipient list gains a "None" entry.
+        assert recipients[0] == "a@b.com"
+
+    def test_html_attachment_blank_multi_recipient(self, tmp_path: Any) -> None:
+        """Multi-recipient batch: HTML attachment markers blanked (I4)."""
+        param = self._make_param()
+        param.max_addr_per_mail = 2
+        html_file = self._html_file(tmp_path, "Bonjour cher ${Prénom} — ${email}")
+        msg, recipients = sm.build_email(
+            param=param,
+            subject="Order ${id}",
+            message="",
+            bcc="a@b.com,c@d.com",
+            attachments=[html_file],
+            merge_row=None,
+            merge_header=None,
+            blank_merge=True,
+        )
+        body = self._payload(msg)
+        assert "Bonjour cher  — " in body
+        assert "${" not in body
+        assert "Alice" not in body
+        assert len(recipients) == 2
+
+    def test_subject_substituted_single_recipient(self, tmp_path: Any) -> None:
+        """Subject markers replaced for a single recipient (FR-012)."""
+        param = self._make_param()
+        html_file = self._html_file(tmp_path, "Body ${name}")
+        msg, _recipients = sm.build_email(
+            param=param,
+            subject="Your order ${id}",
+            message="Body",
+            bcc="a@b.com",
+            attachments=[html_file],
+            merge_row=["42", "Alice"],
+            merge_header=["id", "name"],
+            blank_merge=False,
+        )
+        assert str(msg["Subject"]) == "Your order 42"
+
+    def test_subject_blank_multi_recipient(self, tmp_path: Any) -> None:
+        """Subject markers blanked for a multi-recipient message (FR-006)."""
+        param = self._make_param()
+        html_file = self._html_file(tmp_path, "Body")
+        msg, _recipients = sm.build_email(
+            param=param,
+            subject="Your order ${id}",
+            message="Body",
+            bcc="a@b.com,c@d.com",
+            attachments=[html_file],
+            merge_row=None,
+            merge_header=None,
+            blank_merge=True,
+        )
+        assert str(msg["Subject"]) == "Your order "
