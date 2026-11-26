@@ -1,3 +1,33 @@
+## v1.15.0 (2026-11-26)
+
+### Feat
+
+- **editor**: database merge fields with per-recipient substitution
+- **editor**: drag-resize table rows and columns via cell edges
+
+### Fix
+
+- **send**: drop literal 'None' recipient entry; docs: clean sphinx duplicate warnings
+- **send**: use the batched recipient's row for merge-field substitution
+- **send**: substitute merge fields in HTML/MD attachment bodies and subject
+- **editor**: merge-field picker slot must ignore Qt's checked flag
+- **editor**: skip <img> without src when inlining images
+- **editor**: restore image src through the paste-attribute allowlist
+- **ci**: re-sync poetry.lock content-hash after commitizen bump
+- **scripts**: remediate shellcheck findings, behavior-preserving
+- **editor**: copy only allowlisted attributes from pasted markup
+- **editor**: snapshot DOM before paste insert so size restore runs
+- **editor**: preserve cell and image sizes on copy/paste
+- **ci**: restrict release builds to trusted master revisions
+
+### Refactor
+
+- **filter-builder**: remove YAML editor and enhance visual editor
+- **filter-builder**: remove YAML editor and enhance visual editor
+- **filter-builder**: remove YAML editor and enhance visual editor
+- **filter-builder**: remove YAML editor and enhance visual editor
+- **filter-builder**: remove YAML editor and enhance visual editor
+
 ## v1.14.2 (2026-10-25)
 
 ### Fix
