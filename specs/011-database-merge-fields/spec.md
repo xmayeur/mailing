@@ -88,6 +88,7 @@ The user needs to know which field names are valid. The insertion UI lists the f
 - What happens when a marker is only partially typed or malformed (e.g., `${` alone, `${ID` without closing brace)? → It is left as literal text; only well-formed markers are processed.
 - What happens when the same marker appears multiple times? → Each occurrence is replaced.
 - What happens when a marker is inside text the user intended literally? → In this version every well-formed marker is processed (documented limitation); the user avoids the syntax for literal text.
+- What happens when a marker appears inside an HTML attribute (e.g. `<a href="${email}">`)? → It is replaced like any other occurrence (the raw content is processed as text); this is intended and enables personalized links.
 - What happens when a subscriber's field value contains characters with special meaning in email content (e.g., HTML markup in a CSV cell)? → The value is inserted exactly as stored in the database, without transformation.
 
 ## Requirements *(mandatory)*

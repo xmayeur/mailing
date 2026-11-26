@@ -33,9 +33,14 @@ def format_message_blank(template: str) -> str:
     """
 ```
 
-Call sites (contract):
-- `_build_and_send` computes `mode = per-recipient if len(addressees) == 1 else blank` and must apply the same mode to **body and subject** passed to `build_email`.
-- No recipient field value may reach `build_email` when |addressees| ≥ 2 (invariant I4, testable).
+Call sites (contract, revised after R8):
+- `build_email` accepts `merge_row`/`merge_header` (per-recipient mode) and
+  `blank_merge: bool` (multi-recipient mode) and applies the substitution to
+  the **final** body content — including bodies supplied by HTML/Markdown
+  attachments — and to the subject, before header assembly/body attachment.
+- `_build_and_send` selects the mode from the batch size
+  (`blank_merge = len(addressees) > 1`, `merge_row=None` when blank) and must
+  never pass row values when |addressees| ≥ 2 (invariant I4, testable).
 
 ## C3: Editor insertion — Python↔JS contract
 

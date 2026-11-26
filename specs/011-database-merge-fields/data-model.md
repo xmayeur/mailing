@@ -33,7 +33,7 @@ Relationships: a profile references exactly one subscriber database; a MergeFiel
 |-----------|------|------|
 | Addressees | list[str] | Email addresses in the current message; built by `send_campaign` up to `param.max_addr_per_mail` |
 | Row | list[Any] | Last row of the batch; used for substitution when |Addressees| == 1 |
-| Mode | enum | `per-recipient` (|Addressees| == 1) / `blank` (|Addressees| ≥ 2) — **new** |
+| Mode | enum | `per-recipient` (|Addressees| == 1) / `blank` (|Addressees| ≥ 2) — **new**; passed to `build_email` as `merge_row`/`merge_header` or `blank_merge=True` (see research.md R8) |
 
 State transitions: none (ephemeral per batch).
 

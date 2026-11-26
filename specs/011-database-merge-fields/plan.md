@@ -7,6 +7,8 @@
 
 Insert database merge fields (`${FIELDNAME}`) into the mailing content from the editor and substitute personal values when the mailing goes to one recipient at a time, blank values when one message covers several recipients. The send pipeline already contains a `${field}` substitution engine (`sendMail.format_message`) applied per batch in `send_campaign`; the plan reuses and hardens it (per-marker unknown-field blanking, blank value for multi-recipient batches, subject-line replacement) and adds the editor UX: a field picker populated from the existing database schema cache, inserting the marker at the Quill.js cursor through the existing Python↔JS bridge.
 
+*Post-plan revision (research.md R8): substitution runs inside `build_email` on the final body and subject — the editor sends its page as an HTML attachment whose raw content previously bypassed substitution.*
+
 ## Technical Context
 
 **Language/Version**: Python 3.12–3.14 (`requires-python = ">=3.12, <3.15"`)

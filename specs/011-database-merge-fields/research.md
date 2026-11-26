@@ -19,10 +19,10 @@
 
 **Decision**: Determine replacement mode from the batch size at `_build_and_send` time: 1 addressee → normal per-row substitution; ≥2 addressees → substitute empty string for every well-formed marker (body *and* subject). No change for malformed text (Regex only matches well-formed `${…}`).
 
-**Rationale**: This is exactly where the system decides "one message, N recipients" (`addressees` list length, filled up to `param.max_addr_per_mail` in `send_campaign` at `src/sendMail.py:1076-1123`). It preserves the dominant one-recipient-at-a-time flow (`max_addr_per_mail == 1`) and implements the blank rule with a one-branch condition instead of a redesign.
+**Rationale**: This is exactly where the system decides "one message, N recipients" (`addressees` list length, filled up to `param.max_addr_per_mail` in `send_campaign` at `src/sendMail.py:1076-1123`). It preserves the dominant one-recipient-at-a-time flow (`max_addr_per_mail == 1`) and implements the blank rule with a one-branch condition instead of a redesign. *Revised during implementation (see R8): the mode is passed to `build_email` as `merge_row`/`merge_header` (single) or `blank_merge=True` (multi); the actual substitution runs there.*
 
 **Alternatives considered**:
-- Pass a per-recipient flag deeper into `build_email` — rejected: same result, more plumbing.
+- Pass a per-recipient flag deeper into `build_email` — initially rejected, but adopted in R8 after the HTML-attachment bug showed the substitution must live inside `build_email`.
 - Post-send MIME rewriting — rejected: replace before message assembly (flag order/charset concerns disappear).
 
 ## R3: Unknown-field and empty-value handling
@@ -62,3 +62,29 @@
 **Rationale**: Follows the repo's established layout (`tests/unit`, `tests/integration`; note spec `010-non-python-tests` covers non-Python tests separately). pytest stack already configured in `pyproject.toml`.
 
 **Alternatives considered**: behave BDD scenarios only — insufficient granularity for the substitution edge cases.
+
+## R8 (post-plan): Substitution point moved into build_email
+
+**Decision**: Merge-field substitution runs inside `build_email` (driven by new
+`merge_row`/`merge_header`/`blank_merge` parameters), on the **final** body
+content and subject — not pre-substituted in `_build_and_send`.
+
+**Rationale**: The editor sends its composed page as an HTML/Markdown
+attachment with an empty `param.message`. `build_email`'s attachment loop
+(`_process_html_attachment`) replaces the message with the raw file content
+only after `_build_and_send` had already (pre-)substituted — markers composed
+in the editor were therefore never replaced (reported live: `test.html`
+arrived with literal `${Prénom}` etc.). Substituting after the attachment
+processing covers both body sources uniformly.
+
+**Alternatives considered**:
+- Pre-loading the HTML file into `param.message` in `_build_and_send` —
+  rejected: `build_email` would overwrite the message with the raw file
+  content again (same bug).
+- Post-send MIME rewriting — rejected: charset/encoding complications.
+
+**Related fix**: `generate_mailing` now tracks rows per batch and passes
+`batch_rows[-1]` (the last batched recipient's row) instead of the last row
+*read* — previously, filtered-out trailing rows made the final partial batch
+substitute with a foreign row (reported: `${email}` resolved to the last CSV
+line's value).
