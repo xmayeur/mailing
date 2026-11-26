@@ -9,6 +9,7 @@ Welcome to the sendMail Editor tutorial. This guide covers how to use the standa
 - [Creating a New Newsletter](#creating-a-new-newsletter)
 - [Opening Existing Documents](#opening-existing-documents)
 - [Editing Content](#editing-content)
+- [Personalizing with Database Merge Fields](#personalizing-with-database-merge-fields)
 - [Working with Filters](#working-with-filters)
 - [Managing Profiles](#managing-profiles)
 - [Saving Your Work](#saving-your-work)
@@ -117,6 +118,51 @@ Use the Quill editor toolbar to format text:
 ### HTML Preview
 
 The editor shows a live preview of the generated HTML. This helps you see how the newsletter will look when sent.
+
+## Personalizing with Database Merge Fields
+
+You can personalize each newsletter with data from your subscriber database
+using **merge fields**. A merge field is a marker of the form `${FIELD}` where
+`FIELD` is a column of your database (e.g. `${Prénom}`, `${email}`).
+
+### Inserting a Merge Field
+
+1. Select a profile whose subscriber database is set (CSV, Excel, or Google Sheets)
+2. Click the **Insert field** button in the toolbar
+3. Pick a field from the list — the marker (e.g. `${Prénom}`) is inserted at
+   the cursor as plain text
+
+Markers behave like normal text: you can edit, copy, delete, or undo them.
+To insert one manually, just type it — the syntax is `${` + the exact field
+name + `}`.
+
+### How Markers Are Replaced at Send Time
+
+- When the mailing is sent **one recipient at a time** (the normal flow), each
+  marker is replaced by that recipient's value for the field. An empty value
+  becomes an empty string; an unknown field name also becomes blank
+- Replacement applies to the message **subject line** as well as the body
+- The stored document always keeps its markers — replacement happens only in
+  the outgoing email
+- **Safety**: if any marker is present in the message, the mailing is forced
+  to **one recipient per message** (your *Max addr/mail* setting is ignored),
+  so every marker always resolves to per-recipient values
+
+### Example
+
+Message content:
+
+```text
+Bonjour cher ${Prénom} ${Nom de famille},
+ton e-mail est : ${email}
+```
+
+Sent to Alice (alice@example.com), the recipient receives:
+
+```text
+Bonjour cher Alice Dupont,
+ton e-mail est : alice@example.com
+```
 
 ## Working with Filters
 
@@ -403,6 +449,16 @@ python src/sendMail.py --profile newsletter \
 - Operators requiring a value must have one (e.g. *is equal to*)
 - For `filter`/`filter_test` keys edited in config.yml, check YAML syntax
   (proper indentation with spaces, not tabs)
+
+### Merge Fields Not Replaced
+
+- Markers use the exact database column name: `${email}` works only if your
+  database has an `email` column (check spelling and case)
+- Unknown field names are replaced by a blank value, so a typo shows up as a
+  missing value in the sent email rather than an error
+- Markers are replaced only at send time — the editor always shows the marker
+- The **Insert field** picker lists the current profile's database fields;
+  use it to avoid typos
 
 ### Images Not Embedding
 
