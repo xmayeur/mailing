@@ -123,7 +123,7 @@ from PySide6.QtCore import (  # noqa: E402
     Signal,
     Slot,
 )
-from PySide6.QtGui import QIcon, QPixmap  # noqa: E402
+from PySide6.QtGui import QCursor, QIcon, QPixmap  # noqa: E402
 from PySide6.QtWebChannel import QWebChannel  # noqa: E402
 from PySide6.QtWebEngineCore import QWebEnginePage  # noqa: E402
 from PySide6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
@@ -3831,6 +3831,14 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
             send_action.setToolTip("Save and send the edited file")
             send_action.triggered.connect(self._menu_send)
 
+        # Database merge-field picker (011-database-merge-fields)
+        self._merge_field_action: Any = toolbar.addAction(
+            style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView), "Insert field"
+        )
+        if self._merge_field_action:
+            self._merge_field_action.setToolTip("Insert a database merge field (${FIELD}) at the cursor")
+            self._merge_field_action.triggered.connect(self._show_merge_field_selector)
+
     # ------------------------------------------------------------------
     # Profile selection and session management (new for 005-editor-profile-clipboard)
     # ------------------------------------------------------------------
@@ -4193,6 +4201,127 @@ class EditorWindow(QMainWindow):  # pragma: no cover  # type: ignore[misc]
         page = self._view.page()
         if page:
             page.runJavaScript(script)
+
+    # ------------------------------------------------------------------
+    # Database merge fields (011-database-merge-fields)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _merge_field_marker(field_name: str) -> str:
+        """Build the merge-field marker text for a database field name."""
+        return "${" + field_name + "}"
+
+    def insert_field_marker(self, field_name: str) -> None:
+        """Insert a merge-field marker at the current Quill cursor position.
+
+        The marker (e.g. ``${ID}``) is plain text in the editor: it can be
+        edited, copied, deleted and undone like any other text. Silent no-op
+        when the WebEngine view is unavailable (fallback editor mode).
+        """
+        self._run_js(f"insertMergeField({json.dumps(self._merge_field_marker(field_name))})")
+
+    def get_field_names(self) -> list[str]:
+        """Return field names of the current profile's subscriber database.
+
+        Uses the same schema pipeline as filter validation (schema cache,
+        refreshed on profile/database change). Returns an empty list when the
+        database is unreadable or not configured.
+        """
+        try:
+            fields = self._get_database_schema()
+        except Exception:
+            log.exception("Could not load database schema for merge fields")
+            return []
+        return [str(field) for field in fields]
+
+    def _get_schema_cache(self) -> Any:
+        """Get or create the schema cache provider (merge-field picker)."""
+        if getattr(self, "_merge_schema_cache", None) is None:
+            from schema_cache import SchemaCacheProvider
+
+            self._merge_schema_cache = SchemaCacheProvider()
+        return self._merge_schema_cache
+
+    def _load_gsheet_field_names(self, sa_val: Any, sheet_id_val: Any) -> list[str]:
+        """Load Google Sheets field names via API (merge-field picker helper)."""
+        try:
+            from sendMail import get_google_sheets_schema
+
+            result = get_google_sheets_schema(str(sa_val), str(sheet_id_val))
+            return list(result) if isinstance(result, list) else []
+        except Exception:
+            log.exception("Could not load Google Sheets schema for merge fields")
+            return []
+
+    def _load_csv_field_names(self, db_path: str) -> list[str]:
+        """Load CSV/Excel field names from file (merge-field picker helper)."""
+        try:
+            from schema_provider import DatabaseSchemaProvider
+
+            return list(DatabaseSchemaProvider.detect_and_extract(db_path))
+        except Exception as e:
+            log.debug("Could not extract database schema: %s", e)
+            return []
+
+    def _get_database_schema(self) -> list[str]:
+        """Get subscriber database field names for the current profile.
+
+        Mirrors the send dialog's schema resolution: a profile with a
+        ``database`` file uses CSV/Excel extraction; a profile with
+        ``SHEETID``/``SA`` falls back to Google Sheets. Results are served
+        through the shared schema cache.
+        """
+        profile_name = self._current_profile or "default"
+        profile_cfg = self._config_data.get(profile_name, {})
+        db_path = str(profile_cfg.get("database", "") or "").strip()
+        sheet_id_val = profile_cfg.get("SHEETID") or profile_cfg.get("sheetid")
+        sa_val = profile_cfg.get("SA") or profile_cfg.get("sa")
+        cache = self._get_schema_cache()
+
+        if not db_path and sheet_id_val and sa_val:
+            return cast(
+                list[str],
+                cache.get(
+                    f"{profile_name}_gsheet",
+                    lambda: self._load_gsheet_field_names(sa_val, sheet_id_val),
+                ),
+            )
+
+        if not db_path:
+            return []
+
+        return cast(
+            list[str],
+            cache.get(f"{profile_name}_csv_{db_path}", lambda: self._load_csv_field_names(db_path)),
+        )
+
+    def _build_merge_field_menu(self, fields: list[str]) -> Any:
+        """Build the merge-field picker menu (one action per database field)."""
+        menu = QMenu("Insert field", self)
+        for name in fields:
+            action = menu.addAction(self._merge_field_marker(name))
+            if action:
+                action.triggered.connect(self._make_insert_slot(name))
+        return menu
+
+    def _make_insert_slot(self, field_name: str) -> Any:
+        """Zero-argument slot for the triggered signal (Qt fills zero-param
+        callables with no args; a one-parameter lambda would receive the
+        ``checked`` bool instead of the field name)."""
+        return lambda: self.insert_field_marker(field_name)
+
+    def _show_merge_field_selector(self) -> None:
+        """Open the merge-field picker; insert the chosen marker at the cursor."""
+        fields = self.get_field_names()
+        if not fields:
+            QMessageBox.information(
+                self,
+                "Insert field",
+                "No database fields available for the current profile.\n" "Check the subscriber database setting.",
+            )
+            return
+        menu = self._build_merge_field_menu(fields)
+        menu.exec(QCursor.pos())
 
     # ------------------------------------------------------------------
     # Dirty / title management

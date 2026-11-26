@@ -132,6 +132,44 @@ class TestMessageFormatting:
         assert isinstance(result, str)
 
 
+class TestBlankMode:
+    """Test format_message_blank: every well-formed marker becomes \"\" (C2)."""
+
+    def test_known_field_blank(self) -> None:
+        """Well-formed marker with known header replaced by empty string."""
+        template = "Hello ${name}!"
+        result = sm.format_message_blank(template)
+        assert result == "Hello !"
+
+    def test_unknown_field_blank(self) -> None:
+        """Marker for unknown field also replaced by empty string."""
+        template = "Ref: ${nope}"
+        result = sm.format_message_blank(template)
+        assert result == "Ref: "
+
+    def test_malformed_untouched(self) -> None:
+        """Malformed text stays literal."""
+        template = "Broken: ${name, price: 5$"
+        result = sm.format_message_blank(template)
+        assert "5$" in result
+        assert "Broken: ${name" in result
+
+    def test_no_markers(self) -> None:
+        """Template without markers unchanged."""
+        template = "Plain message"
+        assert sm.format_message_blank(template) == "Plain message"
+
+    def test_template_not_mutated(self) -> None:
+        """Input template unchanged."""
+        template = "Hello ${name}"
+        sm.format_message_blank(template)
+        assert template == "Hello ${name}"
+
+    def test_multiple_occurrences(self) -> None:
+        """All occurrences blanked."""
+        assert sm.format_message_blank("${a}${a}${a}") == ""
+
+
 class TestHtmlProcessing:
     """Test HTML content processing."""
 
@@ -316,14 +354,14 @@ class TestErrorHandling:
         assert "not-an-email" in result  # Still formats even if invalid
 
     def test_missing_required_fields(self) -> None:
-        """Handle missing required template fields."""
+        """Handle missing required template fields (FR-011)."""
         template = "Hello ${name}, your code is ${code}"
         row = ["Alice"]
         header = ["name"]
 
-        # Missing ${code} field
+        # Missing ${code} field: blanked per marker, known fields still substituted
         result = sm.format_message(template, row, header)
-        assert result == template  # Returns original if missing fields
+        assert result == "Hello Alice, your code is "
 
     def test_attachment_cleanup_on_error(self, tmp_path: Any) -> None:
         """Cleanup temporary files on error."""
@@ -466,3 +504,46 @@ class TestEmailHeaders:
         payload: Any = msg.get_payload()
         if isinstance(payload, list) and len(payload) > 1:
             assert payload[1].get_content_type() == "text/html"
+
+
+class TestBatchModeInBuildAndSend:
+    """_build_and_send picks per-recipient vs blank mode by batch size (US2/US3)."""
+
+    from unittest.mock import Mock
+
+    def _run(self, addressees: list[str]) -> dict:
+        param = self.Mock()
+        param.donotsend = False
+        param.verbose = False
+        param.subject = "S ${id}"
+        param.message = "M ${name}"
+        param.file = []
+        param.attachment = None
+        param.smtp_host = "smtp.test.com"
+        captured: dict = {}
+
+        def _fake_build_email(**kwargs: Any) -> tuple:
+            captured.update(kwargs)
+            return (MagicMock(), list(addressees))
+
+        with (
+            patch("sendMail.build_email", side_effect=_fake_build_email),
+            patch("sendMail.send_mail", return_value=True),
+        ):
+            sm._build_and_send(param, addressees, ["42", "Alice"], ["id", "name"])
+        return captured
+
+    def test_one_addressee_uses_row_values(self) -> None:
+        """1 addressee → per-recipient merge context (I3 guard, no flow change)."""
+        result = self._run(["a@b.com"])
+        assert result["merge_row"] == ["42", "Alice"]
+        assert result["merge_header"] == ["id", "name"]
+        assert result["blank_merge"] is False
+
+    def test_two_addressees_blank_values(self) -> None:
+        """2 addressees → blank mode, row values must not reach build_email (I4)."""
+        result = self._run(["a@b.com", "c@d.com"])
+        assert result["blank_merge"] is True
+        assert result["merge_row"] is None
+        assert result["merge_header"] is None
+        assert "Alice" not in str(result.get("message", ""))

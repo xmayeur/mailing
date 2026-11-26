@@ -24,3 +24,15 @@ echo "Building with Nuitka..."
 $PYTHON build_editor.py
 
 echo "✓ Build complete: dist_nuitka/editor.app"
+
+# Install the freshly built bundle to /Applications
+APP="dist_nuitka/editor.app"
+if [ -d "$APP" ]; then
+  rm -rf /Applications/editor.app
+  ditto "$APP" /Applications/editor.app
+  xattr -dr com.apple.quarantine /Applications/editor.app 2>/dev/null || true
+  echo "✓ Installed: /Applications/editor.app"
+else
+  echo "✗ Installation skipped: $APP not found" >&2
+  exit 1
+fi

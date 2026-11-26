@@ -175,14 +175,14 @@ class TestFormatMessage:
         assert "Doe" in result
 
     def test_format_message_invalid(self):
-        """Test message formatting with invalid variable"""
+        """Test message formatting with invalid variable (FR-011: blank)"""
         template = "Hello ${invalid_var}"
         row = ["John"]
         header = ["name"]
 
-        # Should return original template on error
+        # Unknown fields blank out per marker (011-database-merge-fields)
         result = sendMail.format_message(template, row, header)
-        assert result == template
+        assert result == "Hello "
 
 
 class TestFilterFunctions:
@@ -1551,7 +1551,7 @@ def test_generate_mailing_batching_and_filtering():
     param.from_index = 0
     param.profile = "artscroises"
     param.filter = ["active"]
-    param.donotsend = True
+    param.donotsend = False  # substitution only happens when a message is actually built
     param.message = "Hi ${email}"
     param.selected = False
     param.filter = {"email": "is not empty", "status": "is active"}
@@ -1569,11 +1569,26 @@ def test_generate_mailing_batching_and_filtering():
         # OR it calls send_mail if service IS None.
         # Let's ensure send_mail is called by keeping service as None.
         with patch("sendMail.get_gmail_service", return_value=None):
-            # Patch send_mail in sendMail module
-            with patch("sendMail.format_message") as mock_sm:
+            # Patch send_mail so the batches "send" without side effects.
+            # Batches: [1@ex,3@ex] (2 addressees → blank mode) and [4@ex]
+            # (1 addressee → per-recipient). 011 feature.
+            with (
+                patch("sendMail.send_mail", return_value=True),
+                patch(
+                    "sendMail.build_email",
+                    return_value=(MagicMock(), MagicMock()),
+                ) as mock_build_email,
+            ):
                 sendMail.generate_mailing(param)
-                # Should have sent 2 batches (total 3 active recipients, max 2 per mail)
-                assert mock_sm.call_count == 2
+                # Markers in the message force per-recipient sends (011
+                # safety): 3 recipients → 3 single-addressee batches, each
+                # with its own row and blank_merge=False.
+                assert mock_build_email.call_count == 3
+                assert all(call.kwargs["blank_merge"] is False for call in mock_build_email.call_args_list)
+                rows_sent = [call.kwargs["merge_row"] for call in mock_build_email.call_args_list]
+                assert rows_sent[0][3] == "1@ex.com"
+                assert rows_sent[1][3] == "3@ex.com"
+                assert rows_sent[2][3] == "4@ex.com"
 
 
 def test_process_artscroises_wait_and_cleanup():

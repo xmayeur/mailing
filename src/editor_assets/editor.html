@@ -743,6 +743,15 @@
         quill.setSelection(r.index + 1, Quill.sources.SILENT);
       };
 
+      // Insert merge-field text (e.g. "${ID}") at the cursor as plain text;
+      // behaves like typed characters (editable, undoable, copyable)
+      window.insertMergeField = function(text) {
+        const t = text || '';
+        const r = quill.getSelection(true);
+        quill.insertText(r.index, t, Quill.sources.USER);
+        quill.setSelection(r.index + t.length, Quill.sources.SILENT);
+      };
+
       function _showVAlignMenu() {
         document.getElementById('valign-menu').style.display = 'block';
       }

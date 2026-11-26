@@ -25,41 +25,49 @@ Classes
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: editor._AnchorDialog
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: editor._TableDialog
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: editor._SendDialog
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: editor._LineFieldSpec
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: editor._ConfigDialog
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: editor.EditorBridge
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: editor.EditorWindow
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Functions
 ---------
@@ -67,3 +75,4 @@ Functions
 .. autofunction:: editor._svg_icon
 
 .. autofunction:: editor.main
+   :no-index:

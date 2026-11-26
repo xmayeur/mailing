@@ -339,7 +339,10 @@ def make_html_images_inline(in_filepath: str, out_filepath: str | None = None) -
     with open(in_filepath) as file:
         soup = BeautifulSoup(file, _HTML_PARSER)
     for img in soup.find_all("img"):
-        src = str(img.attrs["src"])
+        src = str(img.attrs.get("src", ""))
+        if not src:
+            # <img> without src (placeholder/spacer) — nothing to inline
+            continue
         if "http" in src:
             img_path = urllib.parse.unquote(src)
         else:
@@ -643,7 +646,10 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
     """Format message by replacing ${field} placeholders with row values.
 
     Substitutes template placeholders with subscriber data. Placeholders use
-    syntax ${column_name} which maps to header column names.
+    syntax ${column_name} which maps to header column names. Markers are
+    resolved independently: a marker for an unknown header or a missing/empty
+    value is replaced by an empty string; text that is not a well-formed
+    marker is left untouched.
 
     Args:
         template: Template string with ${field_name} placeholders
@@ -651,17 +657,34 @@ def format_message(template: str, row: list[Any], header: list[str]) -> str:
         header: List of column/field names (indices match row)
 
     Returns:
-        Formatted message with values substituted, or original template on error
+        Formatted message (a new string; the template is never modified)
     """
-    try:
 
-        def _replace(m: re.Match[str]) -> str:
-            key = m.group(1)
-            return str(row[header.index(key)])
+    def _replace(m: re.Match[str]) -> str:
+        key = m.group(1)
+        try:
+            value = row[header.index(key)]
+        except (ValueError, IndexError):
+            return ""
+        return "" if value is None else str(value)
 
-        return re.sub(r"\${(.*?)}", _replace, template)
-    except (ValueError, IndexError):
-        return template
+    return re.sub(r"\${(.*?)}", _replace, template)
+
+
+def format_message_blank(template: str) -> str:
+    """Replace every well-formed ${field} marker with an empty string.
+
+    Used when one message covers several recipients: no single recipient's
+    value may be chosen, so markers blank out instead. Non-marker text is
+    left untouched and the template is never modified.
+
+    Args:
+        template: Template string possibly containing ${field_name} markers
+
+    Returns:
+        New string with all markers replaced by empty strings
+    """
+    return re.sub(r"\${(.*?)}", "", template)
 
 
 def _process_file_attachments(args: Any) -> list[str]:
@@ -923,7 +946,10 @@ def build_email(
     bcc: str | None = None,
     message: str = "",
     images: str | list[str] | None = None,
-    attachments: str | list[str] | None = None,
+    attachments: list[str] | str | None = None,
+    merge_row: list[Any] | None = None,
+    merge_header: list[str] | None = None,
+    blank_merge: bool = False,
 ) -> tuple[MIMEMultipart, list[str]]:
     """Build MIME email message with attachments and inline images.
 
@@ -940,10 +966,22 @@ def build_email(
         message: HTML or text email body
         images: File path(s) of inline images (str or list)
         attachments: File path(s) of attachments (str or list)
+        merge_row: Subscriber row for merge-field substitution (single-recipient
+            batches); None to skip substitution
+        merge_header: Header names matching merge_row (same order)
+        blank_merge: Replace all merge-field markers with empty strings
+            (multi-recipient batches) instead of using merge_row/merge_header
 
     Returns:
         Tuple of (MIME message object, list of recipient addresses)
     """
+    # Merge-field substitution on the subject (011-database-merge-fields):
+    # per-recipient values for single-recipient batches, blank otherwise.
+    if blank_merge:
+        subject = format_message_blank(subject)
+    elif merge_row is not None and merge_header is not None:
+        subject = format_message(subject, merge_row, merge_header)
+
     msg = MIMEMultipart("mixed")
     to, bcc = _set_email_headers(msg, param, subject, to, cc, bcc)  # type: ignore
 
@@ -962,9 +1000,19 @@ def build_email(
         else:
             _process_binary_attachment(att, msg)
 
+    # Merge-field substitution on the final body content (011): must run here,
+    # after an HTML/Markdown attachment has supplied the actual body, otherwise
+    # markers composed in the editor (sent as an HTML file) are never replaced.
+    if blank_merge:
+        message = format_message_blank(message)
+    elif merge_row is not None and merge_header is not None:
+        message = format_message(message, merge_row, merge_header)
+
     _attach_body(msg, msg_related, message, all_inline_images)
 
-    recipients = [r.strip() for r in f"{to},{cc},{bcc}".split(",") if r.strip()]
+    # None → "" so the header swap (_set_email_headers may set bcc=None)
+    # never leaks a literal "None" entry into the recipient list.
+    recipients = [r.strip() for r in f"{to or ''},{cc or ''},{bcc or ''}".split(",") if r.strip()]
     msg._temp_dirs = temp_dirs  # type: ignore
 
     return msg, recipients
@@ -973,13 +1021,19 @@ def build_email(
 def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: list[str]) -> bool:
     """Build one email batch and dispatch it via SMTP or Gmail, then clean up temp dirs.
 
+    Merge-field substitution happens inside :func:`build_email` (on the final
+    body and subject): with a single addressee, ``${FIELD}`` markers are
+    replaced by the recipient's values; with several addressees sharing one
+    message, markers are blanked so no subscriber's data reaches the other
+    recipients.
+
     :return: True if the message was sent, False if sending was skipped or failed.
     :rtype: bool
     """
-    msg_body = format_message(param.message, row, header)
     if param.donotsend:
         log.info("do not sent activated")
         return False
+    blank_merge = len(addressees) > 1
     # Combine HTML file + user-selected attachments (T016: Integrate attachments)
     # param.file is already a list (from editor.py line 1332)
     all_attachments: list[str] = list(param.file) if param.file else []
@@ -990,10 +1044,13 @@ def _build_and_send(param: Any, addressees: list[Any], row: list[Any], header: l
             all_attachments.append(param.attachment)
     msg, recipients = build_email(
         param=param,
-        subject=param.subject,
-        message=msg_body,
+        subject=str(param.subject or ""),
+        message=param.message or "",
         bcc=",".join(addressees),
         attachments=all_attachments if all_attachments else None,
+        merge_row=None if blank_merge else row,
+        merge_header=None if blank_merge else header,
+        blank_merge=blank_merge,
     )
     try:
         if hasattr(param, "smtp_host"):
@@ -1051,6 +1108,37 @@ def _flush_batch(
             sleep(3600)
 
 
+def _contains_merge_marker(text: str | None) -> bool:
+    """True if *text* contains at least one well-formed ${FIELD} marker."""
+    if not text:
+        return False
+    return re.search(r"\${(.*?)}", text) is not None
+
+
+def _message_has_merge_fields(param: Any) -> bool:
+    """True if any merge-field marker appears in the outgoing message content.
+
+    Scans the message body, the subject, and any HTML/Markdown attachment file
+    (the editor sends its composed page as an attachment with an empty
+    message). Malformed constructs are not markers and do not count.
+    """
+    candidates: list[str] = []
+    for attr in ("message", "subject"):
+        value = getattr(param, attr, None)
+        if isinstance(value, str):
+            candidates.append(value)
+    files = getattr(param, "file", None)
+    paths = files if isinstance(files, list) else ([files] if files else [])
+    for path in paths:
+        if isinstance(path, str) and path.endswith(("htm", "html", "md")) and os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8", errors="replace") as f:
+                    candidates.append(f.read())
+            except OSError:
+                log.debug("Could not read attachment for merge-field scan: %s", path)
+    return any(_contains_merge_marker(text) for text in candidates)
+
+
 def generate_mailing(param: Any) -> str:
     """
     Generates and sends emails to a list of subscribers based on provided parameters and subscriber information.
@@ -1077,6 +1165,12 @@ def generate_mailing(param: Any) -> str:
         log.critical(f"Clé de configuration manquante : {e}")
         return "Config Key Error"
 
+    # Safety (011): markers require per-recipient substitution; a shared
+    # message would blank them (or, historically, leak another row's values).
+    if max_add > 1 and _message_has_merge_fields(param):
+        log.info("Merge fields detected in message; forcing max_addr_per_mail=1 " "(per-recipient substitution)")
+        max_add = 1
+
     reader, file_object = get_subscriber_reader(param)
     if not reader:
         return "Reader Error"
@@ -1091,7 +1185,7 @@ def generate_mailing(param: Any) -> str:
         if param.from_index:
             current_row_idx = _skip_to_index(reader, int(param.from_index))
 
-        addressees, recipient_count, mail_batch_count = [], 0, 0
+        addressees, batch_rows, recipient_count, mail_batch_count = [], [], 0, 0
         start_time = time()
         row = None
         cancel_event = _get_cancel_event(param)
@@ -1108,19 +1202,20 @@ def generate_mailing(param: Any) -> str:
                 continue
 
             addressees.append(row[indices["email"]])
+            batch_rows.append(row)
             recipient_count += 1
             if len(addressees) >= max_add:
                 log.info(f"Envoi à {len(addressees)} destinataires (Index: {current_row_idx})")
                 _flush_batch(
                     param,
                     addressees,
-                    row,
+                    batch_rows[-1],
                     header,
                     pause,
                     recipient_count,
                     max_mail_per_hour,
                 )
-                addressees, mail_batch_count = [], mail_batch_count + 1
+                addressees, batch_rows, mail_batch_count = [], [], mail_batch_count + 1
                 if cancel_event is not None and cancel_event.is_set():
                     cancelled = True
                     break
@@ -1133,7 +1228,9 @@ def generate_mailing(param: Any) -> str:
 
         if addressees:
             log.info(f"Envoi final à {len(addressees)} destinataires.")
-            _build_and_send(param, addressees, row, header)  # type: ignore
+            # 011 fix: use the last batched recipient's row — `row` here is the
+            # last row READ, which may have been filtered out entirely.
+            _build_and_send(param, addressees, batch_rows[-1], header)
             mail_batch_count += 1
 
         log.info(
