@@ -339,7 +339,10 @@ def make_html_images_inline(in_filepath: str, out_filepath: str | None = None) -
     with open(in_filepath) as file:
         soup = BeautifulSoup(file, _HTML_PARSER)
     for img in soup.find_all("img"):
-        src = str(img.attrs["src"])
+        src = str(img.attrs.get("src", ""))
+        if not src:
+            # <img> without src (placeholder/spacer) — nothing to inline
+            continue
         if "http" in src:
             img_path = urllib.parse.unquote(src)
         else:
