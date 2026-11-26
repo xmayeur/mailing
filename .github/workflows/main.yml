@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# Supersede in-flight builds when master moves on.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gate:
     # Build only the trusted master revision for this run. Ignore PR/fork runs
@@ -24,6 +29,7 @@ jobs:
         github.event.workflow_run.head_branch == 'master' &&
         github.event.workflow_run.head_sha == github.sha))
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Report trusted build revision
         env:
@@ -33,6 +39,7 @@ jobs:
   version:
     needs: gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.extract.outputs.version }}
       tag: ${{ steps.extract.outputs.tag }}
@@ -57,6 +64,7 @@ jobs:
         os: [ ubuntu-latest, windows-latest, macos-15 ]
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -70,6 +78,17 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6
         with:
           python-version: "3.12"
+
+      - name: Cache pip downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/Library/Caches/pip
+            ~\AppData\Local\pip\Cache
+          key: pip-build-${{ matrix.os }}-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            pip-build-${{ matrix.os }}-
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -146,6 +165,7 @@ jobs:
   release:
     needs: [build, version]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
 

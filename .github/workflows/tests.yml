@@ -7,13 +7,26 @@ on:
   pull_request:
     branches:
       - master
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - '.github/workflows/tests.yml'
 
 permissions:
   contents: read
 
+# A new push to the same branch supersedes the in-flight run instead of
+# queueing behind it (dead weight holding a runner slot).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lockfile-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
     - uses: actions/checkout@v7
@@ -32,14 +45,28 @@ jobs:
   test:
     needs: lockfile-check
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-15, windows-latest]
-        python-version: ['3.12', '3.13', '3.14']
+        # Slim matrix on PRs (single combination catches most regressions);
+        # the full 3-OS × 3-Python grid runs on master pushes.
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest", "macos-15", "windows-latest"]') }}
+        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.12"]') || fromJSON('["3.12", "3.13", "3.14"]') }}
 
     steps:
     - uses: actions/checkout@v7
+
+    - name: Cache pip downloads
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/Library/Caches/pip
+          ~\AppData\Local\pip\Cache
+        key: pip-tests-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+        restore-keys: |
+          pip-tests-${{ runner.os }}-py${{ matrix.python-version }}-
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v7
@@ -91,11 +118,20 @@ jobs:
   sonarcloud:
     needs: lockfile-check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: github.actor != 'dependabot[bot]'
     steps:
     - uses: actions/checkout@v7
       with:
         fetch-depth: 0
+
+    - name: Cache pip downloads
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: pip-sonar-ubuntu-py3.12-${{ hashFiles('poetry.lock') }}
+        restore-keys: |
+          pip-sonar-ubuntu-py3.12-
 
     - name: Set up Python
       uses: actions/setup-python@v7
@@ -124,8 +160,19 @@ jobs:
   lint:
     needs: lockfile-check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
     - uses: actions/checkout@v7
+
+    - name: Cache poetry/pip artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.cache/pypoetry
+        key: pip-lint-ubuntu-py3.12-${{ hashFiles('poetry.lock') }}
+        restore-keys: |
+          pip-lint-ubuntu-py3.12-
 
     - name: Set up Python
       uses: actions/setup-python@v7
@@ -170,11 +217,20 @@ jobs:
   coverage-badge:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
     steps:
     - uses: actions/checkout@v7
+
+    - name: Cache pip downloads
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: pip-badge-ubuntu-py3.12-${{ hashFiles('poetry.lock') }}
+        restore-keys: |
+          pip-badge-ubuntu-py3.12-
 
     - name: Set up Python
       uses: actions/setup-python@v7
